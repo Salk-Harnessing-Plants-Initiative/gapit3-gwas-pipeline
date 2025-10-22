@@ -66,7 +66,7 @@ RUN R -e "install.packages(c( \
     ), repos='https://cloud.r-project.org', Ncpus=4)"
 
 # Layer 3: GAPIT3 from GitHub (pinned version)
-RUN R -e "devtools::install_github('jiabowang/GAPIT@master', force=TRUE)"
+RUN R -e "library(devtools); install_github('jiabowang/GAPIT@master', force=TRUE)"
 
 # Verify GAPIT installation and version
 RUN R -e "library(GAPIT); cat('GAPIT version:', as.character(packageVersion('GAPIT')), '\n')"
