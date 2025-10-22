@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     # Build essentials
     build-essential \
     gfortran \
+    pkg-config \
     # OpenBLAS for fast linear algebra (critical for GAPIT)
     libopenblas-dev \
     liblapack-dev \
