@@ -1,0 +1,187 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: gapit3-gwas-parallel-  # Argo appends unique suffix
+  namespace: default  # TODO: Change to your namespace
+  labels:
+    pipeline: gapit3-gwas
+    stage: production
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Full Parallel Pipeline (184 Traits)
+  # ===========================================================================
+  # Production workflow: runs all 184 traits in parallel
+  # DAG structure: Validate → Extract → 184 parallel GWAS → Collect Results
+  # ===========================================================================
+
+  entrypoint: parallel-pipeline
+  serviceAccountName: default
+
+  # Workflow-level parameters
+  arguments:
+    parameters:
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+    - name: data-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+    - name: start-trait-index
+      value: "2"      # First trait column (after Taxa)
+    - name: end-trait-index
+      value: "187"    # Last trait column (186 traits total)
+    - name: cpu-cores
+      value: "12"
+    - name: memory-gb
+      value: "32"
+    - name: models
+      value: "BLINK,FarmCPU"
+    - name: max-parallelism
+      value: "50"     # Limit concurrent jobs to avoid cluster overload
+
+  # Global timeout (allow ~10 hours for full pipeline)
+  activeDeadlineSeconds: 36000
+
+  # Workflow-level volumes
+  volumes:
+  - name: nfs-data
+    hostPath:
+      path: "{{workflow.parameters.data-hostpath}}"
+      type: Directory
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: DirectoryOrCreate
+
+  templates:
+  # ===========================================================================
+  # Main DAG
+  # ===========================================================================
+  - name: parallel-pipeline
+    dag:
+      tasks:
+      # Step 1: Validate inputs
+      - name: validate-inputs
+        template: validate
+
+      # Step 2: Extract trait manifest
+      - name: extract-traits
+        dependencies: [validate-inputs]
+        template: extract-traits-inline
+
+      # Step 3: Run all traits in parallel (withSequence)
+      - name: run-all-traits
+        dependencies: [extract-traits]
+        template: run-single-trait-wrapper
+        arguments:
+          parameters:
+          - name: trait-index
+            value: "{{item}}"
+        withSequence:
+          start: "{{workflow.parameters.start-trait-index}}"
+          end: "{{workflow.parameters.end-trait-index}}"
+
+      # Step 4: Collect and aggregate results (runs after all traits complete)
+      - name: collect-results
+        dependencies: [run-all-traits]
+        templateRef:
+          name: gapit3-results-collector
+          template: collect-results
+        arguments:
+          parameters:
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: output-hostpath
+            value: "{{workflow.parameters.output-hostpath}}"
+          - name: batch-id
+            value: "{{workflow.name}}"
+
+  # ===========================================================================
+  # Template: Validation
+  # ===========================================================================
+  - name: validate
+    container:
+      image: "{{workflow.parameters.image}}"
+      imagePullPolicy: Always
+      command: ["/scripts/entrypoint.sh"]
+      args: ["validate"]
+
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true
+
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+
+  # ===========================================================================
+  # Template: Extract traits
+  # ===========================================================================
+  - name: extract-traits-inline
+    container:
+      image: "{{workflow.parameters.image}}"
+      imagePullPolicy: Always
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "extract-traits"
+        - "/data/phenotype/iron_traits_edited.txt"
+        - "/outputs/traits_manifest.yaml"
+
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true
+      - name: nfs-outputs
+        mountPath: /outputs
+
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+
+  # ===========================================================================
+  # Template: Wrapper for single trait execution
+  # ===========================================================================
+  - name: run-single-trait-wrapper
+    inputs:
+      parameters:
+      - name: trait-index
+
+    # Reference the WorkflowTemplate
+    templateRef:
+      name: gapit3-gwas-single-trait
+      template: run-gwas
+
+    # Pass parameters to the template
+    arguments:
+      parameters:
+      - name: trait-index
+        value: "{{inputs.parameters.trait-index}}"
+      - name: trait-name
+        value: "trait-{{inputs.parameters.trait-index}}"
+      - name: image
+        value: "{{workflow.parameters.image}}"
+      - name: data-hostpath
+        value: "{{workflow.parameters.data-hostpath}}"
+      - name: output-hostpath
+        value: "{{workflow.parameters.output-hostpath}}"
+      - name: cpu-cores
+        value: "{{workflow.parameters.cpu-cores}}"
+      - name: memory-gb
+        value: "{{workflow.parameters.memory-gb}}"
+      - name: models
+        value: "{{workflow.parameters.models}}"
+
+  # ===========================================================================
+  # Parallelism control
+  # ===========================================================================
+  # Limit concurrent pod execution to avoid overwhelming cluster
+  parallelism: "{{workflow.parameters.max-parallelism}}"

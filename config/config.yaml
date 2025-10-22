@@ -1,0 +1,72 @@
+# ==============================================================================
+# GAPIT3 GWAS Pipeline Configuration
+# ==============================================================================
+# Central configuration file for GWAS analysis parameters
+# Override these settings via command-line arguments or environment variables
+# ==============================================================================
+
+# Data paths (default locations - can be overridden)
+data:
+  genotype: /data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt
+  phenotype: /data/phenotype/iron_traits_edited.txt
+  accession_ids: /data/metadata/ids_gwas.txt
+
+# GAPIT analysis parameters
+gapit:
+  # Models to run: Options are "GLM", "MLM", "MLMM", "SUPER", "FarmCPU", "BLINK", "Blink"
+  models:
+    - BLINK
+    - FarmCPU
+
+  # Number of principal components for population structure correction
+  pca_components: 3
+
+  # Run multiple traits automatically
+  multiple_analysis: true
+
+  # Additional GAPIT parameters (uncomment to use)
+  # kinship:
+  #   algorithm: "VanRaden"  # Options: "VanRaden", "EMMA", "Loiselle"
+  #
+  # filtering:
+  #   maf_threshold: 0.05    # Minor allele frequency threshold
+  #   missing_threshold: 0.2  # Maximum missing data per SNP
+  #
+  # optimization:
+  #   memo: null             # Memory allocation strategy
+  #   sangwich_top: null     # Number of top markers to test
+  #   sangwich_bottom: null  # Number of bottom markers to test
+
+# Output settings
+output:
+  base_dir: /outputs
+  create_timestamp_dirs: true
+  save_intermediate: true
+
+# Compute resources
+resources:
+  # CPU threads (will be set via environment variables)
+  threads: 16  # Default for OpenBLAS/OMP
+
+  # Memory recommendations (informational only - set in Run.AI YAML)
+  # minimum_ram_gb: 16
+  # recommended_ram_gb: 32
+  # optimal_ram_gb: 64
+
+# Logging
+logging:
+  level: INFO  # Options: DEBUG, INFO, WARNING, ERROR
+  save_logs: true
+  log_dir: /logs
+
+# Metadata tracking (FAIR principles)
+metadata:
+  enable_provenance: true
+  save_execution_metadata: true
+  compute_checksums: true
+
+# Validation
+validation:
+  check_input_files: true
+  verify_trait_index: true
+  require_minimum_samples: 50
