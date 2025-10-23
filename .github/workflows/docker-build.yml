@@ -185,21 +185,21 @@ jobs:
       - name: Test R installation
         run: |
           echo "::group::Testing R installation"
-          docker run --rm ${{ steps.image-ref.outputs.image-tag }} R --version
+          docker run --rm --entrypoint R ${{ steps.image-ref.outputs.image-tag }} --version
           echo "::endgroup::"
 
       - name: Test GAPIT3 package
         run: |
           echo "::group::Testing GAPIT3 load and version"
-          docker run --rm ${{ steps.image-ref.outputs.image-tag }} \
-            R -e "library(GAPIT); cat('GAPIT version:', as.character(packageVersion('GAPIT')), '\n')"
+          docker run --rm --entrypoint R ${{ steps.image-ref.outputs.image-tag }} \
+            -e "library(GAPIT); cat('GAPIT version:', as.character(packageVersion('GAPIT')), '\n')"
           echo "::endgroup::"
 
       - name: Test required R packages
         run: |
           echo "::group::Testing required R packages"
-          docker run --rm ${{ steps.image-ref.outputs.image-tag }} \
-            R -e "
+          docker run --rm --entrypoint R ${{ steps.image-ref.outputs.image-tag }} \
+            -e "
             packages <- c('data.table', 'dplyr', 'tidyr', 'ggplot2', 'readr', 'matrixStats', 'gridExtra', 'optparse', 'yaml', 'jsonlite')
             missing <- packages[!sapply(packages, requireNamespace, quietly = TRUE)]
             if (length(missing) > 0) {
