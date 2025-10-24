@@ -38,13 +38,13 @@ output_dir <- opt$`output-dir`
 batch_id <- opt$`batch-id`
 threshold <- opt$threshold
 
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("GAPIT3 Results Collector\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("Output directory:", output_dir, "\n")
 cat("Batch ID:", batch_id, "\n")
 cat("Significance threshold:", threshold, "\n")
-cat("=" %R% 78, "\n\n")
+cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
 # Find all trait result directories
@@ -105,13 +105,13 @@ summary_df <- data.frame(
 
 for (meta in metadata_list) {
   summary_df <- rbind(summary_df, data.frame(
-    trait_index = meta$trait$column_index %||% NA,
-    trait_name = meta$trait$name %||% "unknown",
-    n_samples = meta$trait$n_total %||% NA,
-    n_valid = meta$trait$n_valid %||% NA,
-    n_snps = meta$genotype$n_snps %||% NA,
-    duration_minutes = meta$execution$duration_minutes %||% NA,
-    status = meta$execution$status %||% "unknown",
+    trait_index = if (is.null(meta$trait$column_index)) NA else meta$trait$column_index,
+    trait_name = if (is.null(meta$trait$name)) "unknown" else meta$trait$name,
+    n_samples = if (is.null(meta$trait$n_total)) NA else meta$trait$n_total,
+    n_valid = if (is.null(meta$trait$n_valid)) NA else meta$trait$n_valid,
+    n_snps = if (is.null(meta$genotype$n_snps)) NA else meta$genotype$n_snps,
+    duration_minutes = if (is.null(meta$execution$duration_minutes)) NA else meta$execution$duration_minutes,
+    status = if (is.null(meta$execution$status)) "unknown" else meta$execution$status,
     stringsAsFactors = FALSE
   ))
 }
@@ -151,7 +151,8 @@ for (dir in trait_dirs) {
         # Get trait name from metadata
         meta_file <- file.path(dir, "metadata.json")
         trait_name <- if (file.exists(meta_file)) {
-          fromJSON(meta_file)$trait$name %||% basename(dir)
+          name <- tryCatch(fromJSON(meta_file)$trait$name, error = function(e) NULL)
+          if (is.null(name)) basename(dir) else name
         } else {
           basename(dir)
         }
@@ -204,9 +205,9 @@ cat("Summary statistics saved:", stats_file, "\n\n")
 # ==============================================================================
 # Print summary
 # ==============================================================================
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("Results Collection Summary\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("Batch ID:", batch_id, "\n")
 cat("Collection time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
 
@@ -220,6 +221,6 @@ cat("Average duration:", round(stats$average_duration_minutes, 2), "minutes/trai
 cat("Total compute time:", round(stats$total_duration_hours, 2), "hours\n\n")
 
 cat("Results directory:", file.path(output_dir, "aggregated_results"), "\n")
-cat("=" %R% 78, "\n\n")
+cat(strrep("=", 78), "\n\n")
 
 cat("✓ Results collection complete!\n\n")

@@ -92,16 +92,16 @@ dir.create(output_dir, recursive = TRUE, showWarnings = FALSE)
 setwd(output_dir)
 
 cat("\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("GAPIT3 GWAS Pipeline - Single Trait Execution\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("Trait index:", trait_index, "\n")
 cat("Output directory:", output_dir, "\n")
 cat("GAPIT version:", as.character(packageVersion("GAPIT")), "\n")
 cat("R version:", R.version.string, "\n")
 cat("Models:", paste(models, collapse = ", "), "\n")
 cat("PCA components:", pca_components, "\n")
-cat("=" %R% 78, "\n\n")
+cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
 # Metadata tracking
@@ -192,9 +192,9 @@ metadata$genotype <- list(
 # Run GAPIT
 # ==============================================================================
 cat("\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("Starting GWAS analysis...\n")
-cat("=" %R% 78, "\n\n")
+cat(strrep("=", 78), "\n\n")
 
 gwas_start <- Sys.time()
 
@@ -204,17 +204,17 @@ tryCatch({
     G = myG,
     PCA.total = pca_components,
     model = models,
-    Multiple_analysis = config$gapit$multiple_analysis %||% TRUE
+    Multiple_analysis = if (is.null(config$gapit$multiple_analysis)) TRUE else config$gapit$multiple_analysis
   )
 
   gwas_end <- Sys.time()
   gwas_duration <- as.numeric(difftime(gwas_end, gwas_start, units = "mins"))
 
   cat("\n")
-  cat("=" %R% 78, "\n")
+  cat(strrep("=", 78), "\n")
   cat("GWAS analysis completed successfully!\n")
   cat("Duration:", round(gwas_duration, 2), "minutes\n")
-  cat("=" %R% 78, "\n\n")
+  cat(strrep("=", 78), "\n\n")
 
   metadata$execution$end_time <- gwas_end
   metadata$execution$duration_minutes <- round(gwas_duration, 2)

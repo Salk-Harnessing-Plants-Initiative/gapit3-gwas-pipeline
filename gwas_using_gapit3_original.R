@@ -1,5 +1,14 @@
 # ============================================================
-# GWAS pipeline using GAPIT 3
+# GWAS pipeline using GAPIT 3 - ORIGINAL REFERENCE SCRIPT
+# ============================================================
+# NOTE: This file contains the original R console session provided
+#       by the collaborator. It is kept for reference and documentation
+#       purposes only. It contains R console prompts (>) and is not
+#       meant to be executed directly as an R script.
+#
+#       For the production pipeline, see scripts/run_gwas_single_trait.R
+# ============================================================
+#
 # Author: Elohim Bello Bello
 # Institution: Salk Institute for Biological Studies
 # Description:
@@ -7,7 +16,7 @@
 #   in Arabidopsis thaliana using the GAPIT3 R package.
 #
 #   It imports phenotypic data (mean_median_root_length_day2.txt) and genotype data (acc_snps_filtered_maf_perl_edited_diploid.hmp.txt, ~1.37 million SNPs across 546 accessions), filters accessions, and executes GWAS using the BLINK model.
-#   
+#
 #   Steps included:
 #     1. Install and load GAPIT3 under R version 4.4.1.
 #     2. Import and preprocess phenotype and genotype data.

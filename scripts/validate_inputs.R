@@ -15,9 +15,9 @@ suppressPackageStartupMessages({
 args <- commandArgs(trailingOnly = TRUE)
 config_file <- ifelse(length(args) >= 1, args[1], "/config/config.yaml")
 
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 cat("GAPIT3 Pipeline - Input Validation\n")
-cat("=" %R% 78, "\n\n")
+cat(strrep("=", 78), "\n\n")
 
 # Load config
 if (!file.exists(config_file)) {
@@ -140,13 +140,13 @@ if (!dir.exists(output_dir)) {
 # Summary
 # ==============================================================================
 cat("\n")
-cat("=" %R% 78, "\n")
+cat(strrep("=", 78), "\n")
 if (validation_passed) {
   cat("✓ All validation checks passed!\n")
-  cat("=" %R% 78, "\n\n")
+  cat(strrep("=", 78), "\n\n")
   quit(status = 0)
 } else {
   cat("✗ Validation failed - please fix errors above\n")
-  cat("=" %R% 78, "\n\n")
+  cat(strrep("=", 78), "\n\n")
   quit(status = 1)
 }
