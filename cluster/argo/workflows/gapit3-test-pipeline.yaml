@@ -1,0 +1,180 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: gapit3-test-  # Argo will append unique ID
+  namespace: default  # TODO: Change to your namespace
+  labels:
+    pipeline: gapit3-gwas
+    stage: test
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Test Pipeline (3 Traits)
+  # ===========================================================================
+  # Test workflow for validating pipeline before running all 184 traits
+  # Runs 3 traits in parallel: indices 2, 3, 4
+  # ===========================================================================
+
+  entrypoint: test-pipeline
+  serviceAccountName: default
+
+  # Workflow-level parameters (customize these!)
+  arguments:
+    parameters:
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+    - name: data-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+    - name: cpu-cores
+      value: "12"
+    - name: memory-gb
+      value: "32"
+
+  # Global timeout
+  activeDeadlineSeconds: 14400  # 4 hours max
+
+  # Workflow-level volumes
+  volumes:
+  - name: nfs-data
+    hostPath:
+      path: "{{workflow.parameters.data-hostpath}}"
+      type: Directory
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: DirectoryOrCreate
+
+  templates:
+  # ===========================================================================
+  # Main DAG: Validation → Extract Traits → Run 3 Traits in Parallel
+  # ===========================================================================
+  - name: test-pipeline
+    dag:
+      tasks:
+      # Step 1: Validate inputs
+      - name: validate-inputs
+        template: validate
+
+      # Step 2: Extract trait manifest (depends on validation)
+      - name: extract-traits
+        dependencies: [validate-inputs]
+        template: extract-traits-inline
+
+      # Step 3: Run 3 test traits in parallel
+      - name: run-trait-2
+        dependencies: [extract-traits]
+        templateRef:
+          name: gapit3-gwas-single-trait
+          template: run-gwas
+        arguments:
+          parameters:
+          - name: trait-index
+            value: "2"
+          - name: trait-name
+            value: "test-trait-2"
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: data-hostpath
+            value: "{{workflow.parameters.data-hostpath}}"
+          - name: output-hostpath
+            value: "{{workflow.parameters.output-hostpath}}"
+          - name: cpu-cores
+            value: "{{workflow.parameters.cpu-cores}}"
+          - name: memory-gb
+            value: "{{workflow.parameters.memory-gb}}"
+
+      - name: run-trait-3
+        dependencies: [extract-traits]
+        templateRef:
+          name: gapit3-gwas-single-trait
+          template: run-gwas
+        arguments:
+          parameters:
+          - name: trait-index
+            value: "3"
+          - name: trait-name
+            value: "test-trait-3"
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: data-hostpath
+            value: "{{workflow.parameters.data-hostpath}}"
+          - name: output-hostpath
+            value: "{{workflow.parameters.output-hostpath}}"
+          - name: cpu-cores
+            value: "{{workflow.parameters.cpu-cores}}"
+          - name: memory-gb
+            value: "{{workflow.parameters.memory-gb}}"
+
+      - name: run-trait-4
+        dependencies: [extract-traits]
+        templateRef:
+          name: gapit3-gwas-single-trait
+          template: run-gwas
+        arguments:
+          parameters:
+          - name: trait-index
+            value: "4"
+          - name: trait-name
+            value: "test-trait-4"
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: data-hostpath
+            value: "{{workflow.parameters.data-hostpath}}"
+          - name: output-hostpath
+            value: "{{workflow.parameters.output-hostpath}}"
+          - name: cpu-cores
+            value: "{{workflow.parameters.cpu-cores}}"
+          - name: memory-gb
+            value: "{{workflow.parameters.memory-gb}}"
+
+  # ===========================================================================
+  # Template: Validation
+  # ===========================================================================
+  - name: validate
+    container:
+      image: "{{workflow.parameters.image}}"
+      imagePullPolicy: Always
+      command: ["/scripts/entrypoint.sh"]
+      args: ["validate"]
+
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true
+
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+        limits:
+          memory: "4Gi"
+          cpu: "2"
+
+  # ===========================================================================
+  # Template: Extract trait names (inline version)
+  # ===========================================================================
+  - name: extract-traits-inline
+    container:
+      image: "{{workflow.parameters.image}}"
+      imagePullPolicy: Always
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "extract-traits"
+        - "/data/phenotype/iron_traits_edited.txt"
+        - "/outputs/traits_manifest.yaml"
+
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true
+      - name: nfs-outputs
+        mountPath: /outputs
+
+      resources:
+        requests:
+          memory: "2Gi"
+          cpu: "1"
+        limits:
+          memory: "4Gi"
+          cpu: "2"

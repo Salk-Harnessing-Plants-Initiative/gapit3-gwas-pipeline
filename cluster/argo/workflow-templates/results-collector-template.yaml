@@ -1,0 +1,82 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gapit3-results-collector
+  namespace: default  # TODO: Change to your Argo namespace
+spec:
+  # ===========================================================================
+  # GAPIT3 - Results Collector Template
+  # ===========================================================================
+  # Post-processing step: aggregates results from all trait analyses
+  # Creates summary reports, combined Manhattan plots, etc.
+  # ===========================================================================
+
+  entrypoint: collect-results
+  serviceAccountName: default
+
+  arguments:
+    parameters:
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+    - name: batch-id
+      value: "unknown"
+
+  volumes:
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: Directory
+
+  templates:
+  - name: collect-results
+    inputs:
+      parameters:
+      - name: image
+      - name: batch-id
+
+    container:
+      image: "{{inputs.parameters.image}}"
+      imagePullPolicy: Always
+
+      command: ["Rscript"]
+      args:
+        - "/scripts/collect_results.R"
+        - "--output-dir"
+        - "/outputs"
+        - "--batch-id"
+        - "{{inputs.parameters.batch-id}}"
+
+      volumeMounts:
+      - name: nfs-outputs
+        mountPath: /outputs
+
+      env:
+      - name: BATCH_ID
+        value: "{{inputs.parameters.batch-id}}"
+      - name: WORKFLOW_NAME
+        value: "{{workflow.name}}"
+
+      resources:
+        requests:
+          memory: "8Gi"
+          cpu: "4"
+        limits:
+          memory: "16Gi"
+          cpu: "8"
+
+    outputs:
+      artifacts:
+      - name: summary-report
+        path: /outputs/summary_report.html
+        optional: true
+        archive:
+          none: {}
+
+      - name: aggregated-results
+        path: /outputs/aggregated_results
+        optional: true
+        archive:
+          tar:
+            compressionLevel: 6

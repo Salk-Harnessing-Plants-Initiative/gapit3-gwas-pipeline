@@ -1,0 +1,148 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gapit3-gwas-single-trait
+  namespace: default  # TODO: Change to your Argo namespace
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Single Trait WorkflowTemplate
+  # ===========================================================================
+  # Reusable template for running GWAS on a single trait
+  # Reference from workflows using: templateRef.name: gapit3-gwas-single-trait
+  # ===========================================================================
+
+  entrypoint: run-gwas
+  serviceAccountName: default
+
+  # Template-level arguments with defaults
+  arguments:
+    parameters:
+    - name: trait-index
+      value: "2"
+    - name: trait-name
+      value: "unknown"
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+    - name: data-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update path
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update path
+    - name: cpu-cores
+      value: "12"
+    - name: memory-gb
+      value: "32"
+    - name: models
+      value: "BLINK,FarmCPU"
+
+  # Volume definitions using hostPath (MUST pre-exist on cluster nodes)
+  volumes:
+  - name: nfs-data
+    hostPath:
+      path: "{{workflow.parameters.data-hostpath}}"
+      type: Directory  # Directory MUST exist on the host
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: DirectoryOrCreate  # Will create if doesn't exist
+
+  templates:
+  # ===========================================================================
+  # Main GWAS execution template
+  # ===========================================================================
+  - name: run-gwas
+    inputs:
+      parameters:
+      - name: trait-index
+      - name: trait-name
+      - name: image
+      - name: cpu-cores
+      - name: memory-gb
+      - name: models
+
+    metadata:
+      labels:
+        app: gapit3-gwas
+        component: single-trait
+        trait-index: "{{inputs.parameters.trait-index}}"
+      annotations:
+        # Run.AI annotations for cluster scheduling
+        runai/preemptible: "true"  # Allow preemption for better cluster utilization
+
+    container:
+      image: "{{inputs.parameters.image}}"
+      imagePullPolicy: Always
+
+      # Entrypoint command
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "run-single-trait"
+        - "--trait-index"
+        - "{{inputs.parameters.trait-index}}"
+        - "--config"
+        - "/config/config.yaml"
+        - "--output-dir"
+        - "/outputs"
+        - "--models"
+        - "{{inputs.parameters.models}}"
+        - "--threads"
+        - "{{inputs.parameters.cpu-cores}}"
+
+      # Volume mounts
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true  # Genotype/phenotype are read-only
+      - name: nfs-outputs
+        mountPath: /outputs
+        readOnly: false
+
+      # Environment variables
+      env:
+      - name: OPENBLAS_NUM_THREADS
+        value: "{{inputs.parameters.cpu-cores}}"
+      - name: OMP_NUM_THREADS
+        value: "{{inputs.parameters.cpu-cores}}"
+      - name: TRAIT_INDEX
+        value: "{{inputs.parameters.trait-index}}"
+      - name: TRAIT_NAME
+        value: "{{inputs.parameters.trait-name}}"
+      - name: WORKFLOW_NAME
+        value: "{{workflow.name}}"
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+
+      # Resource allocation (per guide: 32GB RAM + 12 cores)
+      resources:
+        requests:
+          memory: "{{inputs.parameters.memory-gb}}Gi"
+          cpu: "{{inputs.parameters.cpu-cores}}"
+        limits:
+          memory: "36Gi"  # Slight headroom
+          cpu: "16"       # Allow burst to 16 cores
+
+    # Retry strategy for transient failures
+    retryStrategy:
+      limit: 2  # Retry up to 2 times
+      retryPolicy: "OnFailure"
+      backoff:
+        duration: "2m"      # Wait 2 minutes before first retry
+        factor: 2           # Double wait time for each retry
+        maxDuration: "10m"  # Max wait time
+
+    # Output artifacts (optional - for Argo UI visualization)
+    outputs:
+      artifacts:
+      - name: metadata
+        path: /outputs/trait_{{inputs.parameters.trait-index}}_*/metadata.json
+        optional: true
+        archive:
+          none: {}  # Don't compress
+
+      - name: results
+        path: /outputs/trait_{{inputs.parameters.trait-index}}_*
+        optional: true
+        archive:
+          tar:
+            compressionLevel: 6

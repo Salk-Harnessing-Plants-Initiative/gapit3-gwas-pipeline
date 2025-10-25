@@ -1,3 +1,43 @@
+# ==============================================================================
+# GAPIT3 GWAS Pipeline - Git Ignore
+# ==============================================================================
+
+# ==============================================================================
+# DATA FILES (DO NOT COMMIT)
+# ==============================================================================
+# Large data files should be stored on NFS, not in git
+data/*
+!data/README.md
+outputs/
+logs/
+results/
+test_outputs/
+aggregated_results/
+
+# Genotype/Phenotype files (very large)
+*.hmp
+*.hmp.txt
+*.vcf
+*.vcf.gz
+*.bed
+*.bim
+*.fam
+*.ped
+*.map
+
+# GAPIT output files
+GAPIT.*.pdf
+GAPIT.*.csv
+GAPIT.*.txt
+*_GWAS_Results.csv
+
+# Trait manifest (generated)
+traits_manifest.yaml
+batch_*.txt
+
+# ==============================================================================
+# R FILES
+# ==============================================================================
 # History files
 .Rhistory
 .Rapp.history
@@ -20,12 +60,13 @@
 
 # RStudio files
 .Rproj.user/
+*.Rproj
 
 # produced vignettes
 vignettes/*.html
 vignettes/*.pdf
 
-# OAuth2 token, see https://github.com/hadley/httr/releases/tag/v0.3
+# OAuth2 token
 .httr-oauth
 
 # knitr and R markdown default cache directories
@@ -39,11 +80,68 @@ vignettes/*.pdf
 # R Environment Variables
 .Renviron
 
-# pkgdown site
-docs/
-
 # translation temp files
 po/*~
 
 # RStudio Connect folder
 rsconnect/
+
+# ==============================================================================
+# PYTHON
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+env/
+.venv
+
+# ==============================================================================
+# IDE & EDITORS
+# ==============================================================================
+.vscode/
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+.DS_Store
+
+# ==============================================================================
+# OS
+# ==============================================================================
+Thumbs.db
+Desktop.ini
+
+# ==============================================================================
+# LOGS
+# ==============================================================================
+*.log
+*.out
+*.err
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ==============================================================================
+# DOCKER (keep Dockerfile and .dockerignore)
+# ==============================================================================
+# No docker-specific ignores needed
+
+# ==============================================================================
+# ENVIRONMENT VARIABLES
+# ==============================================================================
+.env
+.env.local
+.env.*.local
+*.secret
+
+# ==============================================================================
+# TEMPORARY FILES
+# ==============================================================================
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup

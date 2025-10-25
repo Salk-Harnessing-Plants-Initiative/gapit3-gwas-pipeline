@@ -1,0 +1,57 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# GitHub
+.github
+
+# Documentation
+*.md
+docs/
+
+# IDE
+.vscode
+.devcontainer
+*.swp
+*.swo
+*~
+
+# Data files (should be mounted, not copied)
+data/
+outputs/
+logs/
+
+# Large data files
+*.hmp.txt
+*.hmp
+*.vcf
+*.vcf.gz
+*.bed
+*.bim
+*.fam
+
+# R temporary files
+.Rhistory
+.RData
+.Rproj.user
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+venv/
+.env
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Cluster configs (will be customized per user)
+cluster/argo/workflows/*.yaml
+cluster/argo/workflow-templates/*.yaml
+
+# Test outputs
+test_outputs/
+*.log

@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gapit3-trait-extractor
+  namespace: default  # TODO: Change to your Argo namespace
+spec:
+  # ===========================================================================
+  # GAPIT3 - Trait Name Extractor Template
+  # ===========================================================================
+  # Pre-processing step: extracts trait manifest from phenotype file
+  # Generates traits_manifest.yaml with all 184 trait names
+  # ===========================================================================
+
+  entrypoint: extract-traits
+  serviceAccountName: default
+
+  arguments:
+    parameters:
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+    - name: data-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+
+  volumes:
+  - name: nfs-data
+    hostPath:
+      path: "{{workflow.parameters.data-hostpath}}"
+      type: Directory
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: DirectoryOrCreate
+
+  templates:
+  - name: extract-traits
+    inputs:
+      parameters:
+      - name: image
+
+    container:
+      image: "{{inputs.parameters.image}}"
+      imagePullPolicy: Always
+
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "extract-traits"
+        - "/data/phenotype/iron_traits_edited.txt"
+        - "/outputs/traits_manifest.yaml"
+
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true
+      - name: nfs-outputs
+        mountPath: /outputs
+
+      resources:
+        requests:
+          memory: "4Gi"
+          cpu: "2"
+        limits:
+          memory: "8Gi"
+          cpu: "4"
+
+    outputs:
+      artifacts:
+      - name: traits-manifest
+        path: /outputs/traits_manifest.yaml
+        archive:
+          none: {}

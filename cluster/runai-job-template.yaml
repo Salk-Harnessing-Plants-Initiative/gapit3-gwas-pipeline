@@ -1,0 +1,123 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: gapit3-gwas-trait-{{ TRAIT_INDEX }}
+  labels:
+    app: gapit3-gwas
+    pipeline: arabidopsis-iron-traits
+    trait-index: "{{ TRAIT_INDEX }}"
+    batch-id: "{{ BATCH_ID }}"
+spec:
+  backoffLimit: 2  # Retry up to 2 times on failure
+  ttlSecondsAfterFinished: 86400  # Clean up after 24 hours
+  template:
+    metadata:
+      labels:
+        app: gapit3-gwas
+        trait-index: "{{ TRAIT_INDEX }}"
+    spec:
+      restartPolicy: OnFailure
+
+      # Resource allocation - Critical for memory-intensive GWAS
+      containers:
+      - name: gapit3-gwas
+        image: ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest
+        imagePullPolicy: Always
+
+        # Command and arguments
+        command: ["/scripts/entrypoint.sh"]
+        args:
+          - "run-single-trait"
+          - "--trait-index"
+          - "{{ TRAIT_INDEX }}"
+          - "--config"
+          - "/config/config.yaml"
+          - "--output-dir"
+          - "/outputs"
+          - "--threads"
+          - "12"
+
+        # Resource requests and limits
+        resources:
+          requests:
+            memory: "32Gi"    # Minimum required (per guide)
+            cpu: "12"          # Request 12 cores
+          limits:
+            memory: "36Gi"    # Allow some headroom
+            cpu: "16"          # Allow burst to 16 cores
+
+        # Environment variables
+        env:
+        - name: OPENBLAS_NUM_THREADS
+          value: "12"
+        - name: OMP_NUM_THREADS
+          value: "12"
+        - name: TRAIT_INDEX
+          value: "{{ TRAIT_INDEX }}"
+        - name: BATCH_ID
+          value: "{{ BATCH_ID }}"
+
+        # Volume mounts
+        volumeMounts:
+        - name: nfs-data
+          mountPath: /data
+          readOnly: true  # Genotype/phenotype data is read-only
+        - name: nfs-outputs
+          mountPath: /outputs
+          readOnly: false  # Need write access for results
+        - name: config
+          mountPath: /config
+          readOnly: true
+
+      # Volume definitions
+      volumes:
+      - name: nfs-data
+        nfs:
+          server: "{{ NFS_SERVER }}"
+          path: "{{ NFS_DATA_PATH }}"
+      - name: nfs-outputs
+        nfs:
+          server: "{{ NFS_SERVER }}"
+          path: "{{ NFS_OUTPUT_PATH }}"
+      - name: config
+        configMap:
+          name: gapit3-config
+
+---
+# ConfigMap for pipeline configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gapit3-config
+data:
+  config.yaml: |
+    # GAPIT3 Pipeline Configuration
+    data:
+      genotype: /data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt
+      phenotype: /data/phenotype/iron_traits_edited.txt
+      accession_ids: /data/metadata/ids_gwas.txt
+
+    gapit:
+      models:
+        - BLINK
+        - FarmCPU
+      pca_components: 3
+      multiple_analysis: true
+
+    output:
+      base_dir: /outputs
+      create_timestamp_dirs: true
+      save_intermediate: true
+
+    resources:
+      threads: 12
+
+    metadata:
+      enable_provenance: true
+      save_execution_metadata: true
+      compute_checksums: true
+
+    validation:
+      check_input_files: true
+      verify_trait_index: true
+      require_minimum_samples: 50
