@@ -64,7 +64,8 @@ RUN R -e "install.packages(c( \
     'optparse', \
     'yaml', \
     'jsonlite', \
-    'logging' \
+    'logging', \
+    'testthat' \
     ), repos='https://cloud.r-project.org', Ncpus=4)"
 
 # Layer 3: GAPIT3 from GitHub (pinned version)

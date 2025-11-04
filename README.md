@@ -1,6 +1,8 @@
 # GAPIT3 GWAS Pipeline
 
 [![Docker Build](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml)
+[![R Script Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml)
+[![Devcontainer Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants and other organisms.
@@ -310,12 +312,57 @@ If you use this pipeline, please cite:
 
 ## Contributing
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions welcome! Please follow these steps:
+
+### Development Workflow
+
+1. **Fork and clone** the repository
+2. **Open in devcontainer** (recommended) for consistent environment:
+   ```bash
+   code .
+   # VS Code will prompt: "Reopen in Container"
+   ```
+3. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. **Make your changes** and write tests
+5. **Run tests locally**:
+   ```bash
+   # R unit tests
+   Rscript tests/testthat.R
+
+   # Docker build test
+   docker build -t gapit3-test .
+   ```
+6. **Commit with conventional commits**:
+   ```bash
+   git commit -m "feat: Add new feature"
+   git commit -m "fix: Correct validation bug"
+   git commit -m "docs: Update README"
+   ```
+7. **Push and create Pull Request**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Testing Requirements
+
+All PRs must:
+- ✅ Pass R unit tests
+- ✅ Pass Docker build and functional tests
+- ✅ Include tests for new functionality
+- ✅ Update documentation as needed
+
+See [docs/TESTING.md](docs/TESTING.md) for detailed testing guide.
+
+### Code Style
+
+- **R Scripts**: snake_case, descriptive names, optparse for arguments
+- **YAML Files**: kebab-case, inline comments, TODO for customization
+- **Commits**: Conventional commits (feat, fix, docs, test, chore)
+
+See [openspec/project.md](openspec/project.md) for complete conventions.
 
 ---
 

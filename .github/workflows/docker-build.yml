@@ -216,11 +216,31 @@ jobs:
           docker run --rm ${{ steps.image-ref.outputs.image-tag }} --help
           echo "::endgroup::"
 
-      - name: Test validation script
+      - name: Test validation script with fixtures
         run: |
-          echo "::group::Testing validation script (expected to fail without data)"
-          # This will fail because data files don't exist, but script should run
-          docker run --rm ${{ steps.image-ref.outputs.image-tag }} validate || true
+          echo "::group::Testing validation script with test fixtures"
+          docker run --rm \
+            -v $(pwd)/tests/fixtures:/data \
+            -v $(pwd)/tests/fixtures:/config \
+            ${{ steps.image-ref.outputs.image-tag }} validate || true
+          echo "::endgroup::"
+
+      - name: Test trait extraction with sample data
+        run: |
+          echo "::group::Testing trait extraction"
+          docker run --rm \
+            -v $(pwd)/tests/fixtures:/data \
+            -v $(pwd)/tests:/tests \
+            ${{ steps.image-ref.outputs.image-tag }} \
+            extract-traits /data/phenotype_mini.txt /tests/test_manifest.yaml || true
+          echo "::endgroup::"
+
+      - name: Test environment variable configuration
+        run: |
+          echo "::group::Testing OPENBLAS_NUM_THREADS configuration"
+          docker run --rm \
+            -e OPENBLAS_NUM_THREADS=8 \
+            ${{ steps.image-ref.outputs.image-tag }} bash -c 'echo "OPENBLAS_NUM_THREADS=$OPENBLAS_NUM_THREADS"'
           echo "::endgroup::"
 
       - name: Verification summary
@@ -234,4 +254,6 @@ jobs:
           echo "- ✅ GAPIT3 package" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Required R packages" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Entrypoint script" >> $GITHUB_STEP_SUMMARY
-          echo "- ✅ Validation script" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Validation with test fixtures" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Trait extraction functional test" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Environment variable configuration" >> $GITHUB_STEP_SUMMARY

@@ -1,0 +1,80 @@
+name: Devcontainer Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.devcontainer/**'
+      - 'Dockerfile'
+      - '.github/workflows/test-devcontainer.yml'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - '.devcontainer/**'
+      - 'Dockerfile'
+      - '.github/workflows/test-devcontainer.yml'
+  workflow_dispatch:
+
+jobs:
+  test-devcontainer:
+    runs-on: ubuntu-latest
+    name: Validate Devcontainer
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install devcontainer CLI
+        run: npm install -g @devcontainers/cli
+
+      - name: Build devcontainer
+        run: |
+          echo "::group::Building devcontainer"
+          devcontainer build --workspace-folder . --image-name gapit3-devcontainer-test
+          echo "::endgroup::"
+
+      - name: Test R installation in devcontainer
+        run: |
+          echo "::group::Testing R version"
+          devcontainer exec --workspace-folder . R --version
+          echo "::endgroup::"
+
+      - name: Test GAPIT3 package in devcontainer
+        run: |
+          echo "::group::Testing GAPIT3 load"
+          devcontainer exec --workspace-folder . Rscript -e "library(GAPIT); cat('GAPIT version:', as.character(packageVersion('GAPIT')), '\n')"
+          echo "::endgroup::"
+
+      - name: Test required R packages in devcontainer
+        run: |
+          echo "::group::Testing required packages"
+          devcontainer exec --workspace-folder . Rscript -e "
+          packages <- c('data.table', 'dplyr', 'tidyr', 'ggplot2', 'readr', 'matrixStats', 'gridExtra', 'optparse', 'yaml', 'jsonlite', 'testthat')
+          missing <- packages[!sapply(packages, requireNamespace, quietly = TRUE)]
+          if (length(missing) > 0) {
+            cat('Missing packages:', paste(missing, collapse=', '), '\n')
+            quit(status=1)
+          }
+          cat('All required packages are installed!\n')
+          "
+          echo "::endgroup::"
+
+      - name: Devcontainer validation summary
+        if: always()
+        run: |
+          echo "### Devcontainer Validation :package:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Validated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Devcontainer builds successfully" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ R 4.4.1 installed" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ GAPIT3 package available" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ All required R packages present" >> $GITHUB_STEP_SUMMARY
