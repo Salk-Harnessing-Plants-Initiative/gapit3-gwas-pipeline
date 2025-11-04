@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(while read f)",
+      "Bash(done)",
+      "Bash(for f in cluster/argo/**/*.yaml)",
+      "Bash(do python -c \"import yaml; yaml.safe_load(open(''''$f''''))\")",
+      "Bash(echo:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
