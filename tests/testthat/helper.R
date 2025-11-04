@@ -6,7 +6,24 @@
 
 # Get path to test fixtures
 get_fixture_path <- function(filename) {
-  file.path("tests", "fixtures", filename)
+  # Check if we're already in the root directory (has tests/ subdirectory)
+  if (dir.exists("tests/fixtures")) {
+    return(file.path("tests", "fixtures", filename))
+  }
+  # If we're in tests/ directory, go up one level
+  if (dir.exists("../tests/fixtures")) {
+    return(file.path("../tests", "fixtures", filename))
+  }
+  # If we're in tests/testthat/, go up two levels
+  if (dir.exists("../../tests/fixtures")) {
+    return(file.path("../../tests", "fixtures", filename))
+  }
+  # Fallback: try to find the project root by looking for .git
+  root <- getwd()
+  while (!dir.exists(file.path(root, ".git")) && root != dirname(root)) {
+    root <- dirname(root)
+  }
+  return(file.path(root, "tests", "fixtures", filename))
 }
 
 # Create temporary test output directory
