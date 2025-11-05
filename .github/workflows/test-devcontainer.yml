@@ -34,10 +34,10 @@ jobs:
       - name: Install devcontainer CLI
         run: npm install -g @devcontainers/cli
 
-      - name: Build devcontainer
+      - name: Build and start devcontainer
         run: |
-          echo "::group::Building devcontainer"
-          devcontainer build --workspace-folder . --image-name gapit3-devcontainer-test
+          echo "::group::Building and starting devcontainer"
+          devcontainer up --workspace-folder .
           echo "::endgroup::"
 
       - name: Test R installation in devcontainer

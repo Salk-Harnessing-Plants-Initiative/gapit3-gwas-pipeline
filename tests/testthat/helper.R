@@ -146,6 +146,8 @@ create_mock_config <- function(output_path, genotype_path = NULL, phenotype_path
     validation = list(
       check_input_files = TRUE,
       verify_trait_index = TRUE,
+      # NOTE: Test config uses 5 samples to keep fixtures small and fast
+      # Production requirement is 50 samples (see openspec/project.md line 182)
       require_minimum_samples = 5
     )
   )
