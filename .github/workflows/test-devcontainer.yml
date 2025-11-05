@@ -34,6 +34,10 @@ jobs:
       - name: Install devcontainer CLI
         run: npm install -g @devcontainers/cli
 
+      - name: Create mount directories
+        run: |
+          mkdir -p data outputs logs
+
       - name: Build and start devcontainer
         run: |
           echo "::group::Building and starting devcontainer"
