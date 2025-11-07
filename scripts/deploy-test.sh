@@ -17,8 +17,8 @@ NC='\033[0m' # No Color
 
 # Configuration (update these!)
 NAMESPACE="${NAMESPACE:-default}"
-DATA_PATH="${DATA_PATH:-/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data}"
-OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs}"
+DATA_PATH="${DATA_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data}"
+OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
 IMAGE="${IMAGE:-ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest}"
 
 # ==============================================================================

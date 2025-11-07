@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: gapit3-gwas-parallel-  # Argo appends unique suffix
-  namespace: default  # TODO: Change to your namespace
+  namespace: runai-talmo-lab
   labels:
     pipeline: gapit3-gwas
     stage: production
@@ -21,11 +21,11 @@ spec:
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update
+      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
     - name: start-trait-index
       value: "2"      # First trait column (after Taxa)
     - name: end-trait-index
@@ -169,14 +169,6 @@ spec:
         value: "trait-{{inputs.parameters.trait-index}}"
       - name: image
         value: "{{workflow.parameters.image}}"
-      - name: data-hostpath
-        value: "{{workflow.parameters.data-hostpath}}"
-      - name: output-hostpath
-        value: "{{workflow.parameters.output-hostpath}}"
-      - name: cpu-cores
-        value: "{{workflow.parameters.cpu-cores}}"
-      - name: memory-gb
-        value: "{{workflow.parameters.memory-gb}}"
       - name: models
         value: "{{workflow.parameters.models}}"
 

@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: gapit3-gwas-single-trait
-  namespace: default  # TODO: Change to your Argo namespace
+  namespace: runai-talmo-lab
 spec:
   # ===========================================================================
   # GAPIT3 GWAS - Single Trait WorkflowTemplate
@@ -22,32 +22,18 @@ spec:
     - name: trait-name
       value: "unknown"
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
-    - name: data-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update path
-    - name: output-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update path
-    - name: cpu-cores
-      value: "12"
-    - name: memory-gb
-      value: "32"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
     - name: models
       value: "BLINK,FarmCPU"
-
-  # Volume definitions using hostPath (MUST pre-exist on cluster nodes)
-  volumes:
-  - name: nfs-data
-    hostPath:
-      path: "{{workflow.parameters.data-hostpath}}"
-      type: Directory  # Directory MUST exist on the host
-  - name: nfs-outputs
-    hostPath:
-      path: "{{workflow.parameters.output-hostpath}}"
-      type: DirectoryOrCreate  # Will create if doesn't exist
 
   templates:
   # ===========================================================================
   # Main GWAS execution template
+  # ===========================================================================
+  # IMPORTANT: This template requires the calling workflow to define volumes:
+  #   - nfs-data: Mounted at /data (read-only) for genotype/phenotype files
+  #   - nfs-outputs: Mounted at /outputs (read-write) for GWAS results
+  # See gapit3-test-pipeline.yaml for example volume configuration
   # ===========================================================================
   - name: run-gwas
     inputs:
@@ -55,8 +41,6 @@ spec:
       - name: trait-index
       - name: trait-name
       - name: image
-      - name: cpu-cores
-      - name: memory-gb
       - name: models
 
     metadata:
@@ -85,7 +69,7 @@ spec:
         - "--models"
         - "{{inputs.parameters.models}}"
         - "--threads"
-        - "{{inputs.parameters.cpu-cores}}"
+        - "12"
 
       # Volume mounts
       volumeMounts:
@@ -99,9 +83,9 @@ spec:
       # Environment variables
       env:
       - name: OPENBLAS_NUM_THREADS
-        value: "{{inputs.parameters.cpu-cores}}"
+        value: "12"
       - name: OMP_NUM_THREADS
-        value: "{{inputs.parameters.cpu-cores}}"
+        value: "12"
       - name: TRAIT_INDEX
         value: "{{inputs.parameters.trait-index}}"
       - name: TRAIT_NAME
@@ -114,10 +98,11 @@ spec:
             fieldPath: metadata.name
 
       # Resource allocation (per guide: 32GB RAM + 12 cores)
+      # Note: Resources must be fixed values in WorkflowTemplates when using templateRef
       resources:
         requests:
-          memory: "{{inputs.parameters.memory-gb}}Gi"
-          cpu: "{{inputs.parameters.cpu-cores}}"
+          memory: "32Gi"
+          cpu: "12"
         limits:
           memory: "36Gi"  # Slight headroom
           cpu: "16"       # Allow burst to 16 cores

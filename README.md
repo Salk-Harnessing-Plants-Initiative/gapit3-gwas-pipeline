@@ -19,6 +19,22 @@ Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide associa
 
 ---
 
+## Current Status
+
+### Argo Workflows (⚠️ RBAC Permissions Pending)
+
+The pipeline is fully functional but currently requires **manual RunAI execution** due to pending RBAC permissions in the cluster. Once permissions are granted, full Argo orchestration will work automatically.
+
+**Current workarounds available:**
+- ✅ **Manual RunAI CLI** - Working now (see [Manual RunAI Execution Guide](docs/MANUAL_RUNAI_EXECUTION.md))
+- ✅ **Batch submission script** - [scripts/submit-all-traits-runai.sh](scripts/submit-all-traits-runai.sh)
+- ✅ **Monitoring dashboard** - [scripts/monitor-runai-jobs.sh](scripts/monitor-runai-jobs.sh)
+- ⏳ **Argo Workflows** - Waiting for RBAC fix (see [RBAC Issue](docs/RBAC_PERMISSIONS_ISSUE.md))
+
+**For administrators:** See [RBAC_PERMISSIONS_ISSUE.md](docs/RBAC_PERMISSIONS_ISSUE.md) for required permissions.
+
+---
+
 ## Quick Start
 
 ### For Cluster Users (Argo Workflows)
@@ -157,9 +173,19 @@ data/
 
 ## Documentation
 
+### Deployment & Execution
 - **[Argo Setup Guide](docs/ARGO_SETUP.md)** - Complete cluster deployment instructions
+- **[Manual RunAI Execution](docs/MANUAL_RUNAI_EXECUTION.md)** - Current workaround for RBAC issue
+- **[RunAI Quick Reference](docs/RUNAI_QUICK_REFERENCE.md)** - Command cheat sheet
+- **[RBAC Permissions Issue](docs/RBAC_PERMISSIONS_ISSUE.md)** - For cluster administrators
+
+### Usage & Configuration
 - **[Usage Guide](docs/USAGE.md)** - Parameter descriptions and advanced usage
 - **[Data Dictionary](docs/DATA_DICTIONARY.md)** - Trait descriptions and metadata
+
+### Testing & Troubleshooting
+- **[Deployment Testing](docs/DEPLOYMENT_TESTING.md)** - Test results and validation
+- **[WSL Setup Notes](docs/DEPLOYMENT_TESTING.md#environment-specific-setup)** - Windows/WSL users
 
 ---
 
@@ -391,6 +417,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Status**: Production-ready ✅
+**Status**: Production-ready ✅ (Manual RunAI execution) / ⏳ (Argo orchestration pending RBAC)
 
-Last updated: 2025-10-22
+Last updated: 2025-11-07

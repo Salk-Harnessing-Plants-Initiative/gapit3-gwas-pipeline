@@ -2,6 +2,14 @@
 
 **For non-technical users**: This guide walks you through running the GWAS analysis step-by-step.
 
+> **⚠️ IMPORTANT - Current Status (2025-11-07):**
+>
+> **Argo Workflows** require pending RBAC permissions from cluster administrators. Until those are granted, please use the **Manual RunAI execution method** documented in [Manual RunAI Execution Guide](docs/MANUAL_RUNAI_EXECUTION.md).
+>
+> **Quick workaround:** Use [scripts/submit-all-traits-runai.sh](scripts/submit-all-traits-runai.sh) to submit jobs directly via RunAI CLI. This fully works now!
+>
+> See [RBAC_PERMISSIONS_ISSUE.md](docs/RBAC_PERMISSIONS_ISSUE.md) for details.
+
 ---
 
 ## What This Pipeline Does
@@ -270,6 +278,8 @@ cd gapit3-gwas-pipeline/cluster/argo
 
 ## Questions?
 
+- **Current workaround**: See [docs/MANUAL_RUNAI_EXECUTION.md](docs/MANUAL_RUNAI_EXECUTION.md)
+- **RunAI commands**: See [docs/RUNAI_QUICK_REFERENCE.md](docs/RUNAI_QUICK_REFERENCE.md)
 - **Detailed setup**: See [docs/ARGO_SETUP.md](docs/ARGO_SETUP.md)
 - **Troubleshooting**: See [docs/ARGO_SETUP.md#troubleshooting](docs/ARGO_SETUP.md#troubleshooting)
 - **GitHub issues**: https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/issues

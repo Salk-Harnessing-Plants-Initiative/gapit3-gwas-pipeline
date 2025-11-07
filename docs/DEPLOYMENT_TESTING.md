@@ -719,11 +719,89 @@ runai submit \
 
 ---
 
+---
+
+## Latest Test Results (2025-11-07)
+
+### Workflow Validation Fix
+**Status**: ✅ RESOLVED
+
+Fixed Argo Workflows validation error where parameterized `hostPath` volumes in WorkflowTemplates caused submission failures.
+
+**Issue**: `quantities must match the regular expression` error occurred because Argo validates templates before parameter substitution.
+
+**Solution**:
+- Moved volume definitions from WorkflowTemplate to Workflow level
+- Changed resources (CPU, memory) from parameterized to fixed values
+- Templates now reference volumes by name only
+
+**Result**: Workflows now submit successfully without validation errors.
+
+See [openspec/changes/fix-argo-workflow-validation/](../openspec/changes/fix-argo-workflow-validation/) for complete technical details.
+
+### RBAC Permissions Issue
+**Status**: ⏳ PENDING (Administrator Action Required)
+
+Argo Workflows successfully submit but fail at runtime with RBAC permissions error.
+
+**Error**:
+```
+Error (exit code 64): workflowtaskresults.argoproj.io is forbidden:
+User "system:serviceaccount:runai-talmo-lab:default" cannot create resource
+"workflowtaskresults" in API group "argoproj.io" in the namespace "runai-talmo-lab"
+```
+
+**Impact**:
+- Workflow pods execute successfully (exit code 0)
+- Argo cannot save task results due to missing permissions
+- Subsequent DAG tasks are not triggered
+
+**Workaround**: Manual RunAI CLI execution (fully functional)
+
+See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for administrator resolution steps.
+
+### Successful Manual RunAI Test (2025-11-07)
+**Status**: ✅ SUCCESS
+
+Successfully tested single trait execution using RunAI CLI directly as workaround for RBAC issue.
+
+**Test Configuration**:
+- **Trait**: Index 2 (first phenotype trait)
+- **Models**: BLINK + FarmCPU
+- **Resources**: 12 CPU cores, 32GB RAM
+- **Image**: `ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test`
+- **Execution**: `runai workspace submit` (new CLI syntax)
+
+**Results**:
+- ✅ BLINK model completed in ~5.5 minutes
+- ✅ FarmCPU model completed successfully
+- ✅ Identified 3 significant QTNs
+- ✅ Generated Manhattan plots, QQ plots, GWAS results CSV
+- ✅ All output files created correctly in `/outputs/trait_002_*/`
+
+**Key Findings**:
+1. Pipeline works end-to-end when bypassing Argo orchestration
+2. RunAI CLI syntax has changed (use `runai workspace submit` not `runai submit`)
+3. Project name is `talmo-lab` (not `runai-talmo-lab`)
+4. Both BLINK and FarmCPU models execute correctly and complement each other
+
+**Batch Execution**:
+- Created [scripts/submit-all-traits-runai.sh](../scripts/submit-all-traits-runai.sh) for automated submission
+- Includes concurrency control (max 50 parallel jobs)
+- Created [scripts/monitor-runai-jobs.sh](../scripts/monitor-runai-jobs.sh) for live monitoring
+
+See [MANUAL_RUNAI_EXECUTION.md](MANUAL_RUNAI_EXECUTION.md) for complete manual execution guide.
+
+---
+
 ## Reference
 
 - **Workflows**: [cluster/argo/workflows/](../cluster/argo/workflows/)
 - **Templates**: [cluster/argo/workflow-templates/](../cluster/argo/workflow-templates/)
 - **Config**: [config/config.yaml](../config/config.yaml)
 - **Scripts**: [scripts/](../scripts/)
+- **Manual RunAI Guide**: [MANUAL_RUNAI_EXECUTION.md](MANUAL_RUNAI_EXECUTION.md)
+- **RunAI Quick Reference**: [RUNAI_QUICK_REFERENCE.md](RUNAI_QUICK_REFERENCE.md)
+- **RBAC Issue**: [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md)
 - **Argo Docs**: https://argoproj.github.io/argo-workflows/
 - **RunAI Docs**: https://docs.run.ai/

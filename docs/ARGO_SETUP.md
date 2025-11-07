@@ -2,16 +2,23 @@
 
 Complete guide for deploying and running the GAPIT3 GWAS pipeline on your cluster using Argo Workflows.
 
+> **⚠️ IMPORTANT - Current Status (2025-11-07):**
+>
+> Argo Workflows require pending RBAC permissions from cluster administrators. Until those are granted, please use the **Manual RunAI execution method** documented in [Manual RunAI Execution Guide](MANUAL_RUNAI_EXECUTION.md).
+>
+> See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for administrator information.
+
 ---
 
 ## Table of Contents
 
 1. [Prerequisites](#prerequisites)
 2. [One-Time Setup](#one-time-setup)
-3. [Running the Pipeline](#running-the-pipeline)
-4. [Monitoring Workflows](#monitoring-workflows)
-5. [Troubleshooting](#troubleshooting)
-6. [Advanced Usage](#advanced-usage)
+3. [Workflow Validation Fix](#workflow-validation-fix)
+4. [Running the Pipeline](#running-the-pipeline)
+5. [Monitoring Workflows](#monitoring-workflows)
+6. [Troubleshooting](#troubleshooting)
+7. [Advanced Usage](#advanced-usage)
 
 ---
 
@@ -137,6 +144,47 @@ docker pull ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:lates
 # Or trigger GitHub Actions build (if you pushed to main branch)
 # The image should build automatically via .github/workflows/docker-build.yml
 ```
+
+---
+
+## Workflow Validation Fix
+
+### Important: Volume Configuration Requirements
+
+The workflow templates have been fixed to comply with Argo Workflows validation requirements. Previously, parameterized `hostPath` volumes in WorkflowTemplates caused validation errors because Argo validates template syntax **before** parameter substitution occurs.
+
+**Key Changes Made:**
+1. ✅ Volumes are now defined at the **workflow level** (in `workflows/*.yaml`), not in templates
+2. ✅ Resources (CPU, memory) use **fixed values** in WorkflowTemplates
+3. ✅ Templates reference volumes by name only
+
+**Technical Details:**
+
+The issue occurred because Argo validates WorkflowTemplate resources at submission time:
+
+```yaml
+# ❌ OLD (BROKEN) - In WorkflowTemplate
+volumes:
+- name: nfs-data
+  hostPath:
+    path: "{{inputs.parameters.data-hostpath}}"  # Validation fails BEFORE substitution
+```
+
+```yaml
+# ✅ NEW (WORKING) - In Workflow
+spec:
+  volumes:
+  - name: nfs-data
+    hostPath:
+      path: "{{workflow.parameters.data-hostpath}}"  # Substituted at submission
+```
+
+**Impact on Users:**
+- No action required if using the provided workflows
+- If creating custom workflows, always define `hostPath` volumes at the workflow level
+- Resources (cpu, memory) in templates must be fixed values, not parameters
+
+For complete technical documentation, see [openspec/changes/fix-argo-workflow-validation/](../openspec/changes/fix-argo-workflow-validation/).
 
 ---
 
@@ -474,6 +522,9 @@ metadata:
 
 ## Additional Resources
 
+- **Current Workaround**: [Manual RunAI Execution Guide](MANUAL_RUNAI_EXECUTION.md)
+- **RunAI Commands**: [RunAI Quick Reference](RUNAI_QUICK_REFERENCE.md)
+- **RBAC Issue**: [RBAC Permissions Issue](RBAC_PERMISSIONS_ISSUE.md)
 - **Argo Workflows Docs**: https://argo-workflows.readthedocs.io/
 - **GAPIT3 Manual**: http://zzlab.net/GAPIT/
 - **Pipeline GitHub**: https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline
