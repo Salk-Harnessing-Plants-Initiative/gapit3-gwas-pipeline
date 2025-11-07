@@ -139,6 +139,8 @@ Based on 546 accessions, ~1.4M SNPs:
 - **Local Dev**: Docker + VS Code (optional)
 - **CLI Tools**: `argo`, `kubectl`, `git`
 
+> **Windows Users**: If using WSL (Windows Subsystem for Linux), see [WSL Setup Guide](docs/DEPLOYMENT_TESTING.md#environment-specific-setup) for important configuration notes regarding kubectl and RunAI authentication.
+
 ### Input Data
 
 ```
