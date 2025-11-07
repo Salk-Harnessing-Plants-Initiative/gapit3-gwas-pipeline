@@ -112,12 +112,22 @@ show_status() {
     fi
     echo ""
 
+    # Check if all jobs complete
+    if [ $((succeeded + failed)) -ge 186 ]; then
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo -e "${GREEN}All jobs complete!${NC}"
+        echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+        echo ""
+        echo "Run aggregation with:"
+        echo "  ${GREEN}./scripts/aggregate-runai-results.sh${NC}"
+        echo ""
+    fi
+
     # Commands
     echo -e "${BLUE}Commands:${NC}"
     echo "  View specific job:    runai describe job gapit3-trait-2 -p $PROJECT"
     echo "  View logs:            runai logs gapit3-trait-2 -p $PROJECT --follow"
-    echo "  Delete failed jobs:   ./scripts/cleanup-failed-runai-jobs.sh"
-    echo "  Resubmit failed:      ./scripts/resubmit-failed-traits.sh"
+    echo "  Aggregate results:    ./scripts/aggregate-runai-results.sh"
     echo ""
 }
 

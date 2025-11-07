@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Manual RunAI execution scripts as workaround for RBAC permissions
   - `scripts/submit-all-traits-runai.sh` - Batch submission with concurrency control
   - `scripts/monitor-runai-jobs.sh` - Live monitoring dashboard
+  - `scripts/aggregate-runai-results.sh` - Automatic results aggregation (NEW)
 - Comprehensive documentation for RunAI CLI execution
   - `docs/MANUAL_RUNAI_EXECUTION.md` - Complete execution guide
   - `docs/RUNAI_QUICK_REFERENCE.md` - Command cheat sheet
@@ -20,8 +21,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Technical architecture documentation
   - `docs/WORKFLOW_ARCHITECTURE.md` - Deep dive into workflow design
   - `cluster/argo/README.md` - Directory structure guide
-- OpenSpec change proposal for workflow validation fix
-  - `openspec/changes/fix-argo-workflow-validation/` - Complete technical documentation
+- OpenSpec change proposals
+  - `openspec/changes/fix-argo-workflow-validation/` - Workflow validation fix
+  - `openspec/changes/add-runai-aggregation-script/` - Aggregation automation (NEW)
 
 ### Fixed
 - **Critical**: Argo Workflows validation error with parameterized volumes ([#10](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/pull/10))

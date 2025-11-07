@@ -257,6 +257,67 @@ runai logs gapit3-trait-2 -p runai-talmo-lab --tail 100
 runai top job -p runai-talmo-lab
 ```
 
+## Aggregating Results
+
+After all traits complete, aggregate results into summary reports.
+
+### Automatic Aggregation (Recommended)
+
+Wait for all jobs to complete and automatically aggregate:
+
+```bash
+./scripts/aggregate-runai-results.sh
+```
+
+**What this does**:
+1. Monitors all `gapit3-trait-*` jobs in RunAI
+2. Shows progress: "120/186 complete (65%)"
+3. Waits until all jobs finish
+4. Automatically runs `collect_results.R`
+5. Creates aggregated results
+
+**Output files created**:
+- `aggregated_results/summary_table.csv` - Summary of all traits with metadata
+- `aggregated_results/significant_snps.csv` - All SNPs with p < 5e-8
+- `aggregated_results/summary_stats.json` - Overall statistics
+
+### Advanced Aggregation Options
+
+**Custom output path and batch ID**:
+```bash
+./scripts/aggregate-runai-results.sh \
+  --output-dir /custom/path/outputs \
+  --batch-id "iron-traits-batch-2"
+```
+
+**Specific trait range** (if you only ran some traits):
+```bash
+./scripts/aggregate-runai-results.sh \
+  --start-trait 2 \
+  --end-trait 50
+```
+
+**Check status without waiting**:
+```bash
+./scripts/aggregate-runai-results.sh --check-only
+```
+
+**Force immediate aggregation** (if jobs already complete):
+```bash
+./scripts/aggregate-runai-results.sh --force
+```
+
+### Manual Aggregation
+
+If you prefer to run aggregation manually:
+
+```bash
+Rscript scripts/collect_results.R \
+  --output-dir /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs \
+  --batch-id "manual-runai-$(date +%Y%m%d)" \
+  --threshold 5e-8
+```
+
 ## Checking Results
 
 ### Check output directory
@@ -273,6 +334,20 @@ ls -d /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs/trait_*
 
 # Check for results files
 find /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs/ -name "GAPIT.Association.GWAS_Results.csv"
+```
+
+### View aggregated results
+```bash
+cd /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs/aggregated_results/
+
+# View summary table
+head summary_table.csv
+
+# View significant SNPs
+head significant_snps.csv
+
+# View overall statistics
+cat summary_stats.json
 ```
 
 ## Cleanup

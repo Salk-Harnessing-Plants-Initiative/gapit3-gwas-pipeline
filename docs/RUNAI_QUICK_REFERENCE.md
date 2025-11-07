@@ -147,6 +147,33 @@ watch -n 10 'runai workspace list | grep gapit3'
 runai workspace list | grep gapit3 | awk '{print $4}' | sort | uniq -c
 ```
 
+### Aggregate Results After Parallel Execution
+
+```bash
+# Wait for all jobs to complete, then aggregate
+./scripts/aggregate-runai-results.sh
+
+# Custom output path and batch ID
+./scripts/aggregate-runai-results.sh \
+  --output-dir /custom/path \
+  --batch-id "my-batch-id"
+
+# Specific trait range
+./scripts/aggregate-runai-results.sh --start-trait 2 --end-trait 50
+
+# Check status only (no waiting)
+./scripts/aggregate-runai-results.sh --check-only
+
+# Force immediate aggregation (skip waiting)
+./scripts/aggregate-runai-results.sh --force
+```
+
+**What it does**:
+- Monitors `gapit3-trait-*` workspace completion
+- Shows progress: "120/186 complete (65%)"
+- Auto-runs `collect_results.R` when all jobs finish
+- Creates `aggregated_results/` with summary files
+
 ### Clean Up Failed Jobs
 
 ```bash
