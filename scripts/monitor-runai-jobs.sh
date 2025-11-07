@@ -19,7 +19,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 get_job_stats() {
-    local jobs_output=$(runai list jobs -p $PROJECT 2>/dev/null | grep "gapit3-trait-" || echo "")
+    local jobs_output=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" || echo "")
 
     if [ -z "$jobs_output" ]; then
         echo "0 0 0 0 0"
@@ -70,7 +70,7 @@ show_status() {
     echo ""
 
     # Progress bar
-    if [ $total -gt 0 ]; then
+    if [ "${total:-0}" -gt 0 ]; then
         local complete=$((succeeded + failed))
         local percent=$((complete * 100 / 186))  # 186 total traits (2-187)
         local bar_length=50
@@ -89,14 +89,14 @@ show_status() {
     read trait_dirs result_files <<< $(get_output_stats)
 
     echo -e "${GREEN}Output Files:${NC}"
-    echo "  Trait directories: $trait_dirs"
-    echo "  Result CSV files:  $result_files"
+    echo "  Trait directories: ${trait_dirs:-0}"
+    echo "  Result CSV files:  ${result_files:-0}"
     echo ""
 
     # Recent failures
-    if [ $failed -gt 0 ]; then
+    if [ "${failed:-0}" -gt 0 ]; then
         echo -e "${RED}Recent Failures:${NC}"
-        runai list jobs -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Failed" | head -5 | while read line; do
+        runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Failed" | head -5 | while read line; do
             echo "  $line"
         done
         echo ""
@@ -104,7 +104,7 @@ show_status() {
 
     # Long-running jobs (over 2 hours)
     echo -e "${YELLOW}Long-Running Jobs (>2h):${NC}"
-    local long_running=$(runai list jobs -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' || echo "  None")
+    local long_running=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' || echo "  None")
     if [ -z "$long_running" ]; then
         echo "  None"
     else
