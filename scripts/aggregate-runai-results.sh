@@ -257,7 +257,7 @@ while IFS= read -r line; do
             ((TOTAL++))
 
             # Check status (varies by position, look for keywords)
-            if echo "$line" | grep -q "Succeeded"; then
+            if echo "$line" | grep -qE "Succeeded|Completed"; then
                 ((SUCCEEDED++))
             elif echo "$line" | grep -qE "Failed|Error"; then
                 ((FAILED++))
@@ -337,7 +337,7 @@ if [ "$FORCE" = false ]; then
                 TRAIT_IDX="${BASH_REMATCH[1]}"
 
                 if [ "$TRAIT_IDX" -ge "$START_TRAIT" ] && [ "$TRAIT_IDX" -le "$END_TRAIT" ]; then
-                    if echo "$line" | grep -q "Succeeded"; then
+                    if echo "$line" | grep -qE "Succeeded|Completed"; then
                         ((SUCCEEDED++))
                     elif echo "$line" | grep -qE "Failed|Error"; then
                         ((FAILED++))

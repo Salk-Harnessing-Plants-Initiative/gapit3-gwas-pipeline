@@ -28,7 +28,7 @@ get_job_stats() {
 
     local running=$(echo "$jobs_output" | grep -c "Running" || echo 0)
     local pending=$(echo "$jobs_output" | grep -c "Pending" || echo 0)
-    local succeeded=$(echo "$jobs_output" | grep -c "Succeeded" || echo 0)
+    local succeeded=$(echo "$jobs_output" | grep -cE "Succeeded|Completed" || echo 0)
     local failed=$(echo "$jobs_output" | grep -c "Failed" || echo 0)
     local total=$(echo "$jobs_output" | wc -l)
 
