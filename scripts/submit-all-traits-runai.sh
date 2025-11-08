@@ -6,7 +6,10 @@
 # Implements concurrency control to avoid overwhelming the cluster
 # ===========================================================================
 
-set -euo pipefail
+set -uo pipefail
+
+# Error handling
+trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
 
 # Configuration
 PROJECT="talmo-lab"
@@ -81,7 +84,8 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     # Submit job
     echo -e "${GREEN}[SUBMIT]${NC} Trait $trait_idx (job: $JOB_NAME)"
 
-    if runai workspace submit $JOB_NAME \
+    # Capture output for debugging
+    SUBMIT_OUTPUT=$(runai workspace submit $JOB_NAME \
         --project $PROJECT \
         --image $IMAGE \
         --cpu-core-request $CPU \
@@ -96,11 +100,13 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
           --config /config/config.yaml \
           --output-dir /outputs \
           --models $MODELS \
-          --threads $CPU \
-        > /dev/null 2>&1; then
+          --threads $CPU 2>&1)
+
+    if [ $? -eq 0 ]; then
         ((SUBMITTED++))
     else
         echo -e "${RED}[FAILED]${NC} Trait $trait_idx - submission failed"
+        echo "Error output: $SUBMIT_OUTPUT"
         ((FAILED++))
     fi
 
