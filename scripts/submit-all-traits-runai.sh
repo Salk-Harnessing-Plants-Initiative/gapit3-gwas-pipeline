@@ -85,6 +85,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     echo -e "${GREEN}[SUBMIT]${NC} Trait $trait_idx (job: $JOB_NAME)"
 
     # Capture output for debugging
+    set +e  # Temporarily disable exit on error
     SUBMIT_OUTPUT=$(runai workspace submit $JOB_NAME \
         --project $PROJECT \
         --image $IMAGE \
@@ -101,12 +102,16 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
           --output-dir /outputs \
           --models $MODELS \
           --threads $CPU 2>&1)
+    SUBMIT_EXIT=$?
+    set -e  # Re-enable exit on error
 
-    if [ $? -eq 0 ]; then
+    if [ $SUBMIT_EXIT -eq 0 ]; then
         ((SUBMITTED++))
+        echo "  → Success"
     else
-        echo -e "${RED}[FAILED]${NC} Trait $trait_idx - submission failed"
-        echo "Error output: $SUBMIT_OUTPUT"
+        echo -e "${RED}[FAILED]${NC} Trait $trait_idx - submission failed (exit code: $SUBMIT_EXIT)"
+        echo "Error output:"
+        echo "$SUBMIT_OUTPUT"
         ((FAILED++))
     fi
 
