@@ -62,7 +62,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     JOB_NAME="gapit3-trait-$trait_idx"
 
     # Check if job already exists
-    if runai workspace list -p $PROJECT 2>/dev/null | awk '{print $1}' | grep -q "^$JOB_NAME$"; then
+    if runai workspace list -p $PROJECT 2>/dev/null | grep -q "^$JOB_NAME "; then
         echo -e "${YELLOW}[SKIP]${NC} Trait $trait_idx - job already exists"
         ((SKIPPED++))
         continue
