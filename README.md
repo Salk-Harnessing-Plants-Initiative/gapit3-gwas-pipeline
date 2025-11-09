@@ -30,6 +30,7 @@ The pipeline is fully functional but currently requires **manual RunAI execution
 - ✅ **Batch submission script** - [scripts/submit-all-traits-runai.sh](scripts/submit-all-traits-runai.sh)
 - ✅ **Aggregation script** - [scripts/aggregate-runai-results.sh](scripts/aggregate-runai-results.sh)
 - ✅ **Monitoring dashboard** - [scripts/monitor-runai-jobs.sh](scripts/monitor-runai-jobs.sh)
+- ✅ **Cleanup helper** - [scripts/cleanup-runai.sh](scripts/cleanup-runai.sh)
 - ⏳ **Argo Workflows** - Waiting for RBAC fix (see [RBAC Issue](docs/RBAC_PERMISSIONS_ISSUE.md))
 
 **For administrators:** See [RBAC_PERMISSIONS_ISSUE.md](docs/RBAC_PERMISSIONS_ISSUE.md) for required permissions.

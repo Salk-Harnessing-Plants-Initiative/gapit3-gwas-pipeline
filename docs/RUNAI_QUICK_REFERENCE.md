@@ -174,15 +174,36 @@ runai workspace list | grep gapit3 | awk '{print $4}' | sort | uniq -c
 - Auto-runs `collect_results.R` when all jobs finish
 - Creates `aggregated_results/` with summary files
 
-### Clean Up Failed Jobs
+### Cleanup Commands
+
+```bash
+# Clean all traits (with confirmation)
+./scripts/cleanup-runai.sh --all
+
+# Clean specific range
+./scripts/cleanup-runai.sh --start-trait 2 --end-trait 50
+
+# Preview without deleting (dry-run)
+./scripts/cleanup-runai.sh --all --dry-run
+
+# Only delete workspaces (keep outputs)
+./scripts/cleanup-runai.sh --all --workspaces-only
+
+# Only delete outputs (keep workspaces)
+./scripts/cleanup-runai.sh --all --outputs-only
+
+# Force (no confirmation, for scripts)
+./scripts/cleanup-runai.sh --all --force
+```
+
+#### Manual Cleanup (if needed)
 
 ```bash
 # List failed workspaces
 runai workspace list | grep gapit3 | grep -E "Failed|Error"
 
-# Delete all failed GAPIT3 workspaces
-runai workspace list | grep gapit3 | grep -E "Failed|Error" | awk '{print $1}' | \
-  xargs -I {} runai workload delete workspace {} -p talmo-lab
+# Delete specific workspace
+runai workspace delete gapit3-trait-42 -p talmo-lab
 ```
 
 ## Troubleshooting
