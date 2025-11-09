@@ -26,11 +26,27 @@ get_job_stats() {
         return
     fi
 
-    local running=$(echo "$jobs_output" | grep -c "Running" || echo 0)
-    local pending=$(echo "$jobs_output" | grep -c "Pending" || echo 0)
-    local succeeded=$(echo "$jobs_output" | grep -cE "Succeeded|Completed" || echo 0)
-    local failed=$(echo "$jobs_output" | grep -c "Failed" || echo 0)
-    local total=$(echo "$jobs_output" | wc -l)
+    local running=0
+    local pending=0
+    local succeeded=0
+    local failed=0
+    local total=0
+
+    # Process each job line individually (same approach as aggregate script)
+    while IFS= read -r line; do
+        total=$((total + 1))
+
+        # Check status keywords in the line
+        if echo "$line" | grep -qE "Succeeded|Completed"; then
+            succeeded=$((succeeded + 1))
+        elif echo "$line" | grep -qE "Failed|Error"; then
+            failed=$((failed + 1))
+        elif echo "$line" | grep -q "Running"; then
+            running=$((running + 1))
+        else
+            pending=$((pending + 1))
+        fi
+    done <<< "$jobs_output"
 
     echo "$running $pending $succeeded $failed $total"
 }
