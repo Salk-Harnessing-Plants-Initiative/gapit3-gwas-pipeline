@@ -254,17 +254,17 @@ while IFS= read -r line; do
 
         # Check if trait is in range
         if [ "$TRAIT_IDX" -ge "$START_TRAIT" ] && [ "$TRAIT_IDX" -le "$END_TRAIT" ]; then
-            ((TOTAL++))
+            TOTAL=$((TOTAL + 1))
 
             # Check status (varies by position, look for keywords)
             if echo "$line" | grep -qE "Succeeded|Completed"; then
-                ((SUCCEEDED++))
+                SUCCEEDED=$((SUCCEEDED + 1))
             elif echo "$line" | grep -qE "Failed|Error"; then
-                ((FAILED++))
+                FAILED=$((FAILED + 1))
             elif echo "$line" | grep -q "Running"; then
-                ((RUNNING++))
+                RUNNING=$((RUNNING + 1))
             else
-                ((PENDING++))
+                PENDING=$((PENDING + 1))
             fi
         fi
     fi
@@ -338,13 +338,13 @@ if [ "$FORCE" = false ]; then
 
                 if [ "$TRAIT_IDX" -ge "$START_TRAIT" ] && [ "$TRAIT_IDX" -le "$END_TRAIT" ]; then
                     if echo "$line" | grep -qE "Succeeded|Completed"; then
-                        ((SUCCEEDED++))
+                        SUCCEEDED=$((SUCCEEDED + 1))
                     elif echo "$line" | grep -qE "Failed|Error"; then
-                        ((FAILED++))
+                        FAILED=$((FAILED + 1))
                     elif echo "$line" | grep -q "Running"; then
-                        ((RUNNING++))
+                        RUNNING=$((RUNNING + 1))
                     else
-                        ((PENDING++))
+                        PENDING=$((PENDING + 1))
                     fi
                 fi
             fi

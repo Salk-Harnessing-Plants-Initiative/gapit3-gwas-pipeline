@@ -41,8 +41,8 @@ get_output_stats() {
         return
     fi
 
-    local trait_dirs=$(ls -d $OUTPUT_PATH/trait_*/ 2>/dev/null | wc -l || echo 0)
-    local result_files=$(find $OUTPUT_PATH -name "GAPIT.Association.GWAS_Results.csv" 2>/dev/null | wc -l || echo 0)
+    local trait_dirs=$(ls -d "$OUTPUT_PATH"/trait_*/ 2>/dev/null | wc -l || echo 0)
+    local result_files=$(find "$OUTPUT_PATH" -name "GAPIT.Association.GWAS_Results.csv" 2>/dev/null | wc -l || echo 0)
 
     echo "$trait_dirs $result_files"
 }
@@ -104,7 +104,7 @@ show_status() {
 
     # Long-running jobs (over 2 hours)
     echo -e "${YELLOW}Long-Running Jobs (>2h):${NC}"
-    local long_running=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' || echo "  None")
+    local long_running=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' 2>/dev/null || echo "  None")
     if [ -z "$long_running" ]; then
         echo "  None"
     else
