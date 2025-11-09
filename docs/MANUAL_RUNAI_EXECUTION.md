@@ -318,6 +318,87 @@ Rscript scripts/collect_results.R \
   --threshold 5e-8
 ```
 
+## Cleaning Up Before New Runs
+
+Before starting a fresh pipeline run or rerunning failed traits, clean up old resources using the cleanup helper script.
+
+### Clean Everything (Fresh Start)
+
+```bash
+# Preview what will be deleted
+./scripts/cleanup-runai.sh --all --dry-run
+
+# Delete all RunAI workspaces and output files
+./scripts/cleanup-runai.sh --all
+```
+
+This will:
+- Delete all `gapit3-trait-*` workspaces in RunAI
+- Delete all `trait_*/` directories in outputs
+- Delete `aggregated_results/` directory
+- Prompt for confirmation before deletion
+
+### Clean Specific Traits
+
+```bash
+# Clean up test run (traits 2-4)
+./scripts/cleanup-runai.sh --start-trait 2 --end-trait 4
+
+# Clean up single failed trait
+./scripts/cleanup-runai.sh --start-trait 42 --end-trait 42
+
+# Clean specific range
+./scripts/cleanup-runai.sh --start-trait 50 --end-trait 100
+```
+
+### Selective Cleanup
+
+```bash
+# Only delete RunAI workspaces (keep outputs for analysis)
+./scripts/cleanup-runai.sh --all --workspaces-only
+
+# Only delete output files (keep workspaces running)
+./scripts/cleanup-runai.sh --all --outputs-only
+```
+
+### Automation-Friendly
+
+```bash
+# Skip confirmation prompts (for scripts)
+./scripts/cleanup-runai.sh --all --force
+```
+
+**Common cleanup workflows:**
+
+1. **Before production run after testing:**
+   ```bash
+   # Clean test run
+   ./scripts/cleanup-runai.sh --start-trait 2 --end-trait 4
+
+   # Submit full run
+   ./scripts/submit-all-traits-runai.sh
+   ```
+
+2. **Rerun failed traits:**
+   ```bash
+   # Clean only the failed traits
+   ./scripts/cleanup-runai.sh --start-trait 42 --end-trait 42
+   ./scripts/cleanup-runai.sh --start-trait 137 --end-trait 137
+
+   # Resubmit them
+   START_TRAIT=42 END_TRAIT=42 ./scripts/submit-all-traits-runai.sh
+   START_TRAIT=137 END_TRAIT=137 ./scripts/submit-all-traits-runai.sh
+   ```
+
+3. **Complete fresh start:**
+   ```bash
+   # Clean everything
+   ./scripts/cleanup-runai.sh --all
+
+   # Submit new run
+   ./scripts/submit-all-traits-runai.sh
+   ```
+
 ## Checking Results
 
 ### Check output directory
