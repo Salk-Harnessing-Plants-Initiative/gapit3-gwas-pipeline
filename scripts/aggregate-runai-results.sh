@@ -24,7 +24,7 @@ DEFAULT_THRESHOLD="5e-8"
 
 # Parse from environment or use defaults
 PROJECT="${RUNAI_PROJECT:-$DEFAULT_PROJECT}"
-OUTPUT_DIR="${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}"
+OUTPUT_DIR="${OUTPUT_PATH:-${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}}"
 START_TRAIT=$DEFAULT_START_TRAIT
 END_TRAIT=$DEFAULT_END_TRAIT
 CHECK_INTERVAL=$DEFAULT_CHECK_INTERVAL
@@ -90,7 +90,8 @@ ${BLUE}Examples:${NC}
 
 ${BLUE}Environment Variables:${NC}
   RUNAI_PROJECT    Override default project name
-  OUTPUT_DIR       Override default output directory
+  OUTPUT_PATH      Override default output directory (preferred)
+  OUTPUT_DIR       Override default output directory (alternative)
 
 EOF
 }
