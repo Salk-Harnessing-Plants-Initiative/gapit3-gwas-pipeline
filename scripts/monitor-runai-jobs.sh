@@ -61,17 +61,17 @@ show_status() {
     read running pending succeeded failed total <<< $(get_job_stats)
 
     echo -e "${GREEN}Job Status:${NC}"
-    echo "  Running:    $running"
-    echo "  Pending:    $pending"
-    echo "  Succeeded:  $succeeded"
-    echo "  Failed:     $failed"
+    echo "  Running:    ${running:-0}"
+    echo "  Pending:    ${pending:-0}"
+    echo "  Succeeded:  ${succeeded:-0}"
+    echo "  Failed:     ${failed:-0}"
     echo "  ─────────────────"
-    echo "  Total:      $total"
+    echo "  Total:      ${total:-0}"
     echo ""
 
     # Progress bar
     if [ "${total:-0}" -gt 0 ]; then
-        local complete=$((succeeded + failed))
+        local complete=$((${succeeded:-0} + ${failed:-0}))
         local percent=$((complete * 100 / 186))  # 186 total traits (2-187)
         local bar_length=50
         local filled=$((percent * bar_length / 100))
@@ -113,7 +113,7 @@ show_status() {
     echo ""
 
     # Check if all jobs complete
-    if [ $((succeeded + failed)) -ge 186 ]; then
+    if [ $((${succeeded:-0} + ${failed:-0})) -ge 186 ]; then
         echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
         echo -e "${GREEN}All jobs complete!${NC}"
         echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
