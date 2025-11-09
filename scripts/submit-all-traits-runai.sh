@@ -67,7 +67,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     # Check if job already exists
     if runai workspace list -p $PROJECT 2>/dev/null | grep -q "^$JOB_NAME "; then
         echo -e "${YELLOW}[SKIP]${NC} Trait $trait_idx - job already exists"
-        ((SKIPPED++))
+        SKIPPED=$((SKIPPED + 1))
         continue
     fi
 
@@ -108,13 +108,13 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
 
     if [ $SUBMIT_EXIT -eq 0 ]; then
-        ((SUBMITTED++))
+        SUBMITTED=$((SUBMITTED + 1))
         echo "  → Success"
     else
         echo -e "${RED}[FAILED]${NC} Trait $trait_idx - submission failed (exit code: $SUBMIT_EXIT)"
         echo "Error output:"
         echo "$SUBMIT_OUTPUT"
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
     fi
 
     # Small delay to avoid API rate limits
