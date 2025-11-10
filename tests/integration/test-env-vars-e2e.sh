@@ -100,18 +100,36 @@ setup_tests() {
     log_info "Setting up integration tests..."
     log_info "Project root: $PROJECT_ROOT"
 
-    # Build test Docker image
-    log_info "Building test Docker image: $TEST_IMAGE"
-    cd "$PROJECT_ROOT"
-    docker build -t "$TEST_IMAGE" . || {
-        log_error "Failed to build Docker image"
-        exit 1
-    }
-    log_info "Docker image built successfully"
+    # Skip building if CI_SKIP_BUILD is set (CI already built the image)
+    if [ "${CI_SKIP_BUILD:-}" = "true" ]; then
+        log_info "Skipping Docker build (CI_SKIP_BUILD=true)"
+        log_info "Using existing image: $TEST_IMAGE"
+
+        # Verify image exists
+        if ! docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
+            log_error "Image $TEST_IMAGE not found!"
+            exit 1
+        fi
+    else
+        # Build test Docker image
+        log_info "Building test Docker image: $TEST_IMAGE"
+        cd "$PROJECT_ROOT"
+        docker build -t "$TEST_IMAGE" . || {
+            log_error "Failed to build Docker image"
+            exit 1
+        }
+        log_info "Docker image built successfully"
+    fi
 }
 
 cleanup_tests() {
     log_info "Cleaning up test artifacts..."
+
+    # Skip cleanup if CI_SKIP_CLEANUP is set (CI will handle cleanup)
+    if [ "${CI_SKIP_CLEANUP:-}" = "true" ]; then
+        log_info "Skipping Docker cleanup (CI_SKIP_CLEANUP=true)"
+        return 0
+    fi
 
     # Remove test Docker image
     if docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then

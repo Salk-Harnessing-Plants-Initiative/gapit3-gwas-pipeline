@@ -200,7 +200,7 @@ jobs:
           echo "::group::Testing required R packages"
           docker run --rm --entrypoint R ${{ steps.image-ref.outputs.image-tag }} \
             -e "
-            packages <- c('data.table', 'dplyr', 'tidyr', 'ggplot2', 'readr', 'matrixStats', 'gridExtra', 'optparse', 'yaml', 'jsonlite')
+            packages <- c('data.table', 'dplyr', 'tidyr', 'ggplot2', 'readr', 'matrixStats', 'gridExtra', 'optparse', 'jsonlite', 'logging')
             missing <- packages[!sapply(packages, requireNamespace, quietly = TRUE)]
             if (length(missing) > 0) {
               cat('Missing packages:', paste(missing, collapse=', '), '\n')

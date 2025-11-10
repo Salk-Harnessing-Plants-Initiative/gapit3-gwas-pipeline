@@ -48,9 +48,8 @@ jobs:
         run: |
           # Export test image tag for test script to use
           export TEST_IMAGE="gapit3:test-${{ github.sha }}"
-
-          # Update test script to use our image tag
-          sed -i "s/TEST_IMAGE=\"gapit3:test-\$(date +%s)\"/TEST_IMAGE=\"${TEST_IMAGE}\"/" tests/integration/test-env-vars-e2e.sh
+          export CI_SKIP_BUILD=true
+          export CI_SKIP_CLEANUP=true
 
           # Run integration tests
           bash tests/integration/test-env-vars-e2e.sh
