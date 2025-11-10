@@ -155,3 +155,66 @@ create_mock_config <- function(output_path, genotype_path = NULL, phenotype_path
   yaml::write_yaml(config, output_path)
   return(output_path)
 }
+
+# ==============================================================================
+# Environment Variable Helpers
+# ==============================================================================
+
+# Execute code with temporarily set environment variables
+with_env_vars <- function(vars, code) {
+  old_vals <- list()
+
+  # Save old values and set new ones
+  for (name in names(vars)) {
+    old_vals[[name]] <- Sys.getenv(name, unset = NA)
+    Sys.setenv(name = vars[[name]])
+  }
+
+  # Ensure cleanup happens even if code fails
+  on.exit({
+    for (name in names(old_vals)) {
+      if (is.na(old_vals[[name]])) {
+        Sys.unsetenv(name)
+      } else {
+        Sys.setenv(name = old_vals[[name]])
+      }
+    }
+  })
+
+  force(code)
+}
+
+# Clean up all GAPIT-related environment variables
+cleanup_env_vars <- function() {
+  vars <- c(
+    "TRAIT_INDEX",
+    "DATA_PATH",
+    "OUTPUT_PATH",
+    "GENOTYPE_FILE",
+    "PHENOTYPE_FILE",
+    "ACCESSION_IDS_FILE",
+    "MODELS",
+    "PCA_COMPONENTS",
+    "SNP_THRESHOLD",
+    "MAF_FILTER",
+    "MULTIPLE_ANALYSIS",
+    "OPENBLAS_NUM_THREADS",
+    "OMP_NUM_THREADS"
+  )
+
+  for (var in vars) {
+    Sys.unsetenv(var)
+  }
+}
+
+# Set standard test environment variables
+set_test_env_vars <- function() {
+  Sys.setenv(
+    TRAIT_INDEX = "2",
+    MODELS = "BLINK,FarmCPU",
+    PCA_COMPONENTS = "3",
+    SNP_THRESHOLD = "5e-8",
+    MAF_FILTER = "0.05",
+    MULTIPLE_ANALYSIS = "TRUE"
+  )
+}

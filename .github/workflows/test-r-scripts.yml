@@ -44,7 +44,6 @@ jobs:
         run: |
           install.packages(c(
             'testthat',
-            'yaml',
             'data.table',
             'dplyr',
             'tidyr',
@@ -82,6 +81,8 @@ jobs:
           echo "**Test Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Tested Components:**" >> $GITHUB_STEP_SUMMARY
-          echo "- Config parsing" >> $GITHUB_STEP_SUMMARY
+          echo "- Environment variable parsing" >> $GITHUB_STEP_SUMMARY
+          echo "- Command-line argument parsing" >> $GITHUB_STEP_SUMMARY
+          echo "- Configuration precedence (CLI > env > defaults)" >> $GITHUB_STEP_SUMMARY
           echo "- Input validation logic" >> $GITHUB_STEP_SUMMARY
           echo "- Trait extraction logic" >> $GITHUB_STEP_SUMMARY
