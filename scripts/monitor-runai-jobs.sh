@@ -9,6 +9,7 @@ set -euo pipefail
 
 PROJECT="${PROJECT:-talmo-lab}"
 OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
+JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
 WATCH_MODE="${1:-}"
 
 # Colors
@@ -19,7 +20,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 get_job_stats() {
-    local jobs_output=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" || echo "")
+    local jobs_output=$(runai workspace list -p $PROJECT 2>/dev/null | grep "$JOB_PREFIX-" || echo "")
 
     if [ -z "$jobs_output" ]; then
         echo "0 0 0 0 0"
@@ -112,7 +113,7 @@ show_status() {
     # Recent failures
     if [ "${failed:-0}" -gt 0 ]; then
         echo -e "${RED}Recent Failures:${NC}"
-        runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Failed" | head -5 | while read line; do
+        runai workspace list -p $PROJECT 2>/dev/null | grep "$JOB_PREFIX-" | grep "Failed" | head -5 | while read line; do
             echo "  $line"
         done
         echo ""
@@ -120,7 +121,7 @@ show_status() {
 
     # Long-running jobs (over 2 hours)
     echo -e "${YELLOW}Long-Running Jobs (>2h):${NC}"
-    local long_running=$(runai workspace list -p $PROJECT 2>/dev/null | grep "gapit3-trait-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' 2>/dev/null || echo "  None")
+    local long_running=$(runai workspace list -p $PROJECT 2>/dev/null | grep "$JOB_PREFIX-" | grep "Running" | awk '$4 ~ /[2-9]h|[0-9][0-9]h/ {print "  " $0}' 2>/dev/null || echo "  None")
     if [ -z "$long_running" ]; then
         echo "  None"
     else
@@ -141,8 +142,8 @@ show_status() {
 
     # Commands
     echo -e "${BLUE}Commands:${NC}"
-    echo "  View specific job:    runai describe job gapit3-trait-2 -p $PROJECT"
-    echo "  View logs:            runai logs gapit3-trait-2 -p $PROJECT --follow"
+    echo "  View specific job:    runai describe job $JOB_PREFIX-2 -p $PROJECT"
+    echo "  View logs:            runai logs $JOB_PREFIX-2 -p $PROJECT --follow"
     echo "  Aggregate results:    ./scripts/aggregate-runai-results.sh"
     echo ""
 }

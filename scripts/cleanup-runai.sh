@@ -14,6 +14,7 @@ trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit c
 # Configuration
 PROJECT="${PROJECT:-talmo-lab}"
 OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
+JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
 DEFAULT_START_TRAIT=2
 DEFAULT_END_TRAIT=187
 
@@ -216,7 +217,7 @@ log_info "Discovering resources..."
 EXISTING_WORKSPACES=0
 if [ "$OUTPUTS_ONLY" = false ]; then
     for i in $(seq $START_TRAIT $END_TRAIT); do
-        if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*gapit3-trait-$i[[:space:]]"; then
+        if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_PREFIX-$i[[:space:]]"; then
             EXISTING_WORKSPACES=$((EXISTING_WORKSPACES + 1))
         fi
     done
@@ -321,7 +322,7 @@ if [ "$OUTPUTS_ONLY" = false ] && [ $EXISTING_WORKSPACES -gt 0 ]; then
     trap - ERR
 
     for i in $(seq $START_TRAIT $END_TRAIT); do
-        JOB_NAME="gapit3-trait-$i"
+        JOB_NAME="$JOB_PREFIX-$i"
 
         if [ "$DRY_RUN" = true ]; then
             if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_NAME[[:space:]]"; then
