@@ -35,11 +35,14 @@ tests/
 
 ```
 .github/workflows/
-├── test-r-scripts.yml           # UPDATED: Remove yaml, add env var tests
-├── test-bash-scripts.yml        # NEW: Bash unit tests
-├── test-integration.yml         # NEW: Docker integration tests
-└── docker-build.yml             # UPDATED: Add entrypoint tests
+├── test-r-scripts.yml           # R unit tests (env var parsing)
+└── docker-build.yml             # Docker build + verification + integration
+    ├── build-and-push           # Build and push image
+    ├── verify-image             # Verify R packages, entrypoint
+    └── integration-test         # Env var integration tests
 ```
+
+**Note**: Integration tests were merged into docker-build.yml to test the actual production image instead of building a separate test image.
 
 ## Test Implementation Details
 
@@ -661,21 +664,22 @@ Developer Push
 ┌─────────────────────────────────────────┐
 │  GitHub Actions Triggered               │
 ├─────────────────────────────────────────┤
-│  1. R Script Tests                      │
+│  1. R Script Tests (parallel)           │
 │     - Environment variable parsing      │
 │     - Type conversions                  │
 │     - Argument precedence               │
-│  2. Bash Script Tests                   │
-│     - Entrypoint validation             │
-│     - Helper function logic             │
-│     - shellcheck linting                │
-│  3. Integration Tests                   │
-│     - Build Docker image                │
-│     - Test env vars end-to-end          │
-│     - Test error cases                  │
-│  4. Docker Build                        │
-│     - Full image build                  │
-│     - Push to registry (if main)        │
+│  2. Docker Build Workflow               │
+│     a. build-and-push                   │
+│        - Build Docker image             │
+│        - Push to registry (if main)     │
+│     b. verify-image (needs: build)      │
+│        - Test R packages                │
+│        - Test entrypoint                │
+│        - Functional tests               │
+│     c. integration-test (needs: build)  │
+│        - Test env vars end-to-end       │
+│        - Test validation logic          │
+│        - Test error cases               │
 └─────────────────────────────────────────┘
       ↓
   All Pass? → Merge allowed

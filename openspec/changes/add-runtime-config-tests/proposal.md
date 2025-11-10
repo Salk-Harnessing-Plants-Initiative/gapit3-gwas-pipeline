@@ -209,30 +209,40 @@ test_invalid_config_fails_fast() {
 
 **Category 4: CI Workflow Updates**
 ```yaml
-# .github/workflows/test-r-scripts.yml (updated)
-- name: Install R package dependencies
-  run: |
-    install.packages(c(
-      'testthat',
-      'data.table',
-      'dplyr',
-      'optparse',
-      'jsonlite'
-      # NO MORE 'yaml' - removed
-    ))
+# .github/workflows/docker-build.yml (updated)
+jobs:
+  build-and-push:
+    # ... existing build job
+    outputs:
+      image-tag: ${{ steps.set-tag.outputs.tag }}
+      is-prod: ${{ steps.determine-env.outputs.is-prod }}
 
-- name: Test environment variable parsing
-  run: |
-    Rscript -e "
-    library(testthat)
-    test_file('tests/testthat/test-env_var_parsing.R')
-    "
+  verify-image:
+    needs: build-and-push
+    # ... existing verification tests
 
-- name: Test entrypoint validation
-  run: |
-    sudo npm install -g bats
-    bats tests/bash/test-entrypoint-validation.bats
+  integration-test:  # NEW: Merged from test-integration.yml
+    needs: build-and-push
+    steps:
+      - name: Determine image to test
+        # For PRs: rebuild locally from cache
+        # For pushes: use pushed image from ghcr.io
+
+      - name: Test env vars with actual production image
+        run: |
+          IMAGE="${{ steps.image-ref.outputs.image-tag }}"
+          docker run --rm -e MODELS=BLINK $IMAGE help
+
+      - name: Run integration test suite
+        run: |
+          export TEST_IMAGE="${{ steps.image-ref.outputs.image-tag }}"
+          bash tests/integration/test-env-vars-e2e.sh
 ```
+
+**Benefits of Merged Approach**:
+- Tests the ACTUAL production image (not a separate build)
+- Faster CI (reuses built image instead of building twice)
+- Simpler architecture (one workflow instead of two)
 
 ## Benefits
 

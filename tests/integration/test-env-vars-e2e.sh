@@ -10,7 +10,7 @@ set -euo pipefail
 # Test configuration
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-TEST_IMAGE="gapit3:test-$(date +%s)"
+TEST_IMAGE="${TEST_IMAGE:-gapit3:test-$(date +%s)}"
 TESTS_PASSED=0
 TESTS_FAILED=0
 
