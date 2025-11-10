@@ -83,6 +83,80 @@ docker run -v $(pwd)/data:/data -v $(pwd)/outputs:/outputs \
 
 ---
 
+## Runtime Configuration
+
+The GAPIT3 container is **fully configurable at runtime** via environment variables - no image rebuild required to change analysis parameters.
+
+### Quick Examples
+
+**Change models without rebuilding:**
+```bash
+# Fast preliminary scan (BLINK only)
+docker run --rm \
+  -v /data:/data \
+  -v /outputs:/outputs \
+  -e TRAIT_INDEX=2 \
+  -e MODELS=BLINK \
+  gapit3:latest
+
+# Validation run (multiple models)
+docker run --rm \
+  -e TRAIT_INDEX=2 \
+  -e MODELS=BLINK,FarmCPU,MLM \
+  -e PCA_COMPONENTS=5 \
+  gapit3:latest
+```
+
+**RunAI deployment:**
+```bash
+runai workspace submit gapit3-trait-2 \
+  --project talmo-lab \
+  --image ghcr.io/.../gapit3:latest \
+  --environment TRAIT_INDEX=2 \
+  --environment MODELS=BLINK \
+  --environment PCA_COMPONENTS=5 \
+  --environment SNP_THRESHOLD=5e-8
+```
+
+**Local development with .env file:**
+```bash
+# Copy example and customize
+cp .env.example .env
+nano .env
+
+# Run with your configuration
+docker run --rm --env-file .env gapit3:latest
+```
+
+### Available Configuration Options
+
+**Core Analysis Parameters:**
+- `MODELS` - GWAS models (default: `BLINK,FarmCPU`)
+- `PCA_COMPONENTS` - Population structure correction (default: `3`, range: `0-20`)
+- `SNP_THRESHOLD` - Significance threshold (default: `5e-8`)
+- `MAF_FILTER` - Minor allele frequency filter (default: `0.05`)
+
+**Paths:**
+- `TRAIT_INDEX` - Which trait column to analyze (required)
+- `DATA_PATH` - Input data directory
+- `OUTPUT_PATH` - Output directory
+- `GENOTYPE_FILE` - Genotype HapMap file path
+- `PHENOTYPE_FILE` - Phenotype file path
+
+**Computational Resources:**
+- `OPENBLAS_NUM_THREADS` - Linear algebra threads (default: `12`)
+- `OMP_NUM_THREADS` - OpenMP threads (default: `12`)
+
+**See [.env.example](.env.example) for complete documentation of all options.**
+
+### Configuration Priority
+
+1. **Command-line arguments** (highest priority)
+2. **Environment variables** (RunAI `--environment` or Docker `-e`)
+3. **Defaults in entrypoint.sh** (lowest priority)
+
+---
+
 ## Architecture
 
 ```
@@ -120,6 +194,7 @@ docker run -v $(pwd)/data:/data -v $(pwd)/outputs:/outputs \
 gapit3-gwas-pipeline/
 ├── Dockerfile                  # Production container
 ├── .devcontainer/             # VS Code devcontainer config
+├── .env.example               # Runtime configuration documentation
 ├── cluster/
 │   └── argo/
 │       ├── workflow-templates/  # Reusable Argo templates
@@ -129,12 +204,15 @@ gapit3-gwas-pipeline/
 │   ├── run_gwas_single_trait.R    # Core GWAS script
 │   ├── collect_results.R          # Results aggregator
 │   ├── validate_inputs.R          # Input validation
-│   └── entrypoint.sh              # Container entrypoint
-├── config/
-│   └── config.yaml                # GAPIT parameters
+│   ├── entrypoint.sh              # Container entrypoint (handles runtime config)
+│   ├── submit-all-traits-runai.sh # Batch submission helper
+│   ├── monitor-runai-jobs.sh      # Job monitoring dashboard
+│   ├── aggregate-runai-results.sh # Results aggregation
+│   └── cleanup-runai.sh           # Cleanup helper
 └── docs/
     ├── ARGO_SETUP.md              # Cluster setup guide
-    └── USAGE.md                   # Detailed usage
+    ├── MANUAL_RUNAI_EXECUTION.md  # RunAI workaround guide
+    └── RBAC_PERMISSIONS_ISSUE.md  # Admin information
 ```
 
 ---

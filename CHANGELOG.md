@@ -10,11 +10,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Runtime Configuration via Environment Variables** - Major enhancement allowing container reconfiguration without rebuilds
+  - `.env.example` - Comprehensive documentation of all runtime configuration options
+  - Environment variable support in entrypoint.sh with validation
+  - All GAPIT parameters (models, PCA, thresholds) now configurable at runtime
+  - Works with Docker `--env-file`, RunAI `--environment`, and Argo `env:` specifications
 - Manual RunAI execution scripts as workaround for RBAC permissions
-  - `scripts/submit-all-traits-runai.sh` - Batch submission with concurrency control
+  - `scripts/submit-all-traits-runai.sh` - Batch submission with concurrency control (updated with runtime config support)
   - `scripts/monitor-runai-jobs.sh` - Live monitoring dashboard
   - `scripts/aggregate-runai-results.sh` - Automatic results aggregation
-  - `scripts/cleanup-runai.sh` - Cleanup helper for workspaces and output files (NEW)
+  - `scripts/cleanup-runai.sh` - Cleanup helper for workspaces and output files
 - Comprehensive documentation for RunAI CLI execution
   - `docs/MANUAL_RUNAI_EXECUTION.md` - Complete execution guide
   - `docs/RUNAI_QUICK_REFERENCE.md` - Command cheat sheet
@@ -25,7 +30,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - OpenSpec change proposals
   - `openspec/changes/fix-argo-workflow-validation/` - Workflow validation fix
   - `openspec/changes/add-runai-aggregation-script/` - Aggregation automation
-  - `openspec/changes/add-cleanup-script/` - Cleanup helper script (NEW)
+  - `openspec/changes/add-cleanup-script/` - Cleanup helper script
+  - `openspec/changes/add-dotenv-configuration/` - Runtime configuration proposal
 
 ### Fixed
 - **Critical**: Argo Workflows validation error with parameterized volumes ([#10](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/pull/10))
@@ -36,10 +42,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated RunAI CLI syntax to new version (workspace commands)
 
 ### Changed
+- **Container now runtime-configurable** - No longer requires config.yaml or image rebuilds for parameter changes
+  - Updated `scripts/entrypoint.sh` to read and validate environment variables
+  - Updated `scripts/run_gwas_single_trait.R` to accept command-line arguments with env var fallbacks
+  - Updated `Dockerfile` to remove hardcoded runtime configuration (thread counts moved to runtime)
+  - Updated `scripts/submit-all-traits-runai.sh` to pass all GAPIT parameters as environment variables
+  - Removed `yaml` R package dependency (no longer needed)
+- Updated README.md with runtime configuration section and examples
 - Updated README.md with current status and workaround documentation links
 - Updated QUICKSTART.md with RBAC warning and RunAI instructions
 - Updated docs/ARGO_SETUP.md with workflow validation fix section
 - Updated docs/DEPLOYMENT_TESTING.md with latest test results (2025-11-07)
+
+### Deprecated
+- `config/config.yaml` - Configuration now via environment variables (file kept for backward compatibility but not used by new entrypoint)
 
 ### Documented
 - Workflow validation fix root cause and solution

@@ -11,7 +11,7 @@ set -uo pipefail
 # Error handling
 trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
 
-# Configuration
+# Configuration (Infrastructure)
 PROJECT="talmo-lab"
 IMAGE="ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
 DATA_PATH="${DATA_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data}"
@@ -22,7 +22,13 @@ END_TRAIT="${END_TRAIT:-187}"
 MAX_CONCURRENT="${MAX_CONCURRENT:-50}"
 CPU="${CPU:-12}"
 MEMORY="${MEMORY:-32G}"
+
+# Configuration (GAPIT Runtime Parameters - passed as environment variables to container)
 MODELS="${MODELS:-BLINK,FarmCPU}"
+PCA_COMPONENTS="${PCA_COMPONENTS:-3}"
+SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"
+MAF_FILTER="${MAF_FILTER:-0.05}"
+MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"
 
 # Colors for output
 RED='\033[0;31m'
@@ -41,7 +47,15 @@ echo "  Job prefix:        $JOB_PREFIX"
 echo "  Traits:            $START_TRAIT to $END_TRAIT ($(($END_TRAIT - $START_TRAIT + 1)) total)"
 echo "  Max concurrent:    $MAX_CONCURRENT"
 echo "  Resources:         $CPU CPU, $MEMORY memory"
+echo ""
+echo "GAPIT Parameters (passed as ENV to container):"
 echo "  Models:            $MODELS"
+echo "  PCA Components:    $PCA_COMPONENTS"
+echo "  SNP Threshold:     $SNP_THRESHOLD"
+echo "  MAF Filter:        $MAF_FILTER"
+echo "  Multiple Analysis: $MULTIPLE_ANALYSIS"
+echo ""
+echo "Paths:"
 echo "  Data path:         $DATA_PATH"
 echo "  Output path:       $OUTPUT_PATH"
 echo ""
@@ -96,15 +110,17 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
         --cpu-memory-request $MEMORY \
         --host-path path=$DATA_PATH,mount=/data,mount-propagation=HostToContainer \
         --host-path path=$OUTPUT_PATH,mount=/outputs,mount-propagation=HostToContainer,readwrite \
+        --environment TRAIT_INDEX=$trait_idx \
+        --environment DATA_PATH=/data \
+        --environment OUTPUT_PATH=/outputs \
+        --environment MODELS=$MODELS \
+        --environment PCA_COMPONENTS=$PCA_COMPONENTS \
+        --environment SNP_THRESHOLD=$SNP_THRESHOLD \
+        --environment MAF_FILTER=$MAF_FILTER \
+        --environment MULTIPLE_ANALYSIS=$MULTIPLE_ANALYSIS \
         --environment OPENBLAS_NUM_THREADS=$CPU \
         --environment OMP_NUM_THREADS=$CPU \
-        --environment TRAIT_INDEX=$trait_idx \
-        --command -- /scripts/entrypoint.sh run-single-trait \
-          --trait-index $trait_idx \
-          --config /config/config.yaml \
-          --output-dir /outputs \
-          --models $MODELS \
-          --threads $CPU 2>&1)
+        --command -- /scripts/entrypoint.sh run-single-trait 2>&1)
     SUBMIT_EXIT=$?
     set -e
     trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
