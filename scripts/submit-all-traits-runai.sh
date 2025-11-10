@@ -14,8 +14,9 @@ trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit c
 # Configuration
 PROJECT="talmo-lab"
 IMAGE="ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
-DATA_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
-OUTPUT_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
+DATA_PATH="${DATA_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data}"
+OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
+JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
 START_TRAIT="${START_TRAIT:-2}"
 END_TRAIT="${END_TRAIT:-187}"
 MAX_CONCURRENT="${MAX_CONCURRENT:-50}"
@@ -36,6 +37,7 @@ echo ""
 echo "Configuration:"
 echo "  Project:           $PROJECT"
 echo "  Image:             $IMAGE"
+echo "  Job prefix:        $JOB_PREFIX"
 echo "  Traits:            $START_TRAIT to $END_TRAIT ($(($END_TRAIT - $START_TRAIT + 1)) total)"
 echo "  Max concurrent:    $MAX_CONCURRENT"
 echo "  Resources:         $CPU CPU, $MEMORY memory"
@@ -62,7 +64,7 @@ echo -e "${GREEN}Starting job submission...${NC}"
 echo ""
 
 for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
-    JOB_NAME="gapit3-trait-$trait_idx"
+    JOB_NAME="$JOB_PREFIX-$trait_idx"
 
     # Check if job already exists
     if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_NAME[[:space:]]"; then
