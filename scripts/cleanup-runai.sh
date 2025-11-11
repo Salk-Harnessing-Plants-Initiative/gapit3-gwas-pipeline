@@ -202,18 +202,17 @@ if [ "$OUTPUTS_ONLY" = false ]; then
     fi
 fi
 
-# Check output directory (only if not workspaces-only)
+# Check output directory accessibility (only if not workspaces-only)
 if [ "$WORKSPACES_ONLY" = false ]; then
     if [ ! -d "$OUTPUT_PATH" ]; then
-        log_warn "Output directory does not exist: $OUTPUT_PATH"
-        if [ "$FORCE" = false ]; then
-            read -p "Continue anyway? (y/N): " -n 1 -r
-            echo
-            if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-                log_info "Cancelled"
-                exit 0
-            fi
-        fi
+        log_warn "Cannot access output directory locally: $OUTPUT_PATH"
+        log_info "This is normal if:"
+        log_info "  - You're not on the cluster or don't have cluster mount configured"
+        log_info "  - Jobs haven't created the output directory yet"
+        log_info "Output cleanup will be skipped (workspaces-only mode)"
+        echo ""
+        # Force workspaces-only mode since we can't access output directory
+        WORKSPACES_ONLY=true
     fi
 fi
 

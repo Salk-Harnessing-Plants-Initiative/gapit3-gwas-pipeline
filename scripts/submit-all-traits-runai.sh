@@ -11,6 +11,36 @@ set -uo pipefail
 # Error handling
 trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
 
+# Parse command line arguments
+DRY_RUN=false
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --help|-h)
+            echo "Usage: $0 [OPTIONS]"
+            echo ""
+            echo "Submit GAPIT3 GWAS analysis jobs for all traits to RunAI cluster."
+            echo ""
+            echo "OPTIONS:"
+            echo "  --dry-run    Validate configuration and show submission plan without submitting"
+            echo "  --help, -h   Show this help message"
+            echo ""
+            echo "Configuration is loaded from .env file in project root."
+            echo ""
+            exit 0
+            ;;
+        *)
+            echo "Unknown option: $1"
+            echo "Use --help for usage information"
+            exit 2
+            ;;
+    esac
+done
+
 # Load configuration from .env file if it exists
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
@@ -73,6 +103,73 @@ echo "  Data path:         $DATA_PATH"
 echo "  Output path:       $OUTPUT_PATH"
 echo ""
 
+# DRY-RUN MODE
+if [[ "$DRY_RUN" == "true" ]]; then
+    echo "==========================================================================="
+    echo "DRY-RUN MODE: No jobs will be submitted"
+    echo "==========================================================================="
+    echo ""
+
+    # Run validation
+    echo "Running configuration validation..."
+    echo ""
+
+    VALIDATION_SCRIPT="$SCRIPT_DIR/validate-env.sh"
+    if [[ -f "$VALIDATION_SCRIPT" ]]; then
+        if bash "$VALIDATION_SCRIPT" --env-file "$ENV_FILE"; then
+            echo ""
+        else
+            echo ""
+            echo -e "${RED}[ERROR]${NC} Configuration validation failed"
+            echo "Please fix the errors above before submitting."
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}[WARNING]${NC} Validation script not found: $VALIDATION_SCRIPT"
+        echo "Skipping validation checks..."
+        echo ""
+    fi
+
+    # Show submission plan
+    echo "==========================================================================="
+    echo "Job Submission Plan"
+    echo "==========================================================================="
+    echo ""
+
+    TOTAL_JOBS=$((END_TRAIT - START_TRAIT + 1))
+    PEAK_CPU=$((CPU * MAX_CONCURRENT))
+    PEAK_MEMORY_NUM=${MEMORY%G}
+    PEAK_MEMORY=$((PEAK_MEMORY_NUM * MAX_CONCURRENT))
+
+    echo "Jobs to submit:    $TOTAL_JOBS"
+    echo "Job name range:    $JOB_PREFIX-$START_TRAIT to $JOB_PREFIX-$END_TRAIT"
+    echo "Max concurrent:    $MAX_CONCURRENT jobs"
+    echo ""
+    echo "Resources per job: $CPU CPU cores, $MEMORY memory"
+    echo "Peak resources:    $PEAK_CPU CPU cores, ~${PEAK_MEMORY}G memory"
+    echo ""
+
+    # Show first 5 jobs as examples
+    echo "First 5 jobs:"
+    for i in $(seq $START_TRAIT $((START_TRAIT + 4))); do
+        [[ $i -gt $END_TRAIT ]] && break
+        echo "  - $JOB_PREFIX-$i (Trait index: $i)"
+    done
+    if [[ $TOTAL_JOBS -gt 5 ]]; then
+        echo "  ... ($((TOTAL_JOBS - 5)) more jobs)"
+    fi
+    echo ""
+
+    echo "==========================================================================="
+    echo -e "${GREEN}Configuration validated successfully${NC}"
+    echo "==========================================================================="
+    echo ""
+    echo "To submit these jobs, run:"
+    echo "  $0"
+    echo ""
+    exit 0
+fi
+
 # Confirmation
 read -p "Submit all jobs? (y/N): " -n 1 -r
 echo
@@ -126,6 +223,9 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
         --environment TRAIT_INDEX=$trait_idx \
         --environment DATA_PATH=/data \
         --environment OUTPUT_PATH=/outputs \
+        --environment GENOTYPE_FILE=${GENOTYPE_FILE} \
+        --environment PHENOTYPE_FILE=${PHENOTYPE_FILE} \
+        --environment ACCESSION_IDS_FILE=${ACCESSION_IDS_FILE:-} \
         --environment MODELS=$MODELS \
         --environment PCA_COMPONENTS=$PCA_COMPONENTS \
         --environment SNP_THRESHOLD=$SNP_THRESHOLD \
