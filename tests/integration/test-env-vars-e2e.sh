@@ -299,17 +299,17 @@ run_all_tests() {
     log_info "Starting integration tests..."
     echo
 
-    # Run all test functions
-    test_help_command
-    test_default_env_vars
-    test_custom_env_vars_logged
-    test_invalid_model_validation
-    test_invalid_pca_validation
-    test_invalid_threshold_validation
-    test_missing_required_files
-    test_multiple_env_vars_together
-    test_validation_order
-    test_command_routing
+    # Run all test functions (continue even if some fail)
+    test_help_command || true
+    test_default_env_vars || true
+    test_custom_env_vars_logged || true
+    test_invalid_model_validation || true
+    test_invalid_pca_validation || true
+    test_invalid_threshold_validation || true
+    test_missing_required_files || true
+    test_multiple_env_vars_together || true
+    test_validation_order || true
+    test_command_routing || true
 
     echo
     log_info "================================"
