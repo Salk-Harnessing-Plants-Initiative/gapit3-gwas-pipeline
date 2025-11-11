@@ -102,7 +102,7 @@ validate_pca_components() {
 validate_threshold() {
     # Check if it's a valid number in scientific notation
     if ! echo "$SNP_THRESHOLD" | grep -qE '^[0-9]+\.?[0-9]*[eE]?-?[0-9]*$'; then
-        log_error "SNP_THRESHOLD must be a number (e.g., 5e-8), got: '$SNP_THRESHOLD'"
+        log_error "Invalid threshold: SNP_THRESHOLD must be a numeric value (e.g., 5e-8), got: '$SNP_THRESHOLD'"
         return 1
     fi
 
@@ -373,15 +373,16 @@ show_current_config() {
     echo "Current Environment Variable Values"
     echo "==========================================================================="
     echo ""
-    echo "  TRAIT_INDEX:      $TRAIT_INDEX"
-    echo "  MODELS:           $MODELS"
-    echo "  PCA_COMPONENTS:   $PCA_COMPONENTS"
-    echo "  SNP_THRESHOLD:    $SNP_THRESHOLD"
-    echo "  MAF_FILTER:       $MAF_FILTER"
-    echo "  DATA_PATH:        $DATA_PATH"
-    echo "  OUTPUT_PATH:      $OUTPUT_PATH"
-    echo "  GENOTYPE_FILE:    $GENOTYPE_FILE"
-    echo "  PHENOTYPE_FILE:   $PHENOTYPE_FILE"
+    echo "  TRAIT_INDEX:         $TRAIT_INDEX"
+    echo "  MODELS:              $MODELS"
+    echo "  PCA_COMPONENTS:      $PCA_COMPONENTS"
+    echo "  SNP_THRESHOLD:       $SNP_THRESHOLD"
+    echo "  MAF_FILTER:          $MAF_FILTER"
+    echo "  MULTIPLE_ANALYSIS:   $MULTIPLE_ANALYSIS"
+    echo "  DATA_PATH:           $DATA_PATH"
+    echo "  OUTPUT_PATH:         $OUTPUT_PATH"
+    echo "  GENOTYPE_FILE:       $GENOTYPE_FILE"
+    echo "  PHENOTYPE_FILE:      $PHENOTYPE_FILE"
     echo ""
     echo "==========================================================================="
     echo ""

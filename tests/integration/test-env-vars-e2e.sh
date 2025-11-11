@@ -179,12 +179,14 @@ test_custom_env_vars_logged() {
 test_invalid_model_validation() {
     log_info "Testing invalid model validation..."
 
+    set +e
     output=$(docker run --rm \
         -e MODELS=INVALID_MODEL \
         -e GENOTYPE_FILE=/data/genotype/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/phenotype/test.txt \
-        "$TEST_IMAGE" run-single-trait 2>&1 || true)
+        "$TEST_IMAGE" run-single-trait 2>&1)
     exit_code=$?
+    set -e
 
     # Should fail validation
     assert_exit_code "$exit_code" 1 "Invalid model causes non-zero exit"
@@ -197,12 +199,14 @@ test_invalid_model_validation() {
 test_invalid_pca_validation() {
     log_info "Testing invalid PCA_COMPONENTS validation..."
 
+    set +e
     output=$(docker run --rm \
         -e PCA_COMPONENTS=100 \
         -e GENOTYPE_FILE=/data/genotype/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/phenotype/test.txt \
-        "$TEST_IMAGE" run-single-trait 2>&1 || true)
+        "$TEST_IMAGE" run-single-trait 2>&1)
     exit_code=$?
+    set -e
 
     # Should fail validation
     assert_exit_code "$exit_code" 1 "Invalid PCA causes non-zero exit"
@@ -215,12 +219,14 @@ test_invalid_pca_validation() {
 test_invalid_threshold_validation() {
     log_info "Testing invalid SNP_THRESHOLD validation..."
 
+    set +e
     output=$(docker run --rm \
         -e SNP_THRESHOLD=invalid \
         -e GENOTYPE_FILE=/data/genotype/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/phenotype/test.txt \
-        "$TEST_IMAGE" run-single-trait 2>&1 || true)
+        "$TEST_IMAGE" run-single-trait 2>&1)
     exit_code=$?
+    set -e
 
     # Should fail validation
     assert_exit_code "$exit_code" 1 "Invalid threshold causes non-zero exit"
@@ -230,11 +236,13 @@ test_invalid_threshold_validation() {
 test_missing_required_files() {
     log_info "Testing missing required files validation..."
 
+    set +e
     output=$(docker run --rm \
         -e GENOTYPE_FILE=/nonexistent/file.hmp.txt \
         -e PHENOTYPE_FILE=/nonexistent/file.txt \
-        "$TEST_IMAGE" run-single-trait 2>&1 || true)
+        "$TEST_IMAGE" run-single-trait 2>&1)
     exit_code=$?
+    set -e
 
     # Should fail validation
     assert_exit_code "$exit_code" 1 "Missing files cause non-zero exit"
@@ -285,8 +293,10 @@ test_command_routing() {
     assert_contains "$output" "Usage:" "Help command works"
 
     # Test invalid command
-    output=$(docker run --rm "$TEST_IMAGE" invalid-command 2>&1 || true)
+    set +e
+    output=$(docker run --rm "$TEST_IMAGE" invalid-command 2>&1)
     exit_code=$?
+    set -e
     assert_exit_code "$exit_code" 1 "Invalid command returns non-zero"
     assert_contains "$output" "Unknown command\|not recognized" "Error for invalid command"
 }
