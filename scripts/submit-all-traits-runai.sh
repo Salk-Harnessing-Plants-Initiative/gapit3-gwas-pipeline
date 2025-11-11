@@ -11,11 +11,24 @@ set -uo pipefail
 # Error handling
 trap 'echo ""; echo -e "${RED}[ERROR]${NC} Script failed at line $LINENO. Exit code: $?"; exit 1' ERR
 
-# Configuration (Infrastructure)
-PROJECT="talmo-lab"
-IMAGE="ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
-DATA_PATH="${DATA_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data}"
-OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
+# Load configuration from .env file if it exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    echo "Loading configuration from .env file..."
+    # Export variables from .env (ignore comments and empty lines)
+    set -a
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
+    set +a
+fi
+
+# Configuration (Infrastructure) - .env values or fallback defaults
+PROJECT="${PROJECT:-talmo-lab}"
+IMAGE="${IMAGE:-ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest}"
+DATA_PATH="${DATA_PATH_HOST:-${DATA_PATH:-/data}}"
+OUTPUT_PATH="${OUTPUT_PATH_HOST:-${OUTPUT_PATH:-/outputs}}"
 JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
 START_TRAIT="${START_TRAIT:-2}"
 END_TRAIT="${END_TRAIT:-187}"
