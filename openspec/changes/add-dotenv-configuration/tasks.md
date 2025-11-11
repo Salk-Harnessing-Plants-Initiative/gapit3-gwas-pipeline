@@ -323,41 +323,132 @@ runai workspace submit $JOB_NAME \
 - [ ] Help text documents new options
 - [ ] Backward compatible with existing usage
 
-### Task 3.2: Update aggregate-runai-results.sh (15 min)
+### Task 3.2: Update aggregate-runai-results.sh (15 min) ✅ COMPLETED
 
 **File**: `scripts/aggregate-runai-results.sh`
 
 **Steps**:
-1. Update aggregation job submission to use same pattern
-2. Pass OUTPUT_PATH as environment variable
-3. Add any aggregation-specific parameters
+1. ✅ Added .env file loading at script start (lines 17-25)
+2. ✅ Updated configuration precedence: .env → environment → defaults
+3. ✅ Added support for OUTPUT_PATH_HOST from .env
+4. ✅ Added support for START_TRAIT, END_TRAIT from .env
+5. ✅ Added support for SNP_THRESHOLD from .env
 
-**Example**:
+**Implementation**:
 ```bash
-runai workspace submit gapit3-aggregate-${BATCH_ID} \
-    --project $PROJECT \
-    --image $IMAGE \
-    --environment OUTPUT_PATH="$OUTPUT_PATH" \
-    --environment BATCH_ID="$BATCH_ID" \
-    --command -- /scripts/entrypoint.sh run-aggregation
+# Load configuration from .env file if it exists
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    # Export variables from .env (ignore comments and empty lines)
+    set -a
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
+    set +a
+fi
+
+# Parse from environment or use defaults
+PROJECT="${PROJECT:-${RUNAI_PROJECT:-$DEFAULT_PROJECT}}"
+OUTPUT_DIR="${OUTPUT_PATH_HOST:-${OUTPUT_PATH:-${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}}}"
+START_TRAIT="${START_TRAIT:-$DEFAULT_START_TRAIT}"
+END_TRAIT="${END_TRAIT:-$DEFAULT_END_TRAIT}"
+THRESHOLD="${SNP_THRESHOLD:-$DEFAULT_THRESHOLD}"
 ```
 
 **Acceptance Criteria**:
-- [ ] Aggregation job uses environment variables
-- [ ] Works with new entrypoint.sh commands
-- [ ] OUTPUT_PATH properly passed
+- [x] Aggregation script loads .env file
+- [x] Uses OUTPUT_PATH_HOST for cluster paths
+- [x] Uses SNP_THRESHOLD from .env
+- [x] Maintains backward compatibility with env vars and defaults
 
-### Task 3.3: Add environment variable support to cleanup (15 min)
+### Task 3.3: Add .env support to cleanup and monitor scripts (20 min) ✅ COMPLETED
 
-**File**: `scripts/cleanup-runai.sh`
+**Files**:
+- `scripts/cleanup-runai.sh`
+- `scripts/monitor-runai-jobs.sh`
 
-**Steps**:
-1. Document that cleanup is independent of runtime config
-2. Add note about .env file (never committed, safe to delete)
+**Steps Completed**:
+1. ✅ Added .env file loading to cleanup-runai.sh (lines 14-24)
+2. ✅ Added .env file loading to monitor-runai-jobs.sh (lines 10-20)
+3. ✅ Both scripts now use OUTPUT_PATH_HOST from .env
+4. ✅ Both scripts use PROJECT and JOB_PREFIX from .env
+5. ✅ Maintains fallback to defaults if .env not present
+
+**Implementation Pattern** (used in all scripts):
+```bash
+# Load configuration from .env file if it exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    # Export variables from .env (ignore comments and empty lines)
+    set -a
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
+    set +a
+fi
+
+# Configuration - .env values or fallback defaults
+PROJECT="${PROJECT:-talmo-lab}"
+OUTPUT_PATH="${OUTPUT_PATH_HOST:-${OUTPUT_PATH:-/default/path}}"
+JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
+```
 
 **Acceptance Criteria**:
-- [ ] Documentation explains cleanup doesn't affect config
-- [ ] No changes needed to cleanup logic
+- [x] cleanup-runai.sh loads .env configuration
+- [x] monitor-runai-jobs.sh loads .env configuration
+- [x] All four RunAI scripts now have consistent .env support
+- [x] Scripts work without .env file (use defaults)
+- [x] Scripts properly use OUTPUT_PATH_HOST for cluster paths
+
+### Task 3.4: Fix .env.example accuracy (30 min) ✅ COMPLETED
+
+**File**: `.env.example`
+
+**Critical Issue Found**:
+- .env.example documented options (KINSHIP_METHOD, CORRECTION_METHOD, MAX_ITERATIONS) that were NOT actually configurable
+- submit-all-traits-runai.sh only passes specific env vars to containers
+- This created misleading documentation
+
+**Steps Completed**:
+1. ✅ Verified what submit script actually passes to containers (lines 106-123 of submit script)
+2. ✅ Removed invalid options from .env.example
+3. ✅ Added clear documentation section explaining non-configurable options
+4. ✅ Updated OPENBLAS/OMP_NUM_THREADS notes (auto-set by script)
+5. ✅ Added deployment-specific configuration documentation
+
+**What's Actually Passed to Containers**:
+```bash
+--environment TRAIT_INDEX=$trait_idx \
+--environment DATA_PATH=/data \
+--environment OUTPUT_PATH=/outputs \
+--environment MODELS=$MODELS \
+--environment PCA_COMPONENTS=$PCA_COMPONENTS \
+--environment SNP_THRESHOLD=$SNP_THRESHOLD \
+--environment MAF_FILTER=$MAF_FILTER \
+--environment MULTIPLE_ANALYSIS=$MULTIPLE_ANALYSIS \
+--environment OPENBLAS_NUM_THREADS=$CPU \
+--environment OMP_NUM_THREADS=$CPU
+```
+
+**Added Documentation Section**:
+```bash
+# ===========================================================================
+# Advanced GAPIT Options (NOT configurable via environment variables)
+# ===========================================================================
+# These options exist in the R scripts with hardcoded defaults but are NOT
+# passed as environment variables by submit-all-traits-runai.sh
+# To change these, you must modify the R scripts directly:
+#   - KINSHIP_METHOD=VanRaden (default in entrypoint.sh)
+#   - CORRECTION_METHOD=FDR (default in entrypoint.sh)
+#   - MAX_ITERATIONS=10 (default in entrypoint.sh)
+# ===========================================================================
+```
+
+**Acceptance Criteria**:
+- [x] .env.example only documents actually configurable options
+- [x] Clear section explaining non-configurable options
+- [x] Accurate notes about auto-set values (OPENBLAS/OMP threads)
+- [x] Deployment-specific configuration clearly marked
 
 ## Phase 4: Testing (1 hour)
 

@@ -7,8 +7,21 @@
 
 set -euo pipefail
 
+# Load configuration from .env file if it exists
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    # Export variables from .env (ignore comments and empty lines)
+    set -a
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
+    set +a
+fi
+
+# Configuration - .env values or fallback defaults
 PROJECT="${PROJECT:-talmo-lab}"
-OUTPUT_PATH="${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}"
+OUTPUT_PATH="${OUTPUT_PATH_HOST:-${OUTPUT_PATH:-/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs}}"
 JOB_PREFIX="${JOB_PREFIX:-gapit3-trait}"
 WATCH_MODE="${1:-}"
 

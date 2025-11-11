@@ -5,7 +5,8 @@
       "Bash(done)",
       "Bash(for f in cluster/argo/**/*.yaml)",
       "Bash(do python -c \"import yaml; yaml.safe_load(open(''''$f''''))\")",
-      "Bash(echo:*)"
+      "Bash(echo:*)",
+      "Bash(gh run list:*)"
     ],
     "deny": [],
     "ask": []

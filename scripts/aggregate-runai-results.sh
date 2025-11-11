@@ -14,6 +14,16 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Load configuration from .env file if it exists
+ENV_FILE="$PROJECT_ROOT/.env"
+
+if [ -f "$ENV_FILE" ]; then
+    # Export variables from .env (ignore comments and empty lines)
+    set -a
+    source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
+    set +a
+fi
+
 # Default values
 DEFAULT_PROJECT="talmo-lab"
 DEFAULT_OUTPUT_DIR="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
@@ -23,12 +33,12 @@ DEFAULT_CHECK_INTERVAL=30
 DEFAULT_THRESHOLD="5e-8"
 
 # Parse from environment or use defaults
-PROJECT="${RUNAI_PROJECT:-$DEFAULT_PROJECT}"
-OUTPUT_DIR="${OUTPUT_PATH:-${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}}"
-START_TRAIT=$DEFAULT_START_TRAIT
-END_TRAIT=$DEFAULT_END_TRAIT
+PROJECT="${PROJECT:-${RUNAI_PROJECT:-$DEFAULT_PROJECT}}"
+OUTPUT_DIR="${OUTPUT_PATH_HOST:-${OUTPUT_PATH:-${OUTPUT_DIR:-$DEFAULT_OUTPUT_DIR}}}"
+START_TRAIT="${START_TRAIT:-$DEFAULT_START_TRAIT}"
+END_TRAIT="${END_TRAIT:-$DEFAULT_END_TRAIT}"
 CHECK_INTERVAL=$DEFAULT_CHECK_INTERVAL
-THRESHOLD=$DEFAULT_THRESHOLD
+THRESHOLD="${SNP_THRESHOLD:-$DEFAULT_THRESHOLD}"
 BATCH_ID=""
 CHECK_ONLY=false
 FORCE=false
