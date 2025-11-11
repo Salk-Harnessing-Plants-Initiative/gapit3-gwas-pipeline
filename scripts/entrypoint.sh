@@ -323,7 +323,7 @@ ${GREEN}GAPIT3 GWAS Pipeline - Container Entrypoint${NC}
 ${BLUE}Usage:${NC}
   docker run [OPTIONS] IMAGE [COMMAND]
 
-${BLUE}Commands:${NC}
+${BLUE}Available commands:${NC}
   run-single-trait    Run GWAS for a single trait (default)
   run-aggregation     Aggregate results from multiple traits
   help                Show this help message
@@ -366,6 +366,27 @@ ${BLUE}For More Information:${NC}
 EOF
 }
 
+# Display current environment variable configuration
+show_current_config() {
+    echo ""
+    echo "==========================================================================="
+    echo "Current Environment Variable Values"
+    echo "==========================================================================="
+    echo ""
+    echo "  TRAIT_INDEX:      $TRAIT_INDEX"
+    echo "  MODELS:           $MODELS"
+    echo "  PCA_COMPONENTS:   $PCA_COMPONENTS"
+    echo "  SNP_THRESHOLD:    $SNP_THRESHOLD"
+    echo "  MAF_FILTER:       $MAF_FILTER"
+    echo "  DATA_PATH:        $DATA_PATH"
+    echo "  OUTPUT_PATH:      $OUTPUT_PATH"
+    echo "  GENOTYPE_FILE:    $GENOTYPE_FILE"
+    echo "  PHENOTYPE_FILE:   $PHENOTYPE_FILE"
+    echo ""
+    echo "==========================================================================="
+    echo ""
+}
+
 # ==============================================================================
 # Main Entry Point
 # ==============================================================================
@@ -381,6 +402,7 @@ case "$COMMAND" in
         ;;
     help|--help|-h)
         show_help
+        show_current_config
         exit 0
         ;;
     # Legacy commands for backward compatibility
