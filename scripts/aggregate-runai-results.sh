@@ -31,6 +31,7 @@ DEFAULT_START_TRAIT=2
 DEFAULT_END_TRAIT=187
 DEFAULT_CHECK_INTERVAL=30
 DEFAULT_THRESHOLD="5e-8"
+DEFAULT_JOB_PREFIX="gapit3-trait"
 
 # Parse from environment or use defaults
 PROJECT="${PROJECT:-${RUNAI_PROJECT:-$DEFAULT_PROJECT}}"
@@ -39,6 +40,7 @@ START_TRAIT="${START_TRAIT:-$DEFAULT_START_TRAIT}"
 END_TRAIT="${END_TRAIT:-$DEFAULT_END_TRAIT}"
 CHECK_INTERVAL=$DEFAULT_CHECK_INTERVAL
 THRESHOLD="${SNP_THRESHOLD:-$DEFAULT_THRESHOLD}"
+JOB_PREFIX="${JOB_PREFIX:-$DEFAULT_JOB_PREFIX}"
 BATCH_ID=""
 CHECK_ONLY=false
 FORCE=false
@@ -237,64 +239,70 @@ echo ""
 # Discover Jobs
 # ===========================================================================
 
-log_info "Discovering RunAI workspaces..."
+# Skip job discovery if --force is used
+if [ "$FORCE" = true ]; then
+    log_info "Skipping job discovery (--force mode)"
+    log_info "Will aggregate whatever results exist in output directory"
+else
+    log_info "Discovering RunAI workspaces..."
 
-# Query RunAI for all gapit3-trait-* jobs
-WORKSPACE_LIST=$(runai workspace list -p "$PROJECT" 2>/dev/null | grep "gapit3-trait-" || true)
+    # Query RunAI for all jobs with our prefix
+    WORKSPACE_LIST=$(runai workspace list -p "$PROJECT" 2>/dev/null | grep "${JOB_PREFIX}-" || true)
 
-if [ -z "$WORKSPACE_LIST" ]; then
-    log_warn "No gapit3-trait-* jobs found in project $PROJECT"
-    echo "Did you submit jobs with ./scripts/submit-all-traits-runai.sh ?"
-    exit 0
+    if [ -z "$WORKSPACE_LIST" ]; then
+        log_warn "No ${JOB_PREFIX}-* jobs found in project $PROJECT"
+        echo "Did you submit jobs with ./scripts/submit-all-traits-runai.sh ?"
+        exit 0
+    fi
 fi
 
-# Filter by trait range and count by status
+# Filter by trait range and count by status (skip if --force)
 TOTAL=0
 SUCCEEDED=0
 FAILED=0
 RUNNING=0
 PENDING=0
-
-while IFS= read -r line; do
-    # Extract job name (first column)
-    JOB_NAME=$(echo "$line" | awk '{print $1}')
-
-    # Extract trait index from job name (gapit3-trait-XXX)
-    if [[ $JOB_NAME =~ gapit3-trait-([0-9]+) ]]; then
-        TRAIT_IDX="${BASH_REMATCH[1]}"
-
-        # Check if trait is in range
-        if [ "$TRAIT_IDX" -ge "$START_TRAIT" ] && [ "$TRAIT_IDX" -le "$END_TRAIT" ]; then
-            TOTAL=$((TOTAL + 1))
-
-            # Check status (varies by position, look for keywords)
-            if echo "$line" | grep -qE "Succeeded|Completed"; then
-                SUCCEEDED=$((SUCCEEDED + 1))
-            elif echo "$line" | grep -qE "Failed|Error"; then
-                FAILED=$((FAILED + 1))
-            elif echo "$line" | grep -q "Running"; then
-                RUNNING=$((RUNNING + 1))
-            else
-                PENDING=$((PENDING + 1))
-            fi
-        fi
-    fi
-done <<< "$WORKSPACE_LIST"
-
-# Calculate expected total based on trait range
 EXPECTED=$((END_TRAIT - START_TRAIT + 1))
 
-log_info "Found $TOTAL jobs (expected: $EXPECTED)"
-echo "  Succeeded:  $SUCCEEDED"
-echo "  Running:    $RUNNING"
-echo "  Failed:     $FAILED"
-echo "  Pending:    $PENDING"
-echo ""
+if [ "$FORCE" = false ]; then
+    while IFS= read -r line; do
+        # Extract job name (first column)
+        JOB_NAME=$(echo "$line" | awk '{print $1}')
 
-# Check if we found the expected number of jobs
-if [ $TOTAL -lt $EXPECTED ]; then
-    log_warn "Found fewer jobs ($TOTAL) than expected ($EXPECTED)"
-    log_warn "Some traits may not have been submitted"
+        # Extract trait index from job name using dynamic prefix
+        if [[ $JOB_NAME =~ ${JOB_PREFIX}-([0-9]+) ]]; then
+            TRAIT_IDX="${BASH_REMATCH[1]}"
+
+            # Check if trait is in range
+            if [ "$TRAIT_IDX" -ge "$START_TRAIT" ] && [ "$TRAIT_IDX" -le "$END_TRAIT" ]; then
+                TOTAL=$((TOTAL + 1))
+
+                # Check status (varies by position, look for keywords)
+                if echo "$line" | grep -qE "Succeeded|Completed"; then
+                    SUCCEEDED=$((SUCCEEDED + 1))
+                elif echo "$line" | grep -qE "Failed|Error"; then
+                    FAILED=$((FAILED + 1))
+                elif echo "$line" | grep -q "Running"; then
+                    RUNNING=$((RUNNING + 1))
+                else
+                    PENDING=$((PENDING + 1))
+                fi
+            fi
+        fi
+    done <<< "$WORKSPACE_LIST"
+
+    log_info "Found $TOTAL jobs (expected: $EXPECTED)"
+    echo "  Succeeded:  $SUCCEEDED"
+    echo "  Running:    $RUNNING"
+    echo "  Failed:     $FAILED"
+    echo "  Pending:    $PENDING"
+    echo ""
+
+    # Check if we found the expected number of jobs
+    if [ $TOTAL -lt $EXPECTED ]; then
+        log_warn "Found fewer jobs ($TOTAL) than expected ($EXPECTED)"
+        log_warn "Some traits may not have been submitted"
+    fi
 fi
 
 # ===========================================================================

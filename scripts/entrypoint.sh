@@ -142,8 +142,47 @@ validate_trait_index() {
 
 validate_paths() {
     local missing_paths=()
+    local mount_failures=()
 
-    # Check data path
+    # Check if mount points are actually mounted (not just directories)
+    # This distinguishes infrastructure mount failures from missing files
+    if ! mountpoint -q "$DATA_PATH" 2>/dev/null; then
+        mount_failures+=("DATA_PATH=$DATA_PATH")
+        log_error "INFRASTRUCTURE MOUNT FAILURE: $DATA_PATH is not a mount point"
+        log_error "This indicates a Kubernetes/RunAI volume mount failure"
+    fi
+
+    if ! mountpoint -q "$OUTPUT_PATH" 2>/dev/null; then
+        mount_failures+=("OUTPUT_PATH=$OUTPUT_PATH")
+        log_error "INFRASTRUCTURE MOUNT FAILURE: $OUTPUT_PATH is not a mount point"
+        log_error "This indicates a Kubernetes/RunAI volume mount failure"
+    fi
+
+    # If mounts failed, report infrastructure error and exit with code 2
+    if [ ${#mount_failures[@]} -gt 0 ]; then
+        log_error "=================================================================="
+        log_error "INFRASTRUCTURE FAILURE (NOT A CONFIGURATION ERROR)"
+        log_error "=================================================================="
+        log_error "The following paths failed to mount from host:"
+        for path in "${mount_failures[@]}"; do
+            log_error "  - $path"
+        done
+        log_error ""
+        log_error "This is likely due to:"
+        log_error "  - Node mount table exhaustion"
+        log_error "  - NFS/storage server connection limits"
+        log_error "  - Kubernetes volume attach timeout"
+        log_error "  - Mount propagation race condition"
+        log_error ""
+        log_error "Recommended actions:"
+        log_error "  1. Check pod events: kubectl describe pod \$POD_NAME"
+        log_error "  2. Retry this job (transient infrastructure issue)"
+        log_error "  3. Reduce MAX_CONCURRENT to lower mount pressure"
+        log_error "  4. Check node health: kubectl describe node \$NODE_NAME"
+        return 2  # Exit code 2 = infrastructure failure (retryable)
+    fi
+
+    # Check data path exists
     if [ ! -d "$DATA_PATH" ]; then
         missing_paths+=("DATA_PATH=$DATA_PATH")
     fi
@@ -168,7 +207,7 @@ validate_paths() {
         for path in "${missing_paths[@]}"; do
             log_error "  - $path"
         done
-        return 1
+        return 1  # Exit code 1 = configuration error (not retryable)
     fi
 
     # Create output directory if it doesn't exist

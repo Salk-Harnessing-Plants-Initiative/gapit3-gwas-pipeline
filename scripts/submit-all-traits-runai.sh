@@ -46,12 +46,27 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ENV_FILE="$PROJECT_ROOT/.env"
 
+# Save any pre-existing environment variable overrides
+# These take precedence over values from .env
+SAVED_START_TRAIT="${START_TRAIT:-}"
+SAVED_END_TRAIT="${END_TRAIT:-}"
+
 if [ -f "$ENV_FILE" ]; then
     echo "Loading configuration from .env file..."
     # Export variables from .env (ignore comments and empty lines)
     set -a
     source <(grep -v '^#' "$ENV_FILE" | grep -v '^$' | sed 's/\r$//')
     set +a
+fi
+
+# Restore environment variable overrides (they take precedence over .env)
+if [ -n "$SAVED_START_TRAIT" ]; then
+    START_TRAIT="$SAVED_START_TRAIT"
+    echo "  → Using START_TRAIT override: $START_TRAIT"
+fi
+if [ -n "$SAVED_END_TRAIT" ]; then
+    END_TRAIT="$SAVED_END_TRAIT"
+    echo "  → Using END_TRAIT override: $END_TRAIT"
 fi
 
 # Configuration (Infrastructure) - .env values or fallback defaults
@@ -197,14 +212,22 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
         continue
     fi
 
-    # Check number of running jobs
-    RUNNING=$(runai workspace list -p $PROJECT 2>/dev/null | grep -c "Running" || echo 0)
+    # Check number of active jobs in this batch
+    # Count jobs matching our prefix that are not in terminal states (Succeeded/Failed/Completed)
+    # This ensures we only count OUR jobs, not other users' jobs in the shared project
+    ACTIVE=$(runai workspace list -p $PROJECT 2>/dev/null | \
+        grep "^[[:space:]]*$JOB_PREFIX-" | \
+        grep -vE "Succeeded|Failed|Completed" | \
+        wc -l || echo 0)
 
     # Wait if at max concurrency
-    while [ $RUNNING -ge $MAX_CONCURRENT ]; do
-        echo -e "${YELLOW}[WAIT]${NC} $RUNNING jobs running (max: $MAX_CONCURRENT). Waiting 30s..."
+    while [ $ACTIVE -ge $MAX_CONCURRENT ]; do
+        echo -e "${YELLOW}[WAIT]${NC} $ACTIVE active jobs in batch (max: $MAX_CONCURRENT). Waiting 30s..."
         sleep 30
-        RUNNING=$(runai workspace list -p $PROJECT 2>/dev/null | grep -c "Running" || echo 0)
+        ACTIVE=$(runai workspace list -p $PROJECT 2>/dev/null | \
+            grep "^[[:space:]]*$JOB_PREFIX-" | \
+            grep -vE "Succeeded|Failed|Completed" | \
+            wc -l || echo 0)
     done
 
     # Submit job
@@ -282,3 +305,6 @@ echo "  - List all jobs:        runai workspace list | grep gapit3-trait"
 echo "  - View specific logs:   runai workspace logs gapit3-trait-2 --follow"
 echo "  - Check output files:   ls -lh $OUTPUT_PATH/"
 echo ""
+
+# Exit successfully
+exit 0
