@@ -12,7 +12,7 @@ spec:
   # ===========================================================================
 
   entrypoint: run-gwas
-  serviceAccountName: default
+  serviceAccountName: argo-user
 
   # Template-level arguments with defaults
   arguments:
