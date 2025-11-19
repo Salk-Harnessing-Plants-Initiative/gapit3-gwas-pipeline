@@ -53,7 +53,8 @@ jobs:
             'matrixStats',
             'optparse',
             'jsonlite',
-            'logging'
+            'logging',
+            'yaml'
           ), repos = 'https://cloud.r-project.org', Ncpus = 2)
         shell: Rscript {0}
 

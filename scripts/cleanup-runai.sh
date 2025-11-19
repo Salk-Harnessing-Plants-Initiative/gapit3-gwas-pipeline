@@ -228,6 +228,7 @@ log_info "Discovering resources..."
 EXISTING_WORKSPACES=0
 if [ "$OUTPUTS_ONLY" = false ]; then
     for i in $(seq $START_TRAIT $END_TRAIT); do
+        # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
         if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_PREFIX-$i[[:space:]]"; then
             EXISTING_WORKSPACES=$((EXISTING_WORKSPACES + 1))
         fi
@@ -336,6 +337,7 @@ if [ "$OUTPUTS_ONLY" = false ] && [ $EXISTING_WORKSPACES -gt 0 ]; then
         JOB_NAME="$JOB_PREFIX-$i"
 
         if [ "$DRY_RUN" = true ]; then
+            # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
             if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_NAME[[:space:]]"; then
                 echo "  [DRY RUN] Would delete: $JOB_NAME"
             fi
@@ -346,6 +348,7 @@ if [ "$OUTPUTS_ONLY" = false ] && [ $EXISTING_WORKSPACES -gt 0 ]; then
                 DELETED_WORKSPACES=$((DELETED_WORKSPACES + 1))
             else
                 # Check if it existed
+                # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
                 if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_NAME[[:space:]]"; then
                     echo -e "  ${RED}[✗]${NC} Failed to delete $JOB_NAME"
                     FAILED_WORKSPACES=$((FAILED_WORKSPACES + 1))

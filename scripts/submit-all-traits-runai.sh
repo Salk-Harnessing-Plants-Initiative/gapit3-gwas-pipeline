@@ -206,6 +206,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     JOB_NAME="$JOB_PREFIX-$trait_idx"
 
     # Check if job already exists
+    # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
     if runai workspace list -p $PROJECT 2>/dev/null | grep -qE "^[[:space:]]*$JOB_NAME[[:space:]]"; then
         echo -e "${YELLOW}[SKIP]${NC} Trait $trait_idx - job already exists"
         SKIPPED=$((SKIPPED + 1))
@@ -215,6 +216,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     # Check number of active jobs in this batch
     # Count jobs matching our prefix that are not in terminal states (Succeeded/Failed/Completed)
     # This ensures we only count OUR jobs, not other users' jobs in the shared project
+    # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
     ACTIVE=$(runai workspace list -p $PROJECT 2>/dev/null | \
         grep "^[[:space:]]*$JOB_PREFIX-" | \
         grep -vE "Succeeded|Failed|Completed" | \
@@ -224,6 +226,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     while [ $ACTIVE -ge $MAX_CONCURRENT ]; do
         echo -e "${YELLOW}[WAIT]${NC} $ACTIVE active jobs in batch (max: $MAX_CONCURRENT). Waiting 30s..."
         sleep 30
+        # shellcheck disable=SC1087  # False positive: [[:space:]] is a grep regex, not bash array
         ACTIVE=$(runai workspace list -p $PROJECT 2>/dev/null | \
             grep "^[[:space:]]*$JOB_PREFIX-" | \
             grep -vE "Succeeded|Failed|Completed" | \
