@@ -12,7 +12,7 @@ spec:
   # ===========================================================================
 
   entrypoint: run-gwas
-  serviceAccountName: argo-user
+  serviceAccountName: default  # Required for workflowtaskresults permission
 
   # Template-level arguments with defaults
   arguments:

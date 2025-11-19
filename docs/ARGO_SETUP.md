@@ -2,11 +2,22 @@
 
 Complete guide for deploying and running the GAPIT3 GWAS pipeline on your cluster using Argo Workflows.
 
-> **⚠️ IMPORTANT - Current Status (2025-11-07):**
+> **✅ IMPORTANT - Service Account Requirements (2025-11-18):**
 >
-> Argo Workflows require pending RBAC permissions from cluster administrators. Until those are granted, please use the **Manual RunAI execution method** documented in [Manual RunAI Execution Guide](MANUAL_RUNAI_EXECUTION.md).
+> All workflows MUST use `serviceAccountName: default` for pod execution.
+> The `argo-user` service account is for human CLI usage only and lacks required permissions.
 >
-> See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for administrator information.
+> **See**: [Service Account Documentation](argo-service-accounts.md) for complete details on:
+> - Distinction between `argo-user` (submission) and `default` (execution)
+> - Why workflows need `default` SA for `workflowtaskresults` permission
+> - Path mapping between network share and cluster mounts
+> - Memory requirements and troubleshooting
+
+> **⚠️ Historical Note:**
+>
+> Previous RBAC permission issues (documented in [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md))
+> were caused by incorrect service account configuration and have been resolved.
+> The `default` service account already has the required permissions.
 
 ---
 

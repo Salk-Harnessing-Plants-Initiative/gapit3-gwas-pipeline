@@ -1,6 +1,26 @@
 # RBAC Permissions Issue for Argo Workflows
 
-## Issue Summary
+> **✅ RESOLVED (2025-11-18)**
+>
+> This issue was caused by incorrect service account configuration in commit f1410fe.
+> The `default` service account already has the required `workflowtaskresults` permissions.
+>
+> **Root Cause**: `cluster/argo/workflow-templates/gapit3-single-trait-template.yaml` was
+> incorrectly changed to use `serviceAccountName: argo-user` instead of `default`.
+> The `argo-user` SA lacks `workflowtaskresults` create permission.
+>
+> **Resolution**: Reverted to `serviceAccountName: default` in all workflow templates.
+> Admin testing confirmed this fixes the permission errors.
+>
+> **See**: [argo-service-accounts.md](argo-service-accounts.md) for complete documentation
+> of service account requirements and the distinction between `argo-user` (human submission)
+> and `default` (pod execution).
+
+---
+
+## Historical Context (Issue is now resolved)
+
+### Issue Summary
 
 Argo Workflows in the `runai-talmo-lab` namespace cannot create `workflowtaskresults` resources, causing workflows to fail with exit code 64 even when the actual pod work completes successfully.
 

@@ -21,7 +21,7 @@ spec:
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-6b9d193-test"
     - name: data-hostpath
       value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
     - name: output-hostpath
