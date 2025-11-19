@@ -15,8 +15,8 @@ library(jsonlite)
 # Helper function to source only the functions from collect_results.R
 # ==============================================================================
 source_aggregation_functions <- function() {
-  # Read the script
-  script_path <- file.path("scripts", "collect_results.R")
+  # Read the script (path relative to project root)
+  script_path <- file.path("..", "..", "scripts", "collect_results.R")
   script_lines <- readLines(script_path)
 
   # Find function definitions
