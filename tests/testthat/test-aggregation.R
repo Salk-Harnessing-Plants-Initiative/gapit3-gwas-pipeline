@@ -9,8 +9,7 @@ library(data.table)
 library(dplyr)
 library(jsonlite)
 
-# Source the helper functions
-source(file.path("tests", "testthat", "helper.R"))
+# Note: helper.R is automatically sourced by testthat
 
 # ==============================================================================
 # Helper function to source only the functions from collect_results.R
