@@ -10,6 +10,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Results Aggregation Model Tracking** - Enhanced aggregation script to track which GAPIT model identified each SNP
+  - `scripts/collect_results.R` now reads GAPIT Filter files instead of complete GWAS_Results files (500× performance improvement)
+  - Model information parsed from `traits` column format: `"MODEL.TraitName"`
+  - Output CSV includes `model` column for filtering and comparison
+  - Per-model summary statistics show SNP counts and overlaps
+  - Test fixtures and unit tests for aggregation functionality
+  - Performance: <30 seconds for 186 traits (previously 5-10 minutes)
 - **Runtime Configuration via Environment Variables** - Major enhancement allowing container reconfiguration without rebuilds
   - `.env.example` - Comprehensive documentation of all runtime configuration options
   - Environment variable support in entrypoint.sh with validation
@@ -42,6 +49,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated RunAI CLI syntax to new version (workspace commands)
 
 ### Changed
+- **BREAKING: Aggregated results CSV format updated** - New `model` column added to track which GAPIT model found each SNP
+  - Output filename: `significant_snps.csv` → `all_traits_significant_snps.csv`
+  - Column order: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model`
+  - SNPs found by multiple models now appear as separate rows
+  - Users should re-run aggregation on existing results to get model information
 - **Container now runtime-configurable** - No longer requires config.yaml or image rebuilds for parameter changes
   - Updated `scripts/entrypoint.sh` to read and validate environment variables
   - Updated `scripts/run_gwas_single_trait.R` to accept command-line arguments with env var fallbacks

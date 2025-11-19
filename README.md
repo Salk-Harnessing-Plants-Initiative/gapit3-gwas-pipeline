@@ -183,7 +183,10 @@ docker run --rm --env-file .env gapit3:latest
 │           └─ Execution metadata (JSON)                      │
 │                                                             │
 │  4. Results Collection (Aggregation)                        │
-│     └─ Combine significant SNPs, generate summary report   │
+│     └─ Combine significant SNPs with model tracking        │
+│        - Reads GAPIT Filter files (significant SNPs only)  │
+│        - Tracks which model found each SNP                 │
+│        - Generates per-model summary statistics            │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -202,7 +205,7 @@ gapit3-gwas-pipeline/
 │       └── scripts/             # Helper scripts (submit, monitor)
 ├── scripts/
 │   ├── run_gwas_single_trait.R    # Core GWAS script
-│   ├── collect_results.R          # Results aggregator
+│   ├── collect_results.R          # Results aggregator (with model tracking)
 │   ├── validate_inputs.R          # Input validation
 │   ├── entrypoint.sh              # Container entrypoint (handles runtime config)
 │   ├── submit-all-traits-runai.sh # Batch submission helper
@@ -352,9 +355,31 @@ Each trait produces:
 
 ```
 outputs/aggregated_results/
-├── summary_table.csv       # All traits: sample sizes, durations, status
-├── significant_snps.csv    # SNPs below p < 5e-8 threshold
-└── summary_stats.json      # Overall statistics
+├── summary_table.csv                  # All traits: sample sizes, durations, status
+├── all_traits_significant_snps.csv    # SNPs below p < 5e-8 (with model column)
+└── summary_stats.json                 # Per-model statistics and overlaps
+```
+
+**Output CSV format** (`all_traits_significant_snps.csv`):
+```csv
+SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model
+SNP_123,1,12345,1.2e-9,0.15,500,0.05,2.3e-8,root_length,BLINK
+SNP_123,1,12345,2.3e-9,0.15,500,0.06,3.1e-8,root_length,FarmCPU
+```
+
+- Sorted by P.value (most significant first)
+- SNPs found by multiple models appear as separate rows
+- `model` column enables filtering and comparison
+
+**Summary statistics** (`summary_stats.json`):
+```json
+{
+  "snps_by_model": {
+    "BLINK": 25,
+    "FarmCPU": 28,
+    "both_models": 11
+  }
+}
 ```
 
 ---

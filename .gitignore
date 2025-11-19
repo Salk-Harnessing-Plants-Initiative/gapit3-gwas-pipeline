@@ -31,6 +31,10 @@ GAPIT.*.csv
 GAPIT.*.txt
 *_GWAS_Results.csv
 
+# Exception: allow test fixtures
+!tests/fixtures/**/GAPIT.*.csv
+!tests/fixtures/**/*_GWAS_Results.csv
+
 # Trait manifest (generated)
 traits_manifest.yaml
 batch_*.txt

@@ -1,0 +1,20 @@
+{
+  "execution": {
+    "trait_index": 3,
+    "start_time": "2025-01-01T11:00:00Z",
+    "end_time": "2025-01-01T11:18:00Z",
+    "duration_minutes": 18.3,
+    "status": "success"
+  },
+  "trait": {
+    "name": "mean_GR_rootLength_day_1.2(NYC)",
+    "column_index": 4,
+    "n_total": 500,
+    "n_valid": 495,
+    "n_missing": 5
+  },
+  "genotype": {
+    "n_snps": 1400000,
+    "n_accessions": 500
+  }
+}
