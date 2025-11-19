@@ -84,9 +84,20 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
     }
 
     # Parse model and trait from traits column
-    # Format: "<MODEL>.<TraitName>" (split on first period only)
-    filter_data$model <- sub("\\..*", "", filter_data$traits)
-    filter_data$trait <- sub("^[^.]+\\.", "", filter_data$traits)
+    # Format: "<MODEL>.<TraitName>"
+    # Handle compound models (FarmCPU.LM, Blink.LM) before simple split
+    filter_data$model <- ifelse(
+      grepl("^FarmCPU\\.LM\\.", filter_data$traits), "FarmCPU.LM",
+      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits), "Blink.LM",
+             sub("\\..*", "", filter_data$traits))
+    )
+    filter_data$trait <- ifelse(
+      grepl("^FarmCPU\\.LM\\.", filter_data$traits),
+      sub("^FarmCPU\\.LM\\.", "", filter_data$traits),
+      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits),
+             sub("^Blink\\.LM\\.", "", filter_data$traits),
+             sub("^[^.]+\\.", "", filter_data$traits))
+    )
 
     # Validate model names (warn if unexpected, but continue)
     expected_models <- c("BLINK", "FarmCPU", "GLM", "MLM", "MLMM",
