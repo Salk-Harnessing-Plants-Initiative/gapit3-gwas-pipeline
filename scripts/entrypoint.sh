@@ -63,6 +63,41 @@ log_info() {
     echo -e "${GREEN}[INFO]${NC} $*"
 }
 
+# ==============================================================================
+# Environment Detection
+# ==============================================================================
+
+detect_execution_environment() {
+    # Detect whether running in Argo Workflows or RunAI environment
+    # Returns:
+    #   "argo" - Running in Argo Workflows (uses hostPath volumes)
+    #   "runai" - Running in RunAI (uses NFS mounts via --host-path)
+    #   "unknown" - Cannot determine (default to safer Argo mode)
+
+    # Check for Argo Workflows environment variables
+    if [ -n "${ARGO_WORKFLOW_NAME:-}" ] || [ -n "${ARGO_NODE_ID:-}" ]; then
+        echo "argo"
+        return 0
+    fi
+
+    # Check for Argo runtime directory
+    if [ -d "/var/run/argo" ]; then
+        echo "argo"
+        return 0
+    fi
+
+    # Check for RunAI specific environment variables
+    if [ -n "${RUNAI_JOB_NAME:-}" ] || [ -n "${RUNAI_JOB_UUID:-}" ]; then
+        echo "runai"
+        return 0
+    fi
+
+    # Default to Argo mode (safer - less strict validation)
+    # This handles cases like local Docker runs or other orchestrators
+    echo "unknown"
+    return 0
+}
+
 validate_models() {
     local valid_models="BLINK FarmCPU MLM MLMM SUPER CMLM"
     local models_array
@@ -143,43 +178,70 @@ validate_trait_index() {
 validate_paths() {
     local missing_paths=()
     local mount_failures=()
+    local exec_env
 
-    # Check if mount points are actually mounted (not just directories)
-    # This distinguishes infrastructure mount failures from missing files
-    if ! mountpoint -q "$DATA_PATH" 2>/dev/null; then
-        mount_failures+=("DATA_PATH=$DATA_PATH")
-        log_error "INFRASTRUCTURE MOUNT FAILURE: $DATA_PATH is not a mount point"
-        log_error "This indicates a Kubernetes/RunAI volume mount failure"
-    fi
+    # Detect execution environment
+    exec_env=$(detect_execution_environment)
 
-    if ! mountpoint -q "$OUTPUT_PATH" 2>/dev/null; then
-        mount_failures+=("OUTPUT_PATH=$OUTPUT_PATH")
-        log_error "INFRASTRUCTURE MOUNT FAILURE: $OUTPUT_PATH is not a mount point"
-        log_error "This indicates a Kubernetes/RunAI volume mount failure"
-    fi
+    # Log validation mode
+    case "$exec_env" in
+        argo)
+            log_info "Validation mode: Argo Workflows (hostPath volumes)"
+            log_info "Using directory existence checks (skipping mountpoint validation)"
+            ;;
+        runai)
+            log_info "Validation mode: RunAI (NFS mounts)"
+            log_info "Using mountpoint checks to detect infrastructure failures"
+            ;;
+        unknown)
+            log_info "Validation mode: Unknown environment (using Argo-style validation)"
+            log_info "Using directory existence checks (skipping mountpoint validation)"
+            ;;
+    esac
 
-    # If mounts failed, report infrastructure error and exit with code 2
-    if [ ${#mount_failures[@]} -gt 0 ]; then
-        log_error "=================================================================="
-        log_error "INFRASTRUCTURE FAILURE (NOT A CONFIGURATION ERROR)"
-        log_error "=================================================================="
-        log_error "The following paths failed to mount from host:"
-        for path in "${mount_failures[@]}"; do
-            log_error "  - $path"
-        done
-        log_error ""
-        log_error "This is likely due to:"
-        log_error "  - Node mount table exhaustion"
-        log_error "  - NFS/storage server connection limits"
-        log_error "  - Kubernetes volume attach timeout"
-        log_error "  - Mount propagation race condition"
-        log_error ""
-        log_error "Recommended actions:"
-        log_error "  1. Check pod events: kubectl describe pod \$POD_NAME"
-        log_error "  2. Retry this job (transient infrastructure issue)"
-        log_error "  3. Reduce MAX_CONCURRENT to lower mount pressure"
-        log_error "  4. Check node health: kubectl describe node \$NODE_NAME"
-        return 2  # Exit code 2 = infrastructure failure (retryable)
+    # Only perform mountpoint checks for RunAI environment
+    if [ "$exec_env" = "runai" ]; then
+        # Check if mount points are actually mounted (not just directories)
+        # This distinguishes infrastructure mount failures from missing files
+        if ! mountpoint -q "$DATA_PATH" 2>/dev/null; then
+            mount_failures+=("DATA_PATH=$DATA_PATH")
+            log_error "INFRASTRUCTURE MOUNT FAILURE: $DATA_PATH is not a mount point"
+            log_error "This indicates a Kubernetes/RunAI volume mount failure"
+        fi
+
+        if ! mountpoint -q "$OUTPUT_PATH" 2>/dev/null; then
+            mount_failures+=("OUTPUT_PATH=$OUTPUT_PATH")
+            log_error "INFRASTRUCTURE MOUNT FAILURE: $OUTPUT_PATH is not a mount point"
+            log_error "This indicates a Kubernetes/RunAI volume mount failure"
+        fi
+
+        # If mounts failed, report infrastructure error and exit with code 2
+        if [ ${#mount_failures[@]} -gt 0 ]; then
+            log_error "=================================================================="
+            log_error "INFRASTRUCTURE FAILURE (NOT A CONFIGURATION ERROR)"
+            log_error "=================================================================="
+            log_error "The following paths failed to mount from host:"
+            for path in "${mount_failures[@]}"; do
+                log_error "  - $path"
+            done
+            log_error ""
+            log_error "This is likely due to:"
+            log_error "  - Node mount table exhaustion"
+            log_error "  - NFS/storage server connection limits"
+            log_error "  - Kubernetes volume attach timeout"
+            log_error "  - Mount propagation race condition"
+            log_error ""
+            log_error "Recommended actions:"
+            log_error "  1. Check pod events: kubectl describe pod \$POD_NAME"
+            log_error "  2. Retry this job (transient infrastructure issue)"
+            log_error "  3. Reduce MAX_CONCURRENT to lower mount pressure"
+            log_error "  4. Check node health: kubectl describe node \$NODE_NAME"
+            return 2  # Exit code 2 = infrastructure failure (retryable)
+        fi
+    else
+        # For Argo Workflows and unknown environments, use directory checks
+        # hostPath volumes appear as regular directories, not mount points
+        log_info "Skipping mountpoint validation (not applicable for $exec_env)"
     fi
 
     # Check data path exists
@@ -270,6 +332,7 @@ log_config() {
     echo -e "${BLUE}Job Identity:${NC}"
     echo "  Trait Index:      $TRAIT_INDEX"
     echo "  Hostname:         $(hostname)"
+    echo "  Environment:      $(detect_execution_environment)"
     echo "  Start Time:       $(date '+%Y-%m-%d %H:%M:%S')"
     echo ""
     echo -e "${BLUE}Input Paths:${NC}"

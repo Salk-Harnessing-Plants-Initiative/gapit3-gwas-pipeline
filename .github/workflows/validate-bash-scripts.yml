@@ -1,0 +1,122 @@
+name: Bash Script Validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**/*.sh'
+      - '.github/workflows/validate-bash-scripts.yml'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'scripts/**/*.sh'
+      - '.github/workflows/validate-bash-scripts.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-bash:
+    runs-on: ubuntu-latest
+    name: Validate Bash Scripts
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run bash syntax check on all scripts
+        run: |
+          echo "::group::Bash Syntax Check"
+          EXIT_CODE=0
+          for script in scripts/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Checking syntax: $script"
+              if ! bash -n "$script"; then
+                echo "::error file=$script::Syntax error in $script"
+                EXIT_CODE=1
+              else
+                echo "✓ $script"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Run shellcheck on all scripts
+        run: |
+          echo "::group::ShellCheck Analysis"
+          EXIT_CODE=0
+          for script in scripts/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Running shellcheck: $script"
+              # SC2086: Double quote to prevent globbing (allow some flexibility)
+              # SC2046: Quote to prevent word splitting (allow some flexibility)
+              # SC1091: Not following source files (they may not be in repo)
+              if ! shellcheck -e SC1091 "$script"; then
+                echo "::error file=$script::ShellCheck found issues in $script"
+                EXIT_CODE=1
+              else
+                echo "✓ $script"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Verify shebang consistency
+        run: |
+          echo "::group::Shebang Consistency Check"
+          EXIT_CODE=0
+          for script in scripts/*.sh; do
+            if [ -f "$script" ]; then
+              FIRST_LINE=$(head -n1 "$script")
+              if [[ ! "$FIRST_LINE" =~ ^#!/(usr/bin/env\ bash|bin/bash) ]]; then
+                echo "::warning file=$script::Script $script has non-standard shebang: $FIRST_LINE"
+                echo "Expected: #!/usr/bin/env bash or #!/bin/bash"
+                # Don't fail, just warn
+              else
+                echo "✓ $script has valid shebang"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Check for set -euo pipefail
+        run: |
+          echo "::group::Safe Bash Options Check"
+          for script in scripts/*.sh; do
+            if [ -f "$script" ]; then
+              if grep -q "set -euo pipefail" "$script" || grep -q "set -e" "$script"; then
+                echo "✓ $script uses safe bash options"
+              else
+                echo "::warning file=$script::Script $script should use 'set -euo pipefail' for safer execution"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Validation summary
+        if: always()
+        run: |
+          echo "### Bash Script Validation Summary :shell:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Validated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bash syntax (bash -n)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ShellCheck static analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Shebang consistency" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Safe bash options" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scripts Checked:**" >> $GITHUB_STEP_SUMMARY
+          for script in scripts/*.sh; do
+            if [ -f "$script" ]; then
+              echo "- \`$script\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
