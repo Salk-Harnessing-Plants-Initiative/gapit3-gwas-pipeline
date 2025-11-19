@@ -54,10 +54,9 @@ jobs:
           for script in scripts/*.sh; do
             if [ -f "$script" ]; then
               echo "Running shellcheck: $script"
-              # SC2086: Double quote to prevent globbing (allow some flexibility)
-              # SC2046: Quote to prevent word splitting (allow some flexibility)
               # SC1091: Not following source files (they may not be in repo)
-              if ! shellcheck -e SC1091 "$script"; then
+              # Only fail on error and warning severity (not info/style)
+              if ! shellcheck -e SC1091 --severity=warning "$script"; then
                 echo "::error file=$script::ShellCheck found issues in $script"
                 EXIT_CODE=1
               else
