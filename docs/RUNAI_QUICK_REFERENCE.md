@@ -149,6 +149,8 @@ runai workspace list | grep gapit3 | awk '{print $4}' | sort | uniq -c
 
 ### Aggregate Results After Parallel Execution
 
+#### Option 1: Automated Aggregation Script (Recommended for monitoring)
+
 ```bash
 # Wait for all jobs to complete, then aggregate
 ./scripts/aggregate-runai-results.sh
@@ -173,6 +175,46 @@ runai workspace list | grep gapit3 | awk '{print $4}' | sort | uniq -c
 - Shows progress: "120/186 complete (65%)"
 - Auto-runs `collect_results.R` when all jobs finish
 - Creates `aggregated_results/` with summary files
+
+#### Option 2: Interactive Aggregation Workspace (For manual aggregation or testing)
+
+Use this when you want to run aggregation manually, test the updated script, or don't have persistent volumes.
+
+```bash
+# Submit interactive workspace with mounted directories
+runai submit gapit3-aggregation \
+  --interactive \
+  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-6b9d193-test \
+  --project talmo-lab \
+  --cpu 4 \
+  --memory 16G \
+  --host-path /hpi/hpi_dev/users/eberrigan:/workspace \
+  -- sleep infinity
+
+# Exec into the workspace
+runai exec gapit3-aggregation -it -- bash
+
+# Inside the workspace, run aggregation with latest code from mounted repo
+cd /workspace/gapit3-gwas-pipeline
+Rscript scripts/collect_results.R \
+  --output-dir /workspace/20251110_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs \
+  --batch-id iron_deficiency_20251110 \
+  --threshold 5e-8
+
+# When done, delete the workspace
+runai workload delete workspace gapit3-aggregation -p talmo-lab
+```
+
+**Why use this approach:**
+- No persistent volume claims needed (uses host-path mounts)
+- Can test updated aggregation script from local repo
+- Full control over when aggregation runs
+- Useful for debugging or re-running with different parameters
+
+**Output:**
+- Creates `/workspace/<output-path>/aggregated_results/`
+- Files: `all_traits_significant_snps.csv`, `summary_table.csv`, `summary_stats.json`
+- New: `model` column tracks which GAPIT model found each SNP
 
 ### Cleanup Commands
 
