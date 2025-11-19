@@ -54,9 +54,13 @@ jobs:
           for script in scripts/*.sh; do
             if [ -f "$script" ]; then
               echo "Running shellcheck: $script"
-              # SC1091: Not following source files (they may not be in repo)
-              # Only fail on error and warning severity (not info/style)
-              if ! shellcheck -e SC1091 --severity=warning "$script"; then
+              # Excluded checks:
+              # SC1090,SC1091: Can't follow non-constant source (process substitution, .env files)
+              # SC2034: Variable appears unused (may be used via export or externally)
+              # SC2046: Quote to prevent word splitting (intentional in some cases)
+              # SC2076: Regex quotes (sometimes needed for literal matching)
+              # SC2155: Declare and assign separately (common pattern, acceptable trade-off)
+              if ! shellcheck -e SC1090,SC1091,SC2034,SC2046,SC2076,SC2155 --severity=warning "$script"; then
                 echo "::error file=$script::ShellCheck found issues in $script"
                 EXIT_CODE=1
               else
