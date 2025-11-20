@@ -181,17 +181,17 @@ runai workspace list | grep gapit3 | awk '{print $4}' | sort | uniq -c
 Use this when you want to run aggregation manually, test the updated script, or don't have persistent volumes.
 
 ```bash
-# Submit interactive workspace with mounted directories
-runai submit gapit3-aggregation \
-  --interactive \
+# Submit workspace with mounted directories (runs sleep infinity to keep it alive)
+runai workspace submit gapit3-aggregation \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
   --project talmo-lab \
-  --cpu 4 \
-  --memory 16G \
-  --host-path /hpi/hpi_dev/users/eberrigan:/workspace \
-  -- sleep infinity
+  --cpu-core-request 4 \
+  --cpu-memory-request 16G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan,mount=/workspace,mount-propagation=HostToContainer,readwrite \
+  --command -- sleep infinity
 
-# Exec into the workspace
+# Wait for it to be running, then exec into the workspace
+runai workspace list | grep gapit3-aggregation
 runai exec gapit3-aggregation -it -- bash
 
 # Inside the workspace, run aggregation with latest code from mounted repo
