@@ -105,10 +105,15 @@ setup_tests() {
         log_info "Skipping Docker build (CI_SKIP_BUILD=true)"
         log_info "Using existing image: $TEST_IMAGE"
 
-        # Verify image exists
+        # Pull image if not available locally (for remote registry images)
         if ! docker image inspect "$TEST_IMAGE" >/dev/null 2>&1; then
-            log_error "Image $TEST_IMAGE not found!"
-            exit 1
+            log_info "Image not found locally, attempting to pull: $TEST_IMAGE"
+            if ! docker pull "$TEST_IMAGE"; then
+                log_error "Failed to pull image $TEST_IMAGE!"
+                exit 1
+            fi
+        else
+            log_info "Image already available locally: $TEST_IMAGE"
         fi
     else
         # Build test Docker image
