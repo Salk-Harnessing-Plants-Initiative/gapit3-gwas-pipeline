@@ -184,7 +184,7 @@ Use this when you want to run aggregation manually, test the updated script, or 
 # Submit interactive workspace with mounted directories
 runai submit gapit3-aggregation \
   --interactive \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-6b9d193-test \
+  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
   --project talmo-lab \
   --cpu 4 \
   --memory 16G \
