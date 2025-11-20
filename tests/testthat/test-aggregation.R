@@ -231,3 +231,41 @@ test_that("summary statistics include per-model counts", {
   overlap_count <- sum(snp_models$n_models > 1)
   expect_equal(overlap_count, 1)
 })
+
+# ==============================================================================
+# Test: Empty Filter file without traits column (TDD Phase 1)
+# ==============================================================================
+test_that("read_filter_file returns empty immediately for Filter without traits column", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_empty_no_traits"))
+
+  # Capture any console output
+  output <- capture.output({
+    start_time <- Sys.time()
+    result <- read_filter_file(fixture_dir, threshold = 5e-8)
+    end_time <- Sys.time()
+  })
+
+  # Should return empty data.frame
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 0)
+
+  # Should NOT contain fallback warnings
+  expect_false(any(grepl("using GWAS_Results fallback", output)))
+
+  # Should complete quickly (<0.1 seconds)
+  elapsed <- as.numeric(end_time - start_time, units = "secs")
+  expect_lt(elapsed, 0.1)
+})
+
+# ==============================================================================
+# Test: Empty Filter file with traits column but no rows (TDD Phase 1)
+# ==============================================================================
+test_that("read_filter_file returns empty for Filter with traits but no data", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_empty_with_traits"))
+
+  result <- read_filter_file(fixture_dir, threshold = 5e-8)
+
+  # Should return empty data.frame
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 0)
+})

@@ -73,9 +73,9 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
     filter_data <- fread(filter_file, data.table = FALSE)
 
     # Check if traits column exists
+    # No traits column means no significant SNPs found (empty Filter file)
     if (!"traits" %in% colnames(filter_data)) {
-      cat("  Warning: Filter file missing 'traits' column in", basename(trait_dir), "\n")
-      return(read_gwas_results_fallback(trait_dir, threshold))
+      return(data.frame())
     }
 
     # Return empty data.frame if no rows (no significant SNPs)

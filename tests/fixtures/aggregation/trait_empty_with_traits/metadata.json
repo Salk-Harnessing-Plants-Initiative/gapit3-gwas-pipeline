@@ -1,0 +1,7 @@
+{
+  "trait_name": "test_empty_with_traits",
+  "description": "Test fixture for empty Filter file with traits column but no data rows",
+  "expected_significant_snps": 0,
+  "models": [],
+  "notes": "This represents a Filter file that has the correct schema but no data"
+}
