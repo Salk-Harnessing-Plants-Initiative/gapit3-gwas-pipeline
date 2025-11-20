@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: gapit3-trait-extractor
-  namespace: default  # TODO: Change to your Argo namespace
+  namespace: runai-talmo-lab
 spec:
   # ===========================================================================
   # GAPIT3 - Trait Name Extractor Template
