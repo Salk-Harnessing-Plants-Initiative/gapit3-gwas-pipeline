@@ -82,6 +82,14 @@ spec:
 
       # Environment variables
       env:
+      - name: GENOTYPE_FILE
+        value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+      - name: PHENOTYPE_FILE
+        value: "/data/phenotype/iron_traits_edited.txt"
+      - name: ACCESSION_IDS_FILE
+        value: "/data/metadata/ids_gwas.txt"
+      - name: MODELS
+        value: "{{inputs.parameters.models}}"
       - name: OPENBLAS_NUM_THREADS
         value: "12"
       - name: OMP_NUM_THREADS
@@ -97,24 +105,24 @@ spec:
           fieldRef:
             fieldPath: metadata.name
 
-      # Resource allocation (per guide: 32GB RAM + 12 cores)
+      # Resource allocation - increased for large datasets (1.4M+ SNPs, 2.2GB genotype file)
       # Note: Resources must be fixed values in WorkflowTemplates when using templateRef
       resources:
         requests:
-          memory: "32Gi"
+          memory: "64Gi"
           cpu: "12"
         limits:
-          memory: "36Gi"  # Slight headroom
+          memory: "72Gi"  # Headroom for peak memory during numericalization
           cpu: "16"       # Allow burst to 16 cores
 
     # Retry strategy for transient failures
     retryStrategy:
-      limit: 2  # Retry up to 2 times
+      limit: 5  # Retry up to 5 times (6 total attempts)
       retryPolicy: "OnFailure"
       backoff:
         duration: "2m"      # Wait 2 minutes before first retry
         factor: 2           # Double wait time for each retry
-        maxDuration: "10m"  # Max wait time
+        maxDuration: "30m"  # Max wait time
 
     # Output artifacts (optional - for Argo UI visualization)
     outputs:

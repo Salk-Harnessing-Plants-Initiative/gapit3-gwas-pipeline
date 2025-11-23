@@ -21,11 +21,11 @@ spec:
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-d19efcd-test"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
+      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
+      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
     - name: cpu-cores
       value: "12"
     - name: memory-gb
@@ -76,7 +76,7 @@ spec:
           - name: image
             value: "{{workflow.parameters.image}}"
           - name: models
-            value: "BLINK,FarmCPU"
+            value: "BLINK,FarmCPU,MLM"
 
       - name: run-trait-3
         dependencies: [extract-traits]
@@ -92,7 +92,7 @@ spec:
           - name: image
             value: "{{workflow.parameters.image}}"
           - name: models
-            value: "BLINK,FarmCPU"
+            value: "BLINK,FarmCPU,MLM"
 
       - name: run-trait-4
         dependencies: [extract-traits]
@@ -108,7 +108,7 @@ spec:
           - name: image
             value: "{{workflow.parameters.image}}"
           - name: models
-            value: "BLINK,FarmCPU"
+            value: "BLINK,FarmCPU,MLM"
 
   # ===========================================================================
   # Template: Validation

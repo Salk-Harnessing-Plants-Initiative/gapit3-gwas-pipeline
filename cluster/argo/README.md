@@ -38,17 +38,16 @@ kubectl apply -f workflow-templates/gapit3-single-trait-template.yaml -n runai-t
 ```
 
 **Key Features**:
-- Fixed resource allocation (32GB RAM, 12 CPU)
+- Fixed resource allocation (64GB RAM, 12 CPU) - see [Resource Requirements](#resource-requirements)
 - Volume mounts by reference (defined at workflow level)
-- Supports BLINK and FarmCPU models
+- Supports all GAPIT3 models (BLINK, FarmCPU, MLM, MLMM, SUPER, CMLM)
 - Outputs metadata JSON for traceability
 
 **Parameters**:
 - `trait-index` - Phenotype column number (2-187)
 - `trait-name` - Descriptive name for the trait
 - `image` - Docker image tag to use
-- `models` - GAPIT models: "BLINK", "FarmCPU", or "BLINK,FarmCPU"
-- `threads` - Number of CPU threads (must match resource request)
+- `models` - Comma-separated GAPIT models (e.g., "BLINK,FarmCPU,MLM")
 
 #### trait-extractor-template.yaml
 **Purpose**: Parse phenotype file and generate trait manifest
@@ -326,6 +325,54 @@ find . -name "*.yaml" -exec sed -i \
 find . -name "*.yaml" -exec sed -i \
   "s|YOUR_USERNAME|$USERNAME|g" {} +
 ```
+
+---
+
+## Resource Requirements
+
+### Memory Sizing
+
+The WorkflowTemplate allocates **64GB RAM** per trait job. This is required for large genotype datasets due to GAPIT's memory usage during data loading:
+
+| Stage | Memory Usage | Notes |
+|-------|-------------|-------|
+| Load HapMap file | ~8-10 GB | Raw text loaded into R data.frame |
+| Numericalization | ~15-20 GB | Converting text to numeric matrix (peak usage) |
+| Numeric matrix | ~6 GB | 1.4M SNPs × 550 accessions × 8 bytes |
+| GAPIT analysis | ~5-10 GB | Kinship, PCA, model fitting |
+| **Total peak** | ~40-50 GB | During numericalization step |
+
+**Important**: The memory peak occurs during **numericalization** (before any GWAS model runs), not during model execution. All models (BLINK, FarmCPU, MLM, etc.) run sequentially and share the already-loaded data.
+
+### Scaling Guidelines
+
+| Genotype File Size | SNP Count | Recommended Memory |
+|-------------------|-----------|-------------------|
+| < 500 MB | < 500K SNPs | 32 GB |
+| 500 MB - 1 GB | 500K - 1M SNPs | 48 GB |
+| 1 - 2.5 GB | 1M - 1.5M SNPs | 64 GB |
+| > 2.5 GB | > 1.5M SNPs | 96+ GB |
+
+### Current Configuration
+
+```yaml
+# In gapit3-single-trait-template.yaml
+resources:
+  requests:
+    memory: "64Gi"
+    cpu: "12"
+  limits:
+    memory: "72Gi"  # Headroom for peak usage
+    cpu: "16"
+```
+
+### Parallelism vs Resources
+
+With `parallelism: 30` and 64GB per job:
+- **Peak memory**: 30 × 64GB = 1.92 TB cluster-wide
+- **Peak CPU**: 30 × 12 = 360 cores cluster-wide
+
+Adjust `spec.parallelism` in the workflow if cluster resources are limited.
 
 ---
 

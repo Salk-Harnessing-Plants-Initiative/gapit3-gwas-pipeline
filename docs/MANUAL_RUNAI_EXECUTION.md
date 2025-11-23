@@ -431,6 +431,50 @@ head significant_snps.csv
 cat summary_stats.json
 ```
 
+### Understanding Aggregation Metrics
+
+The aggregation output includes timing metrics that may need interpretation:
+
+**Example output:**
+```
+================================================================================
+AGGREGATION COMPLETE
+================================================================================
+Traits processed:      186
+Successful traits:     186
+Failed traits:         0
+Total significant SNPs: 47
+Average time/trait:    41.66 minutes
+Total aggregated time: 129.15 hours
+```
+
+**How duration metrics are calculated:**
+
+| Metric | Source | Calculation | Meaning |
+|--------|--------|-------------|---------|
+| **Duration per trait** | `metadata.json` | `execution.duration_minutes` | Time from trait analysis start to completion |
+| **Average time/trait** | Summary table | `mean(all trait durations)` | Typical time for one trait to complete |
+| **Total aggregated time** | Summary table | `sum(all trait durations) / 60` | Cumulative computational time across all traits |
+
+**Important notes:**
+
+1. **Total aggregated time is NOT wall-clock time** - Since traits run in parallel, the actual pipeline runtime is much shorter. For example:
+   - 186 traits x 41.66 min/trait = 129.15 hours total compute
+   - With 50 parallel jobs: ~4 hours wall-clock time
+
+2. **Duration is recorded per trait** - Each trait's `metadata.json` contains:
+   ```json
+   {
+     "execution": {
+       "start_time": "2025-11-10T14:30:00Z",
+       "end_time": "2025-11-10T15:12:00Z",
+       "duration_minutes": 42.0
+     }
+   }
+   ```
+
+3. **Missing durations** - If a trait failed or `metadata.json` is missing, that trait's duration is excluded from averages (uses `na.rm = TRUE`).
+
 ## Cleanup
 
 ### Delete specific job
