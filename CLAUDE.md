@@ -16,3 +16,17 @@ Use `@/openspec/AGENTS.md` to learn:
 Keep this managed block so 'openspec update' can refresh the instructions.
 
 <!-- OPENSPEC:END -->
+
+## Path Mapping Reference
+
+**IMPORTANT**: The user is on a Windows computer. Paths differ by context:
+
+| Context | Base Path | Example |
+|---------|-----------|---------|
+| Windows (PowerShell/CMD) | `Z:\users\eberrigan\...` | `Z:\users\eberrigan\20251122_...\outputs` |
+| WSL (bash) | `/mnt/hpi_dev/users/eberrigan/...` | `/mnt/hpi_dev/users/eberrigan/20251122_...\outputs` |
+| GPU Cluster (Argo/RunAI) | `/hpi/hpi_dev/users/eberrigan/...` | `/hpi/hpi_dev/users/eberrigan/20251122_...\outputs` |
+
+The `Z:` drive in Windows maps to `/mnt/hpi_dev` in WSL, which corresponds to `/hpi/hpi_dev` on the cluster.
+
+**Current working dataset**: `20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS`
