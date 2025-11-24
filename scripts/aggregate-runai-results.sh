@@ -188,16 +188,20 @@ fi
 
 log_info "Validating prerequisites..."
 
-# Check runai CLI
-if ! command -v runai &> /dev/null; then
-    log_error "runai CLI not found. Please install RunAI CLI."
-    exit 1
-fi
+# Check runai CLI (only required if not using --force)
+if [ "$FORCE" = false ]; then
+    if ! command -v runai &> /dev/null; then
+        log_error "runai CLI not found. Please install RunAI CLI."
+        log_info "Tip: Use --force to skip RunAI checks and aggregate existing results"
+        exit 1
+    fi
 
-# Check authentication
-if ! runai whoami &> /dev/null 2>&1; then
-    log_error "Not authenticated to RunAI. Run: runai login"
-    exit 1
+    # Check authentication
+    if ! runai whoami &> /dev/null 2>&1; then
+        log_error "Not authenticated to RunAI. Run: runai login"
+        log_info "Tip: Use --force to skip RunAI checks and aggregate existing results"
+        exit 1
+    fi
 fi
 
 # Check output directory exists
