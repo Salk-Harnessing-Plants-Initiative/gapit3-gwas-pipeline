@@ -64,9 +64,5 @@ spec:
           memory: "8Gi"
           cpu: "4"
 
-    outputs:
-      artifacts:
-      - name: traits-manifest
-        path: /outputs/traits_manifest.yaml
-        archive:
-          none: {}
+    # Note: Artifact storage not configured on cluster
+    # Manifest is saved directly to mounted volume at /outputs/traits_manifest.yaml

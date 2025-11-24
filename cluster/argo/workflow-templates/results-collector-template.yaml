@@ -66,17 +66,5 @@ spec:
           memory: "16Gi"
           cpu: "8"
 
-    outputs:
-      artifacts:
-      - name: summary-report
-        path: /outputs/summary_report.html
-        optional: true
-        archive:
-          none: {}
-
-      - name: aggregated-results
-        path: /outputs/aggregated_results
-        optional: true
-        archive:
-          tar:
-            compressionLevel: 6
+    # Note: Artifact storage not configured on cluster
+    # Results are saved directly to mounted volume at /outputs/aggregated_results/
