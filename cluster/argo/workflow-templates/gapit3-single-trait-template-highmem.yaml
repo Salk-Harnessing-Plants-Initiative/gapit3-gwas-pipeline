@@ -1,0 +1,146 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gapit3-gwas-single-trait-highmem
+  namespace: runai-talmo-lab
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Single Trait WorkflowTemplate (HIGH MEMORY)
+  # ===========================================================================
+  # High-resource variant for retrying OOM/timeout-failed traits
+  # Use this template when traits failed due to:
+  #   - OOMKilled (exit code 137) - especially during MLM
+  #   - Timeout (slow MLM convergence)
+  #
+  # Resources: 96Gi memory, 16 CPU cores (vs 64Gi/12 cores in normal template)
+  # Reference from workflows using: templateRef.name: gapit3-gwas-single-trait-highmem
+  # ===========================================================================
+
+  entrypoint: run-gwas
+  serviceAccountName: default  # Required for workflowtaskresults permission
+
+  # Template-level arguments with defaults
+  arguments:
+    parameters:
+    - name: trait-index
+      value: "2"
+    - name: trait-name
+      value: "unknown"
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
+    - name: models
+      value: "BLINK,FarmCPU,MLM"
+
+  templates:
+  # ===========================================================================
+  # Main GWAS execution template (HIGH MEMORY)
+  # ===========================================================================
+  # IMPORTANT: This template requires the calling workflow to define volumes:
+  #   - nfs-data: Mounted at /data (read-only) for genotype/phenotype files
+  #   - nfs-outputs: Mounted at /outputs (read-write) for GWAS results
+  # See gapit3-test-pipeline.yaml for example volume configuration
+  # ===========================================================================
+  - name: run-gwas
+    inputs:
+      parameters:
+      - name: trait-index
+      - name: trait-name
+      - name: image
+      - name: models
+
+    metadata:
+      labels:
+        app: gapit3-gwas
+        component: single-trait-highmem
+        trait-index: "{{inputs.parameters.trait-index}}"
+      annotations:
+        # Run.AI annotations for cluster scheduling
+        runai/preemptible: "true"  # Allow preemption for better cluster utilization
+
+    container:
+      image: "{{inputs.parameters.image}}"
+      imagePullPolicy: Always
+
+      # Entrypoint command
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "run-single-trait"
+        - "--trait-index"
+        - "{{inputs.parameters.trait-index}}"
+        - "--config"
+        - "/config/config.yaml"
+        - "--output-dir"
+        - "/outputs"
+        - "--models"
+        - "{{inputs.parameters.models}}"
+        - "--threads"
+        - "16"  # Increased from 12 to match CPU allocation
+
+      # Volume mounts
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true  # Genotype/phenotype are read-only
+      - name: nfs-outputs
+        mountPath: /outputs
+        readOnly: false
+
+      # Environment variables
+      env:
+      - name: GENOTYPE_FILE
+        value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+      - name: PHENOTYPE_FILE
+        value: "/data/phenotype/iron_traits_edited.txt"
+      - name: ACCESSION_IDS_FILE
+        value: "/data/metadata/ids_gwas.txt"
+      - name: MODELS
+        value: "{{inputs.parameters.models}}"
+      - name: OPENBLAS_NUM_THREADS
+        value: "16"  # Increased from 12 for better MLM performance
+      - name: OMP_NUM_THREADS
+        value: "16"  # Increased from 12 for better MLM performance
+      - name: TRAIT_INDEX
+        value: "{{inputs.parameters.trait-index}}"
+      - name: TRAIT_NAME
+        value: "{{inputs.parameters.trait-name}}"
+      - name: WORKFLOW_NAME
+        value: "{{workflow.name}}"
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+
+      # Resource allocation - HIGH MEMORY for OOM/timeout retries
+      # Increased for MLM model which requires more memory and benefits from more threads
+      resources:
+        requests:
+          memory: "96Gi"   # Increased from 64Gi
+          cpu: "16"        # Increased from 12
+        limits:
+          memory: "104Gi"  # Increased from 72Gi - headroom for peak usage
+          cpu: "20"        # Increased from 16 - allow burst
+
+    # Retry strategy for transient failures
+    retryStrategy:
+      limit: 3  # Reduced from 5 since these are already retries
+      retryPolicy: "OnFailure"
+      backoff:
+        duration: "5m"      # Wait 5 minutes before first retry (longer for resource settling)
+        factor: 2           # Double wait time for each retry
+        maxDuration: "30m"  # Max wait time
+
+    # Output artifacts (optional - for Argo UI visualization)
+    outputs:
+      artifacts:
+      - name: metadata
+        path: /outputs/trait_{{inputs.parameters.trait-index}}_*/metadata.json
+        optional: true
+        archive:
+          none: {}  # Don't compress
+
+      - name: results
+        path: /outputs/trait_{{inputs.parameters.trait-index}}_*
+        optional: true
+        archive:
+          tar:
+            compressionLevel: 6

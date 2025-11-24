@@ -39,8 +39,8 @@ spec:
     - name: max-parallelism
       value: "50"     # Limit concurrent jobs to avoid cluster overload
 
-  # Global timeout (allow ~10 hours for full pipeline)
-  activeDeadlineSeconds: 36000
+  # Global timeout (7 days - effectively no limit, can terminate manually if needed)
+  activeDeadlineSeconds: 604800
 
   # Workflow-level volumes
   volumes:

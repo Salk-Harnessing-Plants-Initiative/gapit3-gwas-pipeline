@@ -376,6 +376,68 @@ Adjust `spec.parallelism` in the workflow if cluster resources are limited.
 
 ---
 
+## Retrying Failed Traits
+
+When traits fail due to OOM or timeout, use the retry script to rerun only the incomplete traits.
+
+### Detect Incomplete Traits
+
+The retry script inspects output directories to find traits with missing model outputs:
+
+```bash
+./scripts/retry-argo-traits.sh \
+  --workflow gapit3-gwas-parallel-8nj24 \
+  --output-dir "Z:/users/eberrigan/.../outputs" \
+  --dry-run
+```
+
+This will show:
+- **Missing traits**: No output directory at all
+- **Incomplete traits**: Have some model outputs but missing others (e.g., BLINK/FarmCPU completed, MLM missing)
+
+### Retry with High Memory
+
+For OOM failures (exit code 137), use the high-memory template:
+
+```bash
+./scripts/retry-argo-traits.sh \
+  --workflow gapit3-gwas-parallel-8nj24 \
+  --output-dir "Z:/users/eberrigan/.../outputs" \
+  --highmem \
+  --submit
+```
+
+**High-memory template resources:**
+| Resource | Normal | High-Memory |
+|----------|--------|-------------|
+| Memory request | 64Gi | 96Gi |
+| Memory limit | 72Gi | 104Gi |
+| CPU request | 12 | 16 |
+| CPU limit | 16 | 20 |
+| Thread env vars | 12 | 16 |
+
+### Manual Trait Specification
+
+If you know which traits failed:
+
+```bash
+./scripts/retry-argo-traits.sh \
+  --workflow gapit3-gwas-parallel-8nj24 \
+  --traits 5,28,29,30,31 \
+  --highmem \
+  --submit
+```
+
+### Install High-Memory Template
+
+Before using `--highmem`, install the template:
+
+```bash
+kubectl apply -f workflow-templates/gapit3-single-trait-template-highmem.yaml -n runai-talmo-lab
+```
+
+---
+
 ## Troubleshooting
 
 ### WorkflowTemplate not found
