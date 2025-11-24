@@ -19,13 +19,21 @@ source_aggregation_functions <- function() {
   script_path <- file.path("..", "..", "scripts", "collect_results.R")
   script_lines <- readLines(script_path)
 
-  # Find function definitions
+  # Find select_best_trait_dirs function
+  select_start <- grep("^select_best_trait_dirs <- function", script_lines)[1]
+  select_end <- grep("^}", script_lines)
+  select_end <- select_end[select_end > select_start][1]
+
+  # Find read_filter_file and read_gwas_results_fallback functions
   read_filter_start <- grep("^read_filter_file <- function", script_lines)[1]
   fallback_end <- grep("^}", script_lines)
   fallback_end <- fallback_end[fallback_end > read_filter_start][2]
 
   # Extract and evaluate function definitions
+  select_code <- paste(script_lines[select_start:select_end], collapse = "\n")
   functions_code <- paste(script_lines[read_filter_start:fallback_end], collapse = "\n")
+
+  eval(parse(text = select_code), envir = .GlobalEnv)
   eval(parse(text = functions_code), envir = .GlobalEnv)
 }
 
@@ -268,4 +276,132 @@ test_that("read_filter_file returns empty for Filter with traits but no data", {
   # Should return empty data.frame
   expect_s3_class(result, "data.frame")
   expect_equal(nrow(result), 0)
+})
+
+# ==============================================================================
+# Tests for select_best_trait_dirs() - Deduplication
+# ==============================================================================
+
+test_that("select_best_trait_dirs returns empty for empty input", {
+  result <- select_best_trait_dirs(character(0), c("BLINK", "FarmCPU", "MLM"))
+  expect_equal(length(result), 0)
+})
+
+test_that("select_best_trait_dirs selects more complete directory", {
+  # Create temp directories with different completeness
+  temp_base <- tempdir()
+  old_dir <- file.path(temp_base, "trait_005_20231101_120000")
+  new_dir <- file.path(temp_base, "trait_005_20231102_120000")
+
+  dir.create(old_dir, showWarnings = FALSE, recursive = TRUE)
+  dir.create(new_dir, showWarnings = FALSE, recursive = TRUE)
+
+  on.exit({
+    unlink(old_dir, recursive = TRUE)
+    unlink(new_dir, recursive = TRUE)
+  })
+
+  # Old directory: 2/3 models (missing MLM)
+  file.create(file.path(old_dir, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+  file.create(file.path(old_dir, "GAPIT.Association.GWAS_Results.FarmCPU.trait.csv"))
+
+  # New directory: 3/3 models (complete)
+  file.create(file.path(new_dir, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+  file.create(file.path(new_dir, "GAPIT.Association.GWAS_Results.FarmCPU.trait.csv"))
+  file.create(file.path(new_dir, "GAPIT.Association.GWAS_Results.MLM.trait.csv"))
+
+  trait_dirs <- c(old_dir, new_dir)
+  expected_models <- c("BLINK", "FarmCPU", "MLM")
+
+  result <- select_best_trait_dirs(trait_dirs, expected_models)
+
+  expect_equal(length(result), 1)
+  expect_equal(result, new_dir)  # Should select more complete
+})
+
+test_that("select_best_trait_dirs prefers old complete over new partial", {
+  # Scenario: retry failed early, old directory is more complete
+  temp_base <- tempdir()
+  old_dir <- file.path(temp_base, "trait_010_20231101_120000")
+  new_dir <- file.path(temp_base, "trait_010_20231102_120000")
+
+  dir.create(old_dir, showWarnings = FALSE, recursive = TRUE)
+  dir.create(new_dir, showWarnings = FALSE, recursive = TRUE)
+
+  on.exit({
+    unlink(old_dir, recursive = TRUE)
+    unlink(new_dir, recursive = TRUE)
+  })
+
+  # Old directory: 2/3 models
+  file.create(file.path(old_dir, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+  file.create(file.path(old_dir, "GAPIT.Association.GWAS_Results.FarmCPU.trait.csv"))
+
+  # New directory: 1/3 models (retry failed very early)
+  file.create(file.path(new_dir, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+
+  trait_dirs <- c(old_dir, new_dir)
+  expected_models <- c("BLINK", "FarmCPU", "MLM")
+
+  result <- select_best_trait_dirs(trait_dirs, expected_models)
+
+  expect_equal(length(result), 1)
+  expect_equal(result, old_dir)  # Should prefer more complete old directory
+})
+
+test_that("select_best_trait_dirs uses newest as tie-breaker", {
+  # Both directories are equally complete
+  temp_base <- tempdir()
+  old_dir <- file.path(temp_base, "trait_015_20231101_120000")
+  new_dir <- file.path(temp_base, "trait_015_20231102_120000")
+
+  dir.create(old_dir, showWarnings = FALSE, recursive = TRUE)
+  dir.create(new_dir, showWarnings = FALSE, recursive = TRUE)
+
+  on.exit({
+    unlink(old_dir, recursive = TRUE)
+    unlink(new_dir, recursive = TRUE)
+  })
+
+  # Both directories: 3/3 models (complete)
+  for (dir in c(old_dir, new_dir)) {
+    file.create(file.path(dir, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+    file.create(file.path(dir, "GAPIT.Association.GWAS_Results.FarmCPU.trait.csv"))
+    file.create(file.path(dir, "GAPIT.Association.GWAS_Results.MLM.trait.csv"))
+  }
+
+  trait_dirs <- c(old_dir, new_dir)
+  expected_models <- c("BLINK", "FarmCPU", "MLM")
+
+  result <- select_best_trait_dirs(trait_dirs, expected_models)
+
+  expect_equal(length(result), 1)
+  expect_equal(result, new_dir)  # Should prefer newer when tied
+})
+
+test_that("select_best_trait_dirs handles multiple traits correctly", {
+  temp_base <- tempdir()
+  dirs <- c(
+    file.path(temp_base, "trait_001_20231101_120000"),
+    file.path(temp_base, "trait_002_20231101_120000"),
+    file.path(temp_base, "trait_002_20231102_120000")  # duplicate for trait 2
+  )
+
+  for (d in dirs) {
+    dir.create(d, showWarnings = FALSE, recursive = TRUE)
+    file.create(file.path(d, "GAPIT.Association.GWAS_Results.BLINK.trait.csv"))
+    file.create(file.path(d, "GAPIT.Association.GWAS_Results.FarmCPU.trait.csv"))
+    file.create(file.path(d, "GAPIT.Association.GWAS_Results.MLM.trait.csv"))
+  }
+
+  on.exit(unlink(dirs, recursive = TRUE))
+
+  expected_models <- c("BLINK", "FarmCPU", "MLM")
+
+  result <- select_best_trait_dirs(dirs, expected_models)
+
+  expect_equal(length(result), 2)  # One per trait index
+  expect_true(dirs[1] %in% result)  # Trait 1
+  expect_true(dirs[3] %in% result)  # Trait 2 (newer)
+  expect_false(dirs[2] %in% result)  # Old trait 2 excluded
 })
