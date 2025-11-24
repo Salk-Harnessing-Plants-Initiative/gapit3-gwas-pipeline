@@ -104,7 +104,8 @@ select_best_trait_dirs <- function(trait_dirs, expected_models) {
 
     for (idx in as.integer(dup_traits)) {
       dirs_for_trait <- trait_info[trait_info$trait_index == idx, ]
-      dirs_for_trait <- dirs_for_trait[order(-dirs_for_trait$n_models, -dirs_for_trait$timestamp), ]
+      # Sort by n_models descending, then timestamp descending (string comparison works for YYYYMMDD_HHMMSS)
+      dirs_for_trait <- dirs_for_trait[order(-dirs_for_trait$n_models, -xtfrm(dirs_for_trait$timestamp)), ]
       selected <- dirs_for_trait[1, ]
       others <- dirs_for_trait[-1, ]
 
