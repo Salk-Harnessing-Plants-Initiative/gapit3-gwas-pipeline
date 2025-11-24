@@ -25,7 +25,9 @@ option_list <- list(
   make_option(c("-b", "--batch-id"), type = "character", default = "unknown",
               help = "Batch/workflow ID for tracking", metavar = "STRING"),
   make_option(c("-t", "--threshold"), type = "numeric", default = 5e-8,
-              help = "Genome-wide significance threshold [default: %default]", metavar = "FLOAT")
+              help = "Genome-wide significance threshold [default: %default]", metavar = "FLOAT"),
+  make_option(c("-m", "--models"), type = "character", default = "BLINK,FarmCPU,MLM",
+              help = "Expected models for completeness check [default: %default]", metavar = "STRING")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
@@ -38,6 +40,7 @@ opt <- parse_args(opt_parser)
 output_dir <- opt$`output-dir`
 batch_id <- opt$`batch-id`
 threshold <- opt$threshold
+expected_models <- strsplit(opt$models, ",")[[1]]
 
 cat(strrep("=", 78), "\n")
 cat("GAPIT3 Results Collector\n")
@@ -45,11 +48,87 @@ cat(strrep("=", 78), "\n")
 cat("Output directory:", output_dir, "\n")
 cat("Batch ID:", batch_id, "\n")
 cat("Significance threshold:", threshold, "\n")
+cat("Expected models:", paste(expected_models, collapse = ", "), "\n")
 cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
+
+#' Select best directory for each trait index (deduplication)
+#'
+#' When multiple directories exist for the same trait (from retries),
+#' select the one with the most complete model outputs.
+#' If tied, select the newest (by timestamp in directory name).
+#'
+#' @param trait_dirs Vector of trait directory paths
+#' @param expected_models Vector of expected model names (e.g., c("BLINK", "FarmCPU", "MLM"))
+#' @return Vector of selected trait directory paths (one per trait index)
+select_best_trait_dirs <- function(trait_dirs, expected_models) {
+  if (length(trait_dirs) == 0) return(character(0))
+
+  # Build info table for all directories
+  trait_info <- data.frame(
+    path = trait_dirs,
+    basename = basename(trait_dirs),
+    stringsAsFactors = FALSE
+  )
+
+  # Extract trait index from directory name
+  # Pattern: trait_<index>_<name>_<timestamp> or trait_<index>_<timestamp>
+  trait_info$trait_index <- as.integer(
+    sub("trait_(\\d+)_.*", "\\1", trait_info$basename)
+  )
+
+  # Count complete models for each directory
+  trait_info$n_models <- sapply(trait_info$path, function(dir) {
+    sum(sapply(expected_models, function(model) {
+      pattern <- paste0("GAPIT\\.Association\\.GWAS_Results\\.", model, "\\.")
+      length(list.files(dir, pattern = pattern)) > 0
+    }))
+  })
+
+  # Extract timestamp for tie-breaking
+  # Try to find YYYYMMDD_HHMMSS pattern at end of directory name
+  trait_info$timestamp <- sub(".*_(\\d{8}_\\d{6})$", "\\1", trait_info$basename)
+  # If no timestamp found, use basename for sorting
+  trait_info$timestamp[trait_info$timestamp == trait_info$basename] <- "00000000_000000"
+
+  # Find traits with duplicates (for logging)
+  dup_counts <- table(trait_info$trait_index)
+  dup_traits <- names(dup_counts[dup_counts > 1])
+
+  if (length(dup_traits) > 0) {
+    cat("  Note: Found multiple directories for", length(dup_traits), "trait(s)\n")
+    cat("  Selecting most complete directory for each:\n")
+
+    for (idx in as.integer(dup_traits)) {
+      dirs_for_trait <- trait_info[trait_info$trait_index == idx, ]
+      dirs_for_trait <- dirs_for_trait[order(-dirs_for_trait$n_models, -dirs_for_trait$timestamp), ]
+      selected <- dirs_for_trait[1, ]
+      others <- dirs_for_trait[-1, ]
+
+      cat("    - Trait", idx, ":", nrow(dirs_for_trait), "directories\n")
+      cat("      Selected:", selected$basename,
+          "(", selected$n_models, "/", length(expected_models), "models)\n")
+      for (j in seq_len(nrow(others))) {
+        cat("      Skipped:", others$basename[j],
+            "(", others$n_models[j], "/", length(expected_models), "models)\n")
+      }
+    }
+    cat("\n")
+  }
+
+  # For each trait index, select best directory
+  # Priority: most models complete, then newest timestamp
+  selected <- trait_info %>%
+    group_by(trait_index) %>%
+    arrange(desc(n_models), desc(timestamp)) %>%
+    slice(1) %>%
+    ungroup()
+
+  return(selected$path)
+}
 
 #' Read GAPIT Filter file and parse model information
 #'
@@ -182,18 +261,22 @@ read_gwas_results_fallback <- function(trait_dir, threshold) {
 }
 
 # ==============================================================================
-# Find all trait result directories
+# Find all trait result directories (with deduplication)
 # ==============================================================================
 cat("Scanning for trait results...\n")
-trait_dirs <- list.dirs(output_dir, recursive = FALSE, full.names = TRUE)
-trait_dirs <- trait_dirs[grepl("trait_\\d+_", basename(trait_dirs))]
+all_trait_dirs <- list.dirs(output_dir, recursive = FALSE, full.names = TRUE)
+all_trait_dirs <- all_trait_dirs[grepl("trait_\\d+_", basename(all_trait_dirs))]
 
-cat("Found", length(trait_dirs), "trait result directories\n\n")
+cat("Found", length(all_trait_dirs), "trait result directories\n")
 
-if (length(trait_dirs) == 0) {
+if (length(all_trait_dirs) == 0) {
   cat("No trait results found. Exiting.\n")
   quit(status = 0)
 }
+
+# Deduplicate: select best directory per trait index
+trait_dirs <- select_best_trait_dirs(all_trait_dirs, expected_models)
+cat("After deduplication:", length(trait_dirs), "unique traits\n\n")
 
 # ==============================================================================
 # Collect metadata from all traits
@@ -328,12 +411,14 @@ cat("Generating summary statistics...\n")
 stats <- list(
   batch_id = batch_id,
   collection_time = Sys.time(),
-  total_traits_attempted = length(trait_dirs),
+  total_directories_found = length(all_trait_dirs),
+  unique_traits = length(trait_dirs),
   successful_traits = success_count,
   failed_traits = failed_count,
   total_significant_snps = nrow(all_snps),
   average_duration_minutes = mean(summary_df$duration_minutes, na.rm = TRUE),
-  total_duration_hours = sum(summary_df$duration_minutes, na.rm = TRUE) / 60
+  total_duration_hours = sum(summary_df$duration_minutes, na.rm = TRUE) / 60,
+  expected_models = expected_models
 )
 
 # Add per-model statistics if model column exists
@@ -381,7 +466,8 @@ cat("Batch ID:", batch_id, "\n")
 cat("Collection time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
 
 cat("Traits:\n")
-cat("  - Total attempted:", length(trait_dirs), "\n")
+cat("  - Directories found:", length(all_trait_dirs), "\n")
+cat("  - Unique traits:", length(trait_dirs), "\n")
 cat("  - Successful:", success_count, "\n")
 cat("  - Failed:", failed_count, "\n\n")
 
