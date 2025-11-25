@@ -120,6 +120,14 @@ spec:
       command: ["/scripts/entrypoint.sh"]
       args: ["validate"]
 
+      env:
+      - name: GENOTYPE_FILE
+        value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+      - name: PHENOTYPE_FILE
+        value: "/data/phenotype/iron_traits_edited.txt"
+      - name: ACCESSION_IDS_FILE
+        value: "/data/metadata/ids_gwas.txt"
+
       volumeMounts:
       - name: nfs-data
         mountPath: /data
