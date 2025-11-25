@@ -23,9 +23,9 @@ spec:
     - name: image
       value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data"
+      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
+      value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
     - name: cpu-cores
       value: "12"
     - name: memory-gb
