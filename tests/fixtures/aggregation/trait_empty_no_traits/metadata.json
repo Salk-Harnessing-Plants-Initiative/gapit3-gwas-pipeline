@@ -1,0 +1,7 @@
+{
+  "trait_name": "test_empty_no_traits",
+  "description": "Test fixture for empty Filter file without traits column",
+  "expected_significant_snps": 0,
+  "models": [],
+  "notes": "This represents a GAPIT run that found no significant SNPs"
+}

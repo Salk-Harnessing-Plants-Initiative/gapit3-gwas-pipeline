@@ -16,36 +16,47 @@ suppressPackageStartupMessages({
   library(matrixStats)
   library(gridExtra)
   library(optparse)
-  library(yaml)
   library(jsonlite)
 })
 
 # ==============================================================================
-# Parse command line arguments
+# Parse command line arguments and environment variables
 # ==============================================================================
 option_list <- list(
-  make_option(c("-t", "--trait-index"), type = "integer", default = NULL,
-              help = "Trait column index (required)", metavar = "INTEGER"),
-  make_option(c("-c", "--config"), type = "character", default = "/config/config.yaml",
-              help = "Path to config file [default: %default]", metavar = "FILE"),
-  make_option(c("-g", "--genotype"), type = "character", default = NULL,
-              help = "Path to genotype HapMap file (overrides config)", metavar = "FILE"),
-  make_option(c("-p", "--phenotype"), type = "character", default = NULL,
-              help = "Path to phenotype file (overrides config)", metavar = "FILE"),
-  make_option(c("-i", "--ids"), type = "character", default = NULL,
-              help = "Path to accession IDs file (overrides config)", metavar = "FILE"),
-  make_option(c("-o", "--output-dir"), type = "character", default = "/outputs",
-              help = "Output directory [default: %default]", metavar = "DIR"),
-  make_option(c("-m", "--models"), type = "character", default = NULL,
-              help = "Comma-separated models (e.g., 'BLINK,FarmCPU') [overrides config]", metavar = "STRING"),
-  make_option(c("--pca"), type = "integer", default = NULL,
-              help = "Number of PCA components [overrides config]", metavar = "INTEGER"),
-  make_option(c("--threads"), type = "integer", default = NULL,
-              help = "Number of CPU threads to use", metavar = "INTEGER")
+  make_option(c("-t", "--trait-index"), type = "integer",
+              default = as.integer(Sys.getenv("TRAIT_INDEX", "2")),
+              help = "Trait column index [env: TRAIT_INDEX]", metavar = "INTEGER"),
+  make_option(c("-g", "--genotype"), type = "character",
+              default = Sys.getenv("GENOTYPE_FILE", "/data/genotype/all_chromosomes_binary.hmp.txt"),
+              help = "Path to genotype HapMap file [env: GENOTYPE_FILE]", metavar = "FILE"),
+  make_option(c("-p", "--phenotype"), type = "character",
+              default = Sys.getenv("PHENOTYPE_FILE", "/data/phenotype/traits.txt"),
+              help = "Path to phenotype file [env: PHENOTYPE_FILE]", metavar = "FILE"),
+  make_option(c("-i", "--ids"), type = "character",
+              default = Sys.getenv("ACCESSION_IDS_FILE", ""),
+              help = "Path to accession IDs file [env: ACCESSION_IDS_FILE]", metavar = "FILE"),
+  make_option(c("-o", "--output-dir"), type = "character",
+              default = Sys.getenv("OUTPUT_PATH", "/outputs"),
+              help = "Output directory [env: OUTPUT_PATH]", metavar = "DIR"),
+  make_option(c("-m", "--models"), type = "character",
+              default = Sys.getenv("MODELS", "BLINK,FarmCPU"),
+              help = "Comma-separated models [env: MODELS]", metavar = "STRING"),
+  make_option(c("--pca"), type = "integer",
+              default = as.integer(Sys.getenv("PCA_COMPONENTS", "3")),
+              help = "Number of PCA components [env: PCA_COMPONENTS]", metavar = "INTEGER"),
+  make_option(c("--threads"), type = "integer",
+              default = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
+              help = "Number of CPU threads [env: OPENBLAS_NUM_THREADS]", metavar = "INTEGER"),
+  make_option(c("--maf"), type = "numeric",
+              default = as.numeric(Sys.getenv("MAF_FILTER", "0.05")),
+              help = "Minor allele frequency filter [env: MAF_FILTER]", metavar = "FLOAT"),
+  make_option(c("--multiple-analysis"), type = "logical",
+              default = as.logical(Sys.getenv("MULTIPLE_ANALYSIS", "TRUE")),
+              help = "Run multiple analysis [env: MULTIPLE_ANALYSIS]", metavar = "BOOL")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
-                          description = "\nRun GWAS analysis for a single trait using GAPIT3")
+                          description = "\nRun GWAS analysis for a single trait using GAPIT3\nConfiguration via command-line arguments or environment variables.")
 opt <- parse_args(opt_parser)
 
 # Validate required arguments
@@ -54,31 +65,32 @@ if (is.null(opt$`trait-index`)) {
 }
 
 # ==============================================================================
-# Load configuration
+# Runtime Configuration (from command-line args or environment variables)
 # ==============================================================================
-cat("Loading configuration from:", opt$config, "\n")
-config <- read_yaml(opt$config)
+cat("Runtime Configuration:\n")
+cat("  Trait Index:    ", opt$`trait-index`, "\n")
+cat("  Models:         ", opt$models, "\n")
+cat("  PCA Components: ", opt$pca, "\n")
+cat("  MAF Filter:     ", opt$maf, "\n")
+cat("  Multiple Analysis:", opt$`multiple-analysis`, "\n")
+cat("\n")
 
-# Override config with command-line arguments if provided
-genotype_file <- ifelse(is.null(opt$genotype), config$data$genotype, opt$genotype)
-phenotype_file <- ifelse(is.null(opt$phenotype), config$data$phenotype, opt$phenotype)
-ids_file <- ifelse(is.null(opt$ids), config$data$accession_ids, opt$ids)
+# Parse inputs
+genotype_file <- opt$genotype
+phenotype_file <- opt$phenotype
+ids_file <- opt$ids
 
-# GAPIT parameters
-if (!is.null(opt$models)) {
-  models <- strsplit(opt$models, ",")[[1]]
-} else {
-  models <- config$gapit$models
-}
+# Parse models (split comma-separated list and trim whitespace)
+models <- strsplit(opt$models, ",")[[1]]
+models <- trimws(models)
 
-pca_components <- ifelse(is.null(opt$pca), config$gapit$pca_components, opt$pca)
+pca_components <- opt$pca
+multiple_analysis <- opt$`multiple-analysis`
 
 # Set thread count
-if (!is.null(opt$threads)) {
-  Sys.setenv(OPENBLAS_NUM_THREADS = opt$threads)
-  Sys.setenv(OMP_NUM_THREADS = opt$threads)
-  cat("Set thread count to:", opt$threads, "\n")
-}
+Sys.setenv(OPENBLAS_NUM_THREADS = opt$threads)
+Sys.setenv(OMP_NUM_THREADS = opt$threads)
+cat("Thread count set to:", opt$threads, "\n\n")
 
 # ==============================================================================
 # Setup output directory
@@ -122,7 +134,8 @@ metadata <- list(
   parameters = list(
     models = models,
     pca_components = pca_components,
-    multiple_analysis = config$gapit$multiple_analysis
+    multiple_analysis = multiple_analysis,
+    maf_filter = opt$maf
   ),
   resources = list(
     threads = Sys.getenv("OPENBLAS_NUM_THREADS")
@@ -204,7 +217,7 @@ tryCatch({
     G = myG,
     PCA.total = pca_components,
     model = models,
-    Multiple_analysis = if (is.null(config$gapit$multiple_analysis)) TRUE else config$gapit$multiple_analysis
+    Multiple_analysis = multiple_analysis
   )
 
   gwas_end <- Sys.time()

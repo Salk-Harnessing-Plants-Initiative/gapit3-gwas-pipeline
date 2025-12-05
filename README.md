@@ -1,6 +1,8 @@
 # GAPIT3 GWAS Pipeline
 
 [![Docker Build](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml)
+[![R Script Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml)
+[![Devcontainer Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants and other organisms.
@@ -14,6 +16,24 @@ Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide associa
 - ⚡ **Optimized Performance**: Multi-threaded OpenBLAS for fast linear algebra
 - 📈 **Auto-Aggregation**: Collect and summarize results from all traits
 - 🎯 **Production-Ready**: Used for Arabidopsis thaliana iron trait analysis (546 accessions, ~1.4M SNPs)
+
+---
+
+## Current Status
+
+### Argo Workflows (⚠️ RBAC Permissions Pending)
+
+The pipeline is fully functional but currently requires **manual RunAI execution** due to pending RBAC permissions in the cluster. Once permissions are granted, full Argo orchestration will work automatically.
+
+**Current workarounds available:**
+- ✅ **Manual RunAI CLI** - Working now (see [Manual RunAI Execution Guide](docs/MANUAL_RUNAI_EXECUTION.md))
+- ✅ **Batch submission script** - [scripts/submit-all-traits-runai.sh](scripts/submit-all-traits-runai.sh)
+- ✅ **Aggregation script** - [scripts/aggregate-runai-results.sh](scripts/aggregate-runai-results.sh)
+- ✅ **Monitoring dashboard** - [scripts/monitor-runai-jobs.sh](scripts/monitor-runai-jobs.sh)
+- ✅ **Cleanup helper** - [scripts/cleanup-runai.sh](scripts/cleanup-runai.sh)
+- ⏳ **Argo Workflows** - Waiting for RBAC fix (see [RBAC Issue](docs/RBAC_PERMISSIONS_ISSUE.md))
+
+**For administrators:** See [RBAC_PERMISSIONS_ISSUE.md](docs/RBAC_PERMISSIONS_ISSUE.md) for required permissions.
 
 ---
 
@@ -63,6 +83,80 @@ docker run -v $(pwd)/data:/data -v $(pwd)/outputs:/outputs \
 
 ---
 
+## Runtime Configuration
+
+The GAPIT3 container is **fully configurable at runtime** via environment variables - no image rebuild required to change analysis parameters.
+
+### Quick Examples
+
+**Change models without rebuilding:**
+```bash
+# Fast preliminary scan (BLINK only)
+docker run --rm \
+  -v /data:/data \
+  -v /outputs:/outputs \
+  -e TRAIT_INDEX=2 \
+  -e MODELS=BLINK \
+  gapit3:latest
+
+# Validation run (multiple models)
+docker run --rm \
+  -e TRAIT_INDEX=2 \
+  -e MODELS=BLINK,FarmCPU,MLM \
+  -e PCA_COMPONENTS=5 \
+  gapit3:latest
+```
+
+**RunAI deployment:**
+```bash
+runai workspace submit gapit3-trait-2 \
+  --project talmo-lab \
+  --image ghcr.io/.../gapit3:latest \
+  --environment TRAIT_INDEX=2 \
+  --environment MODELS=BLINK \
+  --environment PCA_COMPONENTS=5 \
+  --environment SNP_THRESHOLD=5e-8
+```
+
+**Local development with .env file:**
+```bash
+# Copy example and customize
+cp .env.example .env
+nano .env
+
+# Run with your configuration
+docker run --rm --env-file .env gapit3:latest
+```
+
+### Available Configuration Options
+
+**Core Analysis Parameters:**
+- `MODELS` - GWAS models (default: `BLINK,FarmCPU`)
+- `PCA_COMPONENTS` - Population structure correction (default: `3`, range: `0-20`)
+- `SNP_THRESHOLD` - Significance threshold (default: `5e-8`)
+- `MAF_FILTER` - Minor allele frequency filter (default: `0.05`)
+
+**Paths:**
+- `TRAIT_INDEX` - Which trait column to analyze (required)
+- `DATA_PATH` - Input data directory
+- `OUTPUT_PATH` - Output directory
+- `GENOTYPE_FILE` - Genotype HapMap file path
+- `PHENOTYPE_FILE` - Phenotype file path
+
+**Computational Resources:**
+- `OPENBLAS_NUM_THREADS` - Linear algebra threads (default: `12`)
+- `OMP_NUM_THREADS` - OpenMP threads (default: `12`)
+
+**See [.env.example](.env.example) for complete documentation of all options.**
+
+### Configuration Priority
+
+1. **Command-line arguments** (highest priority)
+2. **Environment variables** (RunAI `--environment` or Docker `-e`)
+3. **Defaults in entrypoint.sh** (lowest priority)
+
+---
+
 ## Architecture
 
 ```
@@ -89,7 +183,10 @@ docker run -v $(pwd)/data:/data -v $(pwd)/outputs:/outputs \
 │           └─ Execution metadata (JSON)                      │
 │                                                             │
 │  4. Results Collection (Aggregation)                        │
-│     └─ Combine significant SNPs, generate summary report   │
+│     └─ Combine significant SNPs with model tracking        │
+│        - Reads GAPIT Filter files (significant SNPs only)  │
+│        - Tracks which model found each SNP                 │
+│        - Generates per-model summary statistics            │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -100,6 +197,7 @@ docker run -v $(pwd)/data:/data -v $(pwd)/outputs:/outputs \
 gapit3-gwas-pipeline/
 ├── Dockerfile                  # Production container
 ├── .devcontainer/             # VS Code devcontainer config
+├── .env.example               # Runtime configuration documentation
 ├── cluster/
 │   └── argo/
 │       ├── workflow-templates/  # Reusable Argo templates
@@ -107,14 +205,17 @@ gapit3-gwas-pipeline/
 │       └── scripts/             # Helper scripts (submit, monitor)
 ├── scripts/
 │   ├── run_gwas_single_trait.R    # Core GWAS script
-│   ├── collect_results.R          # Results aggregator
+│   ├── collect_results.R          # Results aggregator (with model tracking)
 │   ├── validate_inputs.R          # Input validation
-│   └── entrypoint.sh              # Container entrypoint
-├── config/
-│   └── config.yaml                # GAPIT parameters
+│   ├── entrypoint.sh              # Container entrypoint (handles runtime config)
+│   ├── submit-all-traits-runai.sh # Batch submission helper
+│   ├── monitor-runai-jobs.sh      # Job monitoring dashboard
+│   ├── aggregate-runai-results.sh # Results aggregation
+│   └── cleanup-runai.sh           # Cleanup helper
 └── docs/
     ├── ARGO_SETUP.md              # Cluster setup guide
-    └── USAGE.md                   # Detailed usage
+    ├── MANUAL_RUNAI_EXECUTION.md  # RunAI workaround guide
+    └── RBAC_PERMISSIONS_ISSUE.md  # Admin information
 ```
 
 ---
@@ -137,6 +238,8 @@ Based on 546 accessions, ~1.4M SNPs:
 - **Local Dev**: Docker + VS Code (optional)
 - **CLI Tools**: `argo`, `kubectl`, `git`
 
+> **Windows Users**: If using WSL (Windows Subsystem for Linux), see [WSL Setup Guide](docs/DEPLOYMENT_TESTING.md#environment-specific-setup) for important configuration notes regarding kubectl and RunAI authentication.
+
 ### Input Data
 
 ```
@@ -153,9 +256,19 @@ data/
 
 ## Documentation
 
+### Deployment & Execution
 - **[Argo Setup Guide](docs/ARGO_SETUP.md)** - Complete cluster deployment instructions
+- **[Manual RunAI Execution](docs/MANUAL_RUNAI_EXECUTION.md)** - Current workaround for RBAC issue
+- **[RunAI Quick Reference](docs/RUNAI_QUICK_REFERENCE.md)** - Command cheat sheet
+- **[RBAC Permissions Issue](docs/RBAC_PERMISSIONS_ISSUE.md)** - For cluster administrators
+
+### Usage & Configuration
 - **[Usage Guide](docs/USAGE.md)** - Parameter descriptions and advanced usage
 - **[Data Dictionary](docs/DATA_DICTIONARY.md)** - Trait descriptions and metadata
+
+### Testing & Troubleshooting
+- **[Deployment Testing](docs/DEPLOYMENT_TESTING.md)** - Test results and validation
+- **[WSL Setup Notes](docs/DEPLOYMENT_TESTING.md#environment-specific-setup)** - Windows/WSL users
 
 ---
 
@@ -242,9 +355,31 @@ Each trait produces:
 
 ```
 outputs/aggregated_results/
-├── summary_table.csv       # All traits: sample sizes, durations, status
-├── significant_snps.csv    # SNPs below p < 5e-8 threshold
-└── summary_stats.json      # Overall statistics
+├── summary_table.csv                  # All traits: sample sizes, durations, status
+├── all_traits_significant_snps.csv    # SNPs below p < 5e-8 (with model column)
+└── summary_stats.json                 # Per-model statistics and overlaps
+```
+
+**Output CSV format** (`all_traits_significant_snps.csv`):
+```csv
+SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model
+SNP_123,1,12345,1.2e-9,0.15,500,0.05,2.3e-8,root_length,BLINK
+SNP_123,1,12345,2.3e-9,0.15,500,0.06,3.1e-8,root_length,FarmCPU
+```
+
+- Sorted by P.value (most significant first)
+- SNPs found by multiple models appear as separate rows
+- `model` column enables filtering and comparison
+
+**Summary statistics** (`summary_stats.json`):
+```json
+{
+  "snps_by_model": {
+    "BLINK": 25,
+    "FarmCPU": 28,
+    "both_models": 11
+  }
+}
 ```
 
 ---
@@ -310,12 +445,57 @@ If you use this pipeline, please cite:
 
 ## Contributing
 
-Contributions welcome! Please:
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit changes (`git commit -m 'Add amazing feature'`)
-4. Push to branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+Contributions welcome! Please follow these steps:
+
+### Development Workflow
+
+1. **Fork and clone** the repository
+2. **Open in devcontainer** (recommended) for consistent environment:
+   ```bash
+   code .
+   # VS Code will prompt: "Reopen in Container"
+   ```
+3. **Create a feature branch**:
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+4. **Make your changes** and write tests
+5. **Run tests locally**:
+   ```bash
+   # R unit tests
+   Rscript tests/testthat.R
+
+   # Docker build test
+   docker build -t gapit3-test .
+   ```
+6. **Commit with conventional commits**:
+   ```bash
+   git commit -m "feat: Add new feature"
+   git commit -m "fix: Correct validation bug"
+   git commit -m "docs: Update README"
+   ```
+7. **Push and create Pull Request**:
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+### Testing Requirements
+
+All PRs must:
+- ✅ Pass R unit tests
+- ✅ Pass Docker build and functional tests
+- ✅ Include tests for new functionality
+- ✅ Update documentation as needed
+
+See [docs/TESTING.md](docs/TESTING.md) for detailed testing guide.
+
+### Code Style
+
+- **R Scripts**: snake_case, descriptive names, optparse for arguments
+- **YAML Files**: kebab-case, inline comments, TODO for customization
+- **Commits**: Conventional commits (feat, fix, docs, test, chore)
+
+See [openspec/project.md](openspec/project.md) for complete conventions.
 
 ---
 
@@ -342,6 +522,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Status**: Production-ready ✅
+**Status**: Production-ready ✅ (Manual RunAI execution) / ⏳ (Argo orchestration pending RBAC)
 
-Last updated: 2025-10-22
+Last updated: 2025-11-07
