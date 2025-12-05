@@ -155,8 +155,8 @@ show_status() {
 
     # Commands
     echo -e "${BLUE}Commands:${NC}"
-    echo "  View specific job:    runai describe job $JOB_PREFIX-2 -p $PROJECT"
-    echo "  View logs:            runai logs $JOB_PREFIX-2 -p $PROJECT --follow"
+    echo "  View specific job:    runai workspace describe $JOB_PREFIX-2 -p $PROJECT"
+    echo "  View logs:            runai workspace logs $JOB_PREFIX-2 -p $PROJECT --follow"
     echo "  Aggregate results:    ./scripts/aggregate-runai-results.sh"
     echo ""
 }

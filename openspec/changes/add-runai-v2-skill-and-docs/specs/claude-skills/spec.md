@@ -13,8 +13,8 @@ The system SHALL provide a Claude skill for RunAI CLI v2 assistance located at `
   - `runai workspace submit` for job submission
   - `runai workspace list` for listing workspaces
   - `runai workspace describe` for workspace details
-  - `runai workload logs workspace` for viewing logs
-  - `runai workload delete workspace` for deletion
+  - `runai workspace logs` for viewing logs
+  - `runai workspace delete` for deletion
   - `runai exec` for interactive shell access
 
 #### Scenario: Skill documents v2 flag syntax

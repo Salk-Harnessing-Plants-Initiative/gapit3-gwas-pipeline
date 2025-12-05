@@ -39,7 +39,7 @@ runai workspace list | grep gapit3
 runai workspace describe gapit3-trait-2-test -p talmo-lab
 
 # Follow logs (once running)
-runai workload logs workspace gapit3-trait-2-test -p talmo-lab --follow
+runai workspace logs gapit3-trait-2-test -p talmo-lab --follow
 ```
 
 ## Step-by-Step Execution
@@ -61,14 +61,14 @@ runai workspace submit gapit3-validate \
 **Monitor the workspace**:
 ```bash
 runai workspace describe gapit3-validate -p talmo-lab
-runai workload logs workspace gapit3-validate -p talmo-lab
+runai workspace logs gapit3-validate -p talmo-lab
 ```
 
 **Expected output**: Validation checks pass for genotype and phenotype files.
 
 **Clean up**:
 ```bash
-runai workload delete workspace gapit3-validate -p talmo-lab
+runai workspace delete gapit3-validate -p talmo-lab
 ```
 
 ### Step 2: Run Single Trait (Test)

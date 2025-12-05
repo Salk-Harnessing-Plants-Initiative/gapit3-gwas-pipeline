@@ -511,7 +511,7 @@ runai workspace submit gapit3-config-test \
   --environment PCA_COMPONENTS=5
 
 # Verify config in logs
-runai logs gapit3-config-test -p talmo-lab
+runai workspace logs gapit3-config-test -p talmo-lab
 
 # Test 2: Batch with script
 ./scripts/submit-all-traits-runai.sh \
