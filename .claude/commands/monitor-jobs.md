@@ -13,13 +13,13 @@ Monitor RunAI jobs or Argo workflows with real-time status updates.
 
 ```bash
 # List all GAPIT3 jobs
-runai list jobs | grep gapit3
+runai workspace list | grep gapit3
 
 # Show detailed status for specific job
-runai describe job gapit3-trait-2
+runai workspace describe gapit3-trait-2
 
 # Get logs from running job
-runai logs gapit3-trait-2
+runai workspace logs gapit3-trait-2
 ```
 
 ## Argo Workflows
@@ -87,13 +87,13 @@ Press Ctrl+C to exit. Refreshing every 10s...
 
 ```bash
 # Show only running jobs
-runai list jobs | grep -E "gapit3.*Running"
+runai workspace list | grep -E "gapit3.*Running"
 
 # Show only failed jobs
-runai list jobs | grep -E "gapit3.*Failed"
+runai workspace list | grep -E "gapit3.*Failed"
 
 # Show only completed jobs
-runai list jobs | grep -E "gapit3.*Succeeded"
+runai workspace list | grep -E "gapit3.*Succeeded"
 ```
 
 ## Check Specific Trait
@@ -101,15 +101,15 @@ runai list jobs | grep -E "gapit3.*Succeeded"
 ```bash
 # Monitor single trait
 TRAIT=45
-runai describe job gapit3-trait-$(printf "%03d" $TRAIT)
-runai logs gapit3-trait-$(printf "%03d" $TRAIT) --follow
+runai workspace describe gapit3-trait-$(printf "%03d" $TRAIT)
+runai workspace logs gapit3-trait-$(printf "%03d" $TRAIT) --follow
 ```
 
 ## Performance Metrics
 
 ```bash
 # Show resource usage for all jobs
-runai list jobs -o wide | grep gapit3
+runai workspace list -o wide | grep gapit3
 
 # Get detailed metrics
 kubectl top pods -l job-name=gapit3-trait-002
@@ -126,7 +126,7 @@ argo get <workflow-name> -o json | jq '.status.nodes[] | {name: .displayName, ph
 
 ```bash
 # View error logs
-runai logs gapit3-trait-089 --tail=100
+runai workspace logs gapit3-trait-089 --tail=100
 
 # Check events
 kubectl describe pod -l job-name=gapit3-trait-089
@@ -144,7 +144,7 @@ Set up notifications for job completion:
 ```bash
 # Watch until all complete
 while true; do
-  RUNNING=$(runai list jobs | grep -c "gapit3.*Running")
+  RUNNING=$(runai workspace list | grep -c "gapit3.*Running")
   if [ "$RUNNING" -eq 0 ]; then
     echo "All jobs completed!" | mail -s "GWAS Pipeline Done" $USER@example.com
     break
@@ -170,9 +170,9 @@ Once jobs complete:
 ```bash
 # Terminal multiplexer (tmux/screen) for parallel monitoring
 tmux new-session \; \
-  send-keys 'runai logs gapit3-trait-002 --follow' C-m \; \
+  send-keys 'runai workspace logs gapit3-trait-002 --follow' C-m \; \
   split-window -v \; \
-  send-keys 'runai logs gapit3-trait-045 --follow' C-m \; \
+  send-keys 'runai workspace logs gapit3-trait-045 --follow' C-m \; \
   split-window -v \; \
   send-keys './scripts/monitor-runai-jobs.sh' C-m
 ```

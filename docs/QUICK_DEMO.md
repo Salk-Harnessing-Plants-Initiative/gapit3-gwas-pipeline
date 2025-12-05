@@ -26,7 +26,7 @@ Argo workflow already configured: [gapit3-test-pipeline.yaml](../cluster/argo/wo
 ### 2. Verify Connectivity
 ```bash
 # RunAI
-runai list jobs
+runai workspace list
 
 # Argo (if available)
 argo list -n runai-talmo-lab
@@ -210,10 +210,10 @@ cd cluster/argo/scripts/
 ### Cluster Commands
 ```bash
 # List RunAI jobs
-runai list jobs
+runai workspace list
 
 # Describe specific job
-runai describe job <job-name>
+runai workspace describe <job-name>
 
 # List Argo workflows
 argo list -n runai-talmo-lab
@@ -228,7 +228,7 @@ argo get <workflow-name> -n runai-talmo-lab
 
 **RunAI Jobs Pending**: Check cluster resources
 ```bash
-runai describe job <job-name>
+runai workspace describe <job-name>
 ```
 
 **Argo RBAC Errors**: Currently waiting on cluster admin approval

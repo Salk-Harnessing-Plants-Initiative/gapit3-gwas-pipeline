@@ -10,6 +10,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **RunAI CLI v2 Skill and Documentation Update** - Complete migration to RunAI CLI v2 syntax
+  - `.claude/skills/runai/` - New Claude skill for RunAI CLI v2 assistance
+    - `skill.md` - Comprehensive v2 command reference with migration guide
+    - `examples.md` - Real-world GAPIT3 pipeline usage examples
+  - Updated all documentation to use RunAI CLI v2 commands:
+    - `docs/RUNAI_QUICK_REFERENCE.md` - Fixed incorrect command syntax
+    - `docs/MANUAL_RUNAI_EXECUTION.md` - 108 command updates
+    - `docs/DEMO_COMMANDS.md` - Updated quick reference commands
+    - `docs/QUICK_DEMO.md` - Updated demo workflow commands
+    - `docs/DEPLOYMENT_TESTING.md` - Updated troubleshooting commands
+    - `.claude/commands/monitor-jobs.md` - Updated monitoring commands
+    - `.claude/commands/cleanup-jobs.md` - Updated cleanup commands
+  - Key v2 syntax changes:
+    - `runai submit` → `runai workspace submit`
+    - `runai list jobs` → `runai workspace list`
+    - `runai describe job` → `runai workspace describe`
+    - `runai logs` → `runai workspace logs`
+    - `runai delete job` → `runai workspace delete`
+    - `--cpu` → `--cpu-core-request`, `--memory` → `--cpu-memory-request`
+    - New host-path syntax: `path=/path,mount=/mount,mount-propagation=HostToContainer`
+    - Project name: `runai-talmo-lab` → `talmo-lab`
 - **Results Aggregation Model Tracking** - Enhanced aggregation script to track which GAPIT model identified each SNP
   - `scripts/collect_results.R` now reads GAPIT Filter files instead of complete GWAS_Results files (500× performance improvement)
   - Model information parsed from `traits` column format: `"MODEL.TraitName"`

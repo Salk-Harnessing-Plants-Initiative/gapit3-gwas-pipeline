@@ -137,7 +137,7 @@ argo delete --completed --dry-run
 ./scripts/monitor-runai-jobs.sh
 
 # Count by status
-runai list jobs | grep gapit3 | awk '{print $3}' | sort | uniq -c
+runai workspace list | grep gapit3 | awk '{print $3}' | sort | uniq -c
 ```
 
 ### Step 2: Aggregate Results
@@ -167,10 +167,10 @@ cat outputs/aggregated_results/summary_table.csv | wc -l
 ### Step 5: Handle Failed Jobs Separately
 ```bash
 # List failed jobs to investigate
-runai list jobs | grep "gapit3.*Failed"
+runai workspace list | grep "gapit3.*Failed"
 
 # Check why they failed
-runai logs gapit3-trait-089 --tail=50
+runai workspace logs gapit3-trait-089 --tail=50
 
 # Decide: retry or delete
 # Retry: ./scripts/retry-failed-traits.sh
@@ -180,7 +180,7 @@ runai logs gapit3-trait-089 --tail=50
 ### Step 6: Verify
 ```bash
 # Check remaining jobs
-runai list jobs | grep gapit3
+runai workspace list | grep gapit3
 
 # Should only see running jobs (if any)
 ```
@@ -192,10 +192,10 @@ runai list jobs | grep gapit3
 # Delete jobs for traits 1-50 ONLY (completed/failed only)
 for i in {1..50}; do
   JOB="gapit3-trait-$(printf "%03d" $i)"
-  STATUS=$(runai list jobs | grep "^$JOB" | awk '{print $3}')
+  STATUS=$(runai workspace list | grep "^$JOB" | awk '{print $3}')
   if [[ "$STATUS" == "Succeeded" || "$STATUS" == "Failed" ]]; then
     echo "Deleting $JOB ($STATUS)"
-    runai delete job $JOB
+    runai workspace delete $JOB
   else
     echo "Skipping $JOB ($STATUS - not completed/failed)"
   fi
@@ -299,7 +299,8 @@ kubectl delete job gapit3-trait-002 --force --grace-period=0
 ls outputs/trait_*/
 
 # Resubmit single trait if needed
-runai submit gapit3-trait-002 \
+runai workspace submit gapit3-trait-002 \
+  --project talmo-lab \
   --image ghcr.io/.../gapit3:latest \
   --environment TRAIT_INDEX=2 \
   ...

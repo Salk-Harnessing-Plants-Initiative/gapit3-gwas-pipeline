@@ -59,23 +59,23 @@ runai workspace describe gapit3-trait-2 -p talmo-lab
 ### View Logs
 
 ```bash
-runai workload logs workspace <WORKSPACE_NAME> -p talmo-lab --follow
+runai workspace logs <WORKSPACE_NAME> -p talmo-lab --follow
 ```
 
 Example:
 ```bash
-runai workload logs workspace gapit3-trait-2 -p talmo-lab --follow
+runai workspace logs gapit3-trait-2 -p talmo-lab --follow
 ```
 
 ### Delete Workspace
 
 ```bash
-runai workload delete workspace <WORKSPACE_NAME> -p talmo-lab
+runai workspace delete <WORKSPACE_NAME> -p talmo-lab
 ```
 
 Example:
 ```bash
-runai workload delete workspace gapit3-trait-2 -p talmo-lab
+runai workspace delete gapit3-trait-2 -p talmo-lab
 ```
 
 ## Common Workflows
@@ -104,13 +104,13 @@ runai workspace submit gapit3-trait-2-test \
 runai workspace list | grep gapit3-trait-2-test
 
 # View logs
-runai workload logs workspace gapit3-trait-2-test -p talmo-lab --follow
+runai workspace logs gapit3-trait-2-test -p talmo-lab --follow
 
 # Check results
 ls -lh /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs/
 
 # Clean up
-runai workload delete workspace gapit3-trait-2-test -p talmo-lab
+runai workspace delete gapit3-trait-2-test -p talmo-lab
 ```
 
 ### Submit Multiple Traits
@@ -202,7 +202,7 @@ Rscript scripts/collect_results.R \
   --threshold 5e-8
 
 # When done, delete the workspace
-runai workload delete workspace gapit3-aggregation -p talmo-lab
+runai workspace delete gapit3-aggregation -p talmo-lab
 ```
 
 **Why use this approach:**
@@ -298,8 +298,8 @@ For batch operations, use the helper scripts:
 | `runai submit` | `runai workspace submit` |
 | `runai list jobs` | `runai workspace list` |
 | `runai describe job` | `runai workspace describe` |
-| `runai logs` | `runai workload logs workspace` |
-| `runai delete job` | `runai workload delete workspace` |
+| `runai logs` | `runai workspace logs` |
+| `runai delete job` | `runai workspace delete` |
 | `--cpu 12` | `--cpu-core-request 12` |
 | `--memory 32G` | `--cpu-memory-request 32G` |
 | `--host-path /path:/mount:ro` | `--host-path path=/path,mount=/mount,mount-propagation=HostToContainer` |

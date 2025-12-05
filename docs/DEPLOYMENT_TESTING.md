@@ -396,8 +396,8 @@ kubectl top nodes
 kubectl top pods -l pipeline=gapit3-gwas
 
 # RunAI dashboard (if using RunAI)
-runai list jobs
-runai describe job <job-name>
+runai workspace list
+runai workspace describe <job-name>
 ```
 
 ### View in Argo UI
@@ -697,13 +697,13 @@ If using RunAI for advanced scheduling:
 
 ```bash
 # Submit via RunAI (alternative to Argo)
-runai submit \
-  --name gapit3-test \
+runai workspace submit gapit3-test \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest \
-  --cpu 12 --memory 32G \
+  --cpu-core-request 12 --cpu-memory-request 32G \
   --gpu 0 \
-  --volume /hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data:/data \
-  --volume /hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs:/outputs \
+  --host-path path=/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data,mount=/data,mount-propagation=HostToContainer \
+  --host-path path=/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
   --command -- /scripts/entrypoint.sh run-single-trait --trait-index 2
 
 # Use RunAI with Argo (annotations already configured)
@@ -770,7 +770,7 @@ Successfully tested single trait execution using RunAI CLI directly as workaroun
 - **Models**: BLINK + FarmCPU
 - **Resources**: 12 CPU cores, 32GB RAM
 - **Image**: `ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test`
-- **Execution**: `runai workspace submit` (new CLI syntax)
+- **Execution**: `runai workspace submit` (v2 CLI syntax)
 
 **Results**:
 - ✅ BLINK model completed in ~5.5 minutes

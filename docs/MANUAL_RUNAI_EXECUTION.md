@@ -49,26 +49,26 @@ runai workload logs workspace gapit3-trait-2-test -p talmo-lab --follow
 Before running GWAS, validate your data:
 
 ```bash
-runai submit gapit3-validate \
-  --project runai-talmo-lab \
+runai workspace submit gapit3-validate \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu 1 \
-  --memory 2G \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data:/data:ro \
+  --cpu-core-request 1 \
+  --cpu-memory-request 2G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
   --command -- /scripts/entrypoint.sh validate
 ```
 
-**Monitor the job**:
+**Monitor the workspace**:
 ```bash
-runai describe job gapit3-validate -p runai-talmo-lab
-runai logs gapit3-validate -p runai-talmo-lab
+runai workspace describe gapit3-validate -p talmo-lab
+runai workload logs workspace gapit3-validate -p talmo-lab
 ```
 
 **Expected output**: Validation checks pass for genotype and phenotype files.
 
 **Clean up**:
 ```bash
-runai delete job gapit3-validate -p runai-talmo-lab
+runai workload delete workspace gapit3-validate -p talmo-lab
 ```
 
 ### Step 2: Run Single Trait (Test)
@@ -76,13 +76,13 @@ runai delete job gapit3-validate -p runai-talmo-lab
 Test with one trait before running all traits:
 
 ```bash
-runai submit gapit3-trait-2-test \
-  --project runai-talmo-lab \
+runai workspace submit gapit3-trait-2-test \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu 12 \
-  --memory 32G \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data:/data:ro \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs:/outputs:rw \
+  --cpu-core-request 12 \
+  --cpu-memory-request 32G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
   --command -- /scripts/entrypoint.sh run-single-trait \
@@ -96,13 +96,13 @@ runai submit gapit3-trait-2-test \
 **Monitor**:
 ```bash
 # Watch job status
-runai describe job gapit3-trait-2-test -p runai-talmo-lab
+runai workspace describe gapit3-trait-2-test -p talmo-lab
 
 # Follow logs in real-time
-runai logs gapit3-trait-2-test -p runai-talmo-lab --follow
+runai workspace logs gapit3-trait-2-test -p talmo-lab --follow
 
 # Check if job completed
-runai list jobs -p runai-talmo-lab | grep gapit3-trait-2-test
+runai workspace list -p talmo-lab | grep gapit3-trait-2-test
 ```
 
 **Check outputs** (after completion):
@@ -126,12 +126,12 @@ Run 3 test traits in parallel:
 
 ```bash
 # Trait 2
-runai submit gapit3-trait-2 \
-  --project runai-talmo-lab \
+runai workspace submit gapit3-trait-2 \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu 12 --memory 32G \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data:/data:ro \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs:/outputs:rw \
+  --cpu-core-request 12 --cpu-memory-request 32G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
   --command -- /scripts/entrypoint.sh run-single-trait \
@@ -139,12 +139,12 @@ runai submit gapit3-trait-2 \
     --models BLINK,FarmCPU --threads 12
 
 # Trait 3
-runai submit gapit3-trait-3 \
-  --project runai-talmo-lab \
+runai workspace submit gapit3-trait-3 \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu 12 --memory 32G \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data:/data:ro \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs:/outputs:rw \
+  --cpu-core-request 12 --cpu-memory-request 32G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
   --command -- /scripts/entrypoint.sh run-single-trait \
@@ -152,12 +152,12 @@ runai submit gapit3-trait-3 \
     --models BLINK,FarmCPU --threads 12
 
 # Trait 4
-runai submit gapit3-trait-4 \
-  --project runai-talmo-lab \
+runai workspace submit gapit3-trait-4 \
+  --project talmo-lab \
   --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu 12 --memory 32G \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data:/data:ro \
-  --host-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs:/outputs:rw \
+  --cpu-core-request 12 --cpu-memory-request 32G \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
+  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
   --command -- /scripts/entrypoint.sh run-single-trait \
@@ -167,7 +167,7 @@ runai submit gapit3-trait-4 \
 
 **Monitor all jobs**:
 ```bash
-runai list jobs -p runai-talmo-lab | grep gapit3-trait
+runai workspace list -p talmo-lab | grep gapit3-trait
 ```
 
 #### Option B: Use a Bash Script to Submit All Traits
@@ -178,7 +178,7 @@ Create a script to submit all 186 traits:
 #!/bin/bash
 # File: scripts/submit-all-traits.sh
 
-PROJECT="runai-talmo-lab"
+PROJECT="talmo-lab"
 IMAGE="ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
 DATA_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
 OUTPUT_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
@@ -191,24 +191,24 @@ echo "Maximum concurrent jobs: $MAX_CONCURRENT"
 
 for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
   # Check number of running jobs
-  RUNNING=$(runai list jobs -p $PROJECT | grep -c "Running")
+  RUNNING=$(runai workspace list -p $PROJECT | grep -c "Running")
 
   # Wait if at max concurrency
   while [ $RUNNING -ge $MAX_CONCURRENT ]; do
     echo "Waiting... ($RUNNING jobs running)"
     sleep 30
-    RUNNING=$(runai list jobs -p $PROJECT | grep -c "Running")
+    RUNNING=$(runai workspace list -p $PROJECT | grep -c "Running")
   done
 
   # Submit job
   echo "Submitting trait $trait_idx..."
-  runai submit gapit3-trait-$trait_idx \
+  runai workspace submit gapit3-trait-$trait_idx \
     --project $PROJECT \
     --image $IMAGE \
-    --cpu 12 \
-    --memory 32G \
-    --host-path $DATA_PATH:/data:ro \
-    --host-path $OUTPUT_PATH:/outputs:rw \
+    --cpu-core-request 12 \
+    --cpu-memory-request 32G \
+    --host-path path=$DATA_PATH,mount=/data,mount-propagation=HostToContainer \
+    --host-path path=$OUTPUT_PATH,mount=/outputs,mount-propagation=HostToContainer,readwrite \
     --environment OPENBLAS_NUM_THREADS=12 \
     --environment OMP_NUM_THREADS=12 \
     --command -- /scripts/entrypoint.sh run-single-trait \
@@ -235,26 +235,26 @@ chmod +x scripts/submit-all-traits.sh
 
 ### List all jobs
 ```bash
-runai list jobs -p runai-talmo-lab
+runai workspace list -p talmo-lab
 ```
 
 ### Check specific job status
 ```bash
-runai describe job gapit3-trait-2 -p runai-talmo-lab
+runai workspace describe gapit3-trait-2 -p talmo-lab
 ```
 
 ### View logs
 ```bash
 # Real-time logs
-runai logs gapit3-trait-2 -p runai-talmo-lab --follow
+runai workspace logs gapit3-trait-2 -p talmo-lab --follow
 
 # Recent logs
-runai logs gapit3-trait-2 -p runai-talmo-lab --tail 100
+runai workspace logs gapit3-trait-2 -p talmo-lab --tail 100
 ```
 
 ### Monitor resource usage
 ```bash
-runai top job -p runai-talmo-lab
+runai top job -p talmo-lab
 ```
 
 ## Aggregating Results
@@ -479,17 +479,17 @@ Total aggregated time: 129.15 hours
 
 ### Delete specific job
 ```bash
-runai delete job gapit3-trait-2 -p runai-talmo-lab
+runai workspace delete gapit3-trait-2 -p talmo-lab
 ```
 
 ### Delete all GAPIT3 jobs
 ```bash
-runai list jobs -p runai-talmo-lab | grep gapit3-trait | awk '{print $1}' | xargs -I {} runai delete job {} -p runai-talmo-lab
+runai workspace list -p talmo-lab | grep gapit3-trait | awk '{print $1}' | xargs -I {} runai workspace delete {} -p talmo-lab
 ```
 
 ### Delete failed jobs only
 ```bash
-runai list jobs -p runai-talmo-lab | grep "Failed" | grep gapit3 | awk '{print $1}' | xargs -I {} runai delete job {} -p runai-talmo-lab
+runai workspace list -p talmo-lab | grep "Failed" | grep gapit3 | awk '{print $1}' | xargs -I {} runai workspace delete {} -p talmo-lab
 ```
 
 ## Troubleshooting
@@ -497,7 +497,7 @@ runai list jobs -p runai-talmo-lab | grep "Failed" | grep gapit3 | awk '{print $
 ### Job fails immediately
 Check logs for errors:
 ```bash
-runai logs gapit3-trait-2 -p runai-talmo-lab
+runai workspace logs gapit3-trait-2 -p talmo-lab
 ```
 
 Common issues:
@@ -508,7 +508,7 @@ Common issues:
 ### Job stuck in "Pending"
 Check cluster resources:
 ```bash
-runai describe job gapit3-trait-2 -p runai-talmo-lab
+runai workspace describe gapit3-trait-2 -p talmo-lab
 ```
 
 Possible causes:
@@ -521,13 +521,13 @@ In logs: "Killed" or "OOM"
 
 Solution: Increase memory request:
 ```bash
---memory 48G  # Instead of 32G
+--cpu-memory-request 48G  # Instead of 32G
 ```
 
 ### Results missing
 Check if job completed:
 ```bash
-runai describe job gapit3-trait-2 -p runai-talmo-lab | grep Status
+runai workspace describe gapit3-trait-2 -p talmo-lab | grep Status
 ```
 
 If completed but no results:

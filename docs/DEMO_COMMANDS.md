@@ -14,7 +14,7 @@ Open 2 WSL terminals:
 ### Verify Cluster Connectivity
 ```bash
 # Check RunAI
-runai list jobs
+runai workspace list
 
 # Check Argo (optional)
 argo list -n runai-talmo-lab
@@ -97,7 +97,7 @@ Batch Submission Complete
 
 ### List Jobs Directly
 ```bash
-runai list jobs | grep eberrigan-gapit-gwas
+runai workspace list | grep eberrigan-gapit-gwas
 ```
 
 ### Check Output Files
@@ -262,12 +262,12 @@ https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/pkgs/c
 
 ### Check RunAI Job Details
 ```bash
-runai describe job eberrigan-gapit-gwas-trait-002
+runai workspace describe eberrigan-gapit-gwas-trait-002
 ```
 
 ### Check RunAI Job Logs
 ```bash
-runai logs eberrigan-gapit-gwas-trait-002
+runai workspace logs eberrigan-gapit-gwas-trait-002
 ```
 
 ### Check Argo Workflow Details
