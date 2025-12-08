@@ -52,7 +52,10 @@ option_list <- list(
               help = "Minor allele frequency filter [env: MAF_FILTER]", metavar = "FLOAT"),
   make_option(c("--multiple-analysis"), type = "logical",
               default = as.logical(Sys.getenv("MULTIPLE_ANALYSIS", "TRUE")),
-              help = "Run multiple analysis [env: MULTIPLE_ANALYSIS]", metavar = "BOOL")
+              help = "Run multiple analysis [env: MULTIPLE_ANALYSIS]", metavar = "BOOL"),
+  make_option(c("--snp-fdr"), type = "numeric",
+              default = NULL,
+              help = "FDR threshold for SNP significance (e.g., 0.05) [env: SNP_FDR]", metavar = "FLOAT")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
@@ -72,6 +75,7 @@ cat("  Trait Index:    ", opt$`trait-index`, "\n")
 cat("  Models:         ", opt$models, "\n")
 cat("  PCA Components: ", opt$pca, "\n")
 cat("  MAF Filter:     ", opt$maf, "\n")
+cat("  SNP FDR:        ", ifelse(is.null(opt$`snp-fdr`), "disabled", opt$`snp-fdr`), "\n")
 cat("  Multiple Analysis:", opt$`multiple-analysis`, "\n")
 cat("\n")
 
@@ -135,7 +139,8 @@ metadata <- list(
     models = models,
     pca_components = pca_components,
     multiple_analysis = multiple_analysis,
-    maf_filter = opt$maf
+    maf_filter = opt$maf,
+    snp_fdr = opt$`snp-fdr`
   ),
   resources = list(
     threads = Sys.getenv("OPENBLAS_NUM_THREADS")
@@ -212,13 +217,23 @@ cat(strrep("=", 78), "\n\n")
 gwas_start <- Sys.time()
 
 tryCatch({
-  myGAPIT <- GAPIT(
+  # Build GAPIT arguments
+  gapit_args <- list(
     Y = myY,
     G = myG,
     PCA.total = pca_components,
     model = models,
     Multiple_analysis = multiple_analysis
   )
+
+  # Add SNP.FDR if specified
+  if (!is.null(opt$`snp-fdr`)) {
+    cat("Applying FDR threshold:", opt$`snp-fdr`, "\n")
+    gapit_args$SNP.FDR <- opt$`snp-fdr`
+  }
+
+  # Run GAPIT with constructed arguments
+  myGAPIT <- do.call(GAPIT, gapit_args)
 
   gwas_end <- Sys.time()
   gwas_duration <- as.numeric(difftime(gwas_end, gwas_start, units = "mins"))

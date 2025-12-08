@@ -33,6 +33,7 @@ PCA_COMPONENTS="${PCA_COMPONENTS:-3}"
 SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"
 MAF_FILTER="${MAF_FILTER:-0.05}"
 MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"
+SNP_FDR="${SNP_FDR:-}"  # FDR threshold (e.g., 0.05); empty = disabled
 
 # Computational Resources
 OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-${CPU_LIMIT:-12}}"
@@ -155,6 +156,28 @@ validate_maf_filter() {
     if awk -v maf="$MAF_FILTER" 'BEGIN { exit !(maf < 0.0 || maf > 0.5) }'; then
         log_error "MAF_FILTER must be between 0.0 and 0.5, got: $MAF_FILTER"
         log_error "Use 0.0 to disable filtering"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_snp_fdr() {
+    # SNP_FDR is optional - empty string means disabled
+    if [ -z "$SNP_FDR" ]; then
+        return 0
+    fi
+
+    # Check if it's a valid number
+    if ! echo "$SNP_FDR" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+        log_error "SNP_FDR must be a number, got: '$SNP_FDR'"
+        return 1
+    fi
+
+    # Check range (using awk for floating point comparison)
+    if awk -v fdr="$SNP_FDR" 'BEGIN { exit !(fdr <= 0.0 || fdr > 1.0) }'; then
+        log_error "SNP_FDR must be between 0.0 and 1.0, got: $SNP_FDR"
+        log_error "Common values: 0.05 (5% FDR), 0.1 (10% FDR)"
         return 1
     fi
 
@@ -306,6 +329,10 @@ validate_config() {
         errors=$((errors + 1))
     fi
 
+    if ! validate_snp_fdr; then
+        errors=$((errors + 1))
+    fi
+
     if ! validate_paths; then
         errors=$((errors + 1))
     fi
@@ -348,6 +375,7 @@ log_config() {
     echo "  Models:           $MODELS"
     echo "  PCA Components:   $PCA_COMPONENTS"
     echo "  SNP Threshold:    $SNP_THRESHOLD"
+    echo "  SNP FDR:          ${SNP_FDR:-disabled}"
     echo "  MAF Filter:       $MAF_FILTER"
     echo "  Multiple Analysis: $MULTIPLE_ANALYSIS"
     echo ""
@@ -380,16 +408,24 @@ run_single_trait() {
     # Log configuration
     log_config
 
-    # Execute R script with parameters
-    exec Rscript /scripts/run_gwas_single_trait.R \
-        --trait-index "$TRAIT_INDEX" \
-        --genotype "$GENOTYPE_FILE" \
-        --phenotype "$PHENOTYPE_FILE" \
-        --ids "$ACCESSION_IDS_FILE" \
-        --output-dir "$OUTPUT_PATH" \
-        --models "$MODELS" \
-        --pca "$PCA_COMPONENTS" \
-        --threads "$OPENBLAS_NUM_THREADS"
+    # Build R script command with parameters
+    local cmd="Rscript /scripts/run_gwas_single_trait.R \
+        --trait-index $TRAIT_INDEX \
+        --genotype $GENOTYPE_FILE \
+        --phenotype $PHENOTYPE_FILE \
+        --ids $ACCESSION_IDS_FILE \
+        --output-dir $OUTPUT_PATH \
+        --models $MODELS \
+        --pca $PCA_COMPONENTS \
+        --threads $OPENBLAS_NUM_THREADS"
+
+    # Add optional SNP_FDR parameter if set
+    if [ -n "$SNP_FDR" ]; then
+        cmd="$cmd --snp-fdr $SNP_FDR"
+    fi
+
+    # Execute R script
+    exec $cmd
 }
 
 run_aggregation() {
@@ -438,6 +474,7 @@ ${BLUE}Environment Variables:${NC}
     MODELS              GWAS models (default: BLINK,FarmCPU)
     PCA_COMPONENTS      PCA components (default: 3)
     SNP_THRESHOLD       P-value threshold (default: 5e-8)
+    SNP_FDR             FDR threshold (e.g., 0.05; default: disabled)
     DATA_PATH           Input data directory (default: /data)
     OUTPUT_PATH         Output directory (default: /outputs)
 
@@ -479,6 +516,7 @@ show_current_config() {
     echo "  MODELS:              $MODELS"
     echo "  PCA_COMPONENTS:      $PCA_COMPONENTS"
     echo "  SNP_THRESHOLD:       $SNP_THRESHOLD"
+    echo "  SNP_FDR:             ${SNP_FDR:-disabled}"
     echo "  MAF_FILTER:          $MAF_FILTER"
     echo "  MULTIPLE_ANALYSIS:   $MULTIPLE_ANALYSIS"
     echo "  DATA_PATH:           $DATA_PATH"
