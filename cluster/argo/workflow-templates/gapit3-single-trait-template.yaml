@@ -56,20 +56,11 @@ spec:
       image: "{{inputs.parameters.image}}"
       imagePullPolicy: Always
 
-      # Entrypoint command
+      # Entrypoint command - configuration is passed via environment variables (env section below)
+      # The entrypoint.sh script reads from env vars, NOT CLI args
       command: ["/scripts/entrypoint.sh"]
       args:
         - "run-single-trait"
-        - "--trait-index"
-        - "{{inputs.parameters.trait-index}}"
-        - "--config"
-        - "/config/config.yaml"
-        - "--output-dir"
-        - "/outputs"
-        - "--models"
-        - "{{inputs.parameters.models}}"
-        - "--threads"
-        - "12"
 
       # Volume mounts
       volumeMounts:

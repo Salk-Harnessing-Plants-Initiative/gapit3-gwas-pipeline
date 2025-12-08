@@ -28,7 +28,7 @@ data/
     └── ids_gwas.txt  (optional)
 ```
 
-**Note**: The specific filenames shown above are configured in [config/config.yaml](../config/config.yaml#L10-L12). You can change them in the config file, but the file formats must match the specifications below.
+**Note**: The specific filenames are configured via environment variables (see [.env.example](../.env.example)). Set `GENOTYPE_FILE`, `PHENOTYPE_FILE`, and `ACCESSION_IDS_FILE` to customize paths. The file formats must match the specifications below.
 
 ---
 
@@ -187,7 +187,7 @@ For our production use case:
 
 2. **Minimum Sample Size**:
    - Test mode: 5 samples minimum
-   - Production: 50 samples minimum (see [config/config.yaml](../config/config.yaml#L72))
+   - Production: 50 samples minimum
 
 3. **Trait Indexing**:
    - Trait index `1` = `Taxa` column (not analyzed)
@@ -269,9 +269,9 @@ An-1
 
 If you want to analyze **all samples** in your genotype/phenotype files, simply:
 - Delete or don't create `ids_gwas.txt`, OR
-- Leave the config path commented out in [config/config.yaml](../config/config.yaml#L12):
-  ```yaml
-  # accession_ids: /data/metadata/ids_gwas.txt  # Commented = analyze all
+- Leave `ACCESSION_IDS_FILE` unset or empty in your environment:
+  ```bash
+  ACCESSION_IDS_FILE=  # Empty = analyze all samples
   ```
 
 ---
@@ -421,12 +421,11 @@ sample_4	30.5	15.9	40
 sample_5	26.4	13.1	44
 ```
 
-**Update config** ([config/config.yaml](../config/config.yaml)):
-```yaml
-data:
-  genotype: /data/genotype/test.hmp.txt
-  phenotype: /data/phenotype/test_traits.txt
-  # accession_ids: /data/metadata/ids_gwas.txt  # Optional - commented out
+**Set environment variables**:
+```bash
+GENOTYPE_FILE=/data/genotype/test.hmp.txt
+PHENOTYPE_FILE=/data/phenotype/test_traits.txt
+ACCESSION_IDS_FILE=  # Optional - leave empty to analyze all samples
 ```
 
 ### Using the Built-in Test Fixtures
@@ -520,14 +519,15 @@ comm -3 geno.txt pheno.txt
 
 ### Error: "File not found"
 
-**Cause**: Paths in config.yaml don't match actual file locations
+**Cause**: Environment variable paths don't match actual file locations
 
 **Fix**:
 ```bash
-# Verify paths in config
-cat config/config.yaml | grep -A 3 "^data:"
+# Verify environment variables
+echo "GENOTYPE_FILE=$GENOTYPE_FILE"
+echo "PHENOTYPE_FILE=$PHENOTYPE_FILE"
 
-# Update to match your actual files
+# Update .env or set correct environment variables
 ```
 
 ---
@@ -544,11 +544,10 @@ cat config/config.yaml | grep -A 3 "^data:"
 ### Quick Verification
 
 ```bash
-# Run the validation script
-Rscript scripts/validate_inputs.R \
-  --genotype data/genotype/*.hmp.txt \
-  --phenotype data/phenotype/*.txt \
-  --config config/config.yaml
+# Run the validation script (reads from environment variables)
+GENOTYPE_FILE=/data/genotype/your_file.hmp.txt \
+PHENOTYPE_FILE=/data/phenotype/your_traits.txt \
+Rscript scripts/validate_inputs.R
 ```
 
 For more help, see:

@@ -318,15 +318,16 @@ cd cluster/argo
 
 ## Configuration
 
-### GAPIT Parameters ([config/config.yaml](config/config.yaml))
+### Runtime Configuration via Environment Variables ([.env.example](.env.example))
 
-```yaml
-gapit:
-  models:
-    - BLINK      # Fast, effective
-    - FarmCPU    # More accurate, slower
-  pca_components: 3
-  multiple_analysis: true
+All GAPIT parameters are configured through environment variables. See [.env.example](.env.example) for complete documentation.
+
+```bash
+# Key parameters
+MODELS=BLINK,FarmCPU    # GWAS models to run
+PCA_COMPONENTS=3        # Population structure correction
+SNP_THRESHOLD=5e-8      # Significance threshold
+MAF_FILTER=0.05         # Minor allele frequency filter
 ```
 
 ### Argo Parallelization

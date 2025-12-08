@@ -24,18 +24,11 @@ spec:
         image: ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest
         imagePullPolicy: Always
 
-        # Command and arguments
+        # Command - configuration is passed via environment variables (env section below)
+        # The entrypoint.sh script reads from env vars, NOT CLI args
         command: ["/scripts/entrypoint.sh"]
         args:
           - "run-single-trait"
-          - "--trait-index"
-          - "{{ TRAIT_INDEX }}"
-          - "--config"
-          - "/config/config.yaml"
-          - "--output-dir"
-          - "/outputs"
-          - "--threads"
-          - "12"
 
         # Resource requests and limits
         resources:
@@ -46,7 +39,7 @@ spec:
             memory: "36Gi"    # Allow some headroom
             cpu: "16"          # Allow burst to 16 cores
 
-        # Environment variables
+        # Environment variables - ALL configuration is passed here
         env:
         - name: OPENBLAS_NUM_THREADS
           value: "12"
@@ -56,6 +49,18 @@ spec:
           value: "{{ TRAIT_INDEX }}"
         - name: BATCH_ID
           value: "{{ BATCH_ID }}"
+        - name: GENOTYPE_FILE
+          value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+        - name: PHENOTYPE_FILE
+          value: "/data/phenotype/iron_traits_edited.txt"
+        - name: ACCESSION_IDS_FILE
+          value: "/data/metadata/ids_gwas.txt"
+        - name: MODELS
+          value: "BLINK,FarmCPU"
+        - name: PCA_COMPONENTS
+          value: "3"
+        - name: OUTPUT_PATH
+          value: "/outputs"
 
         # Volume mounts
         volumeMounts:
@@ -65,9 +70,6 @@ spec:
         - name: nfs-outputs
           mountPath: /outputs
           readOnly: false  # Need write access for results
-        - name: config
-          mountPath: /config
-          readOnly: true
 
       # Volume definitions
       volumes:
@@ -79,45 +81,3 @@ spec:
         nfs:
           server: "{{ NFS_SERVER }}"
           path: "{{ NFS_OUTPUT_PATH }}"
-      - name: config
-        configMap:
-          name: gapit3-config
-
----
-# ConfigMap for pipeline configuration
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: gapit3-config
-data:
-  config.yaml: |
-    # GAPIT3 Pipeline Configuration
-    data:
-      genotype: /data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt
-      phenotype: /data/phenotype/iron_traits_edited.txt
-      accession_ids: /data/metadata/ids_gwas.txt
-
-    gapit:
-      models:
-        - BLINK
-        - FarmCPU
-      pca_components: 3
-      multiple_analysis: true
-
-    output:
-      base_dir: /outputs
-      create_timestamp_dirs: true
-      save_intermediate: true
-
-    resources:
-      threads: 12
-
-    metadata:
-      enable_provenance: true
-      save_execution_metadata: true
-      compute_checksums: true
-
-    validation:
-      check_input_files: true
-      verify_trait_index: true
-      require_minimum_samples: 50
