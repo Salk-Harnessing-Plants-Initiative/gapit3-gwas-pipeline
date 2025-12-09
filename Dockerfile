@@ -82,15 +82,13 @@ RUN mkdir -p /data/genotype \
     /data/metadata \
     /outputs \
     /logs \
-    /config \
     /scripts
 
 # Set working directory
 WORKDIR /workspace
 
-# Copy pipeline scripts (will be added in next steps)
+# Copy pipeline scripts
 COPY scripts/ /scripts/
-COPY config/ /config/
 
 # Make scripts executable
 RUN chmod +x /scripts/*.sh /scripts/*.R
