@@ -1,5 +1,7 @@
 # Proposal: Fix GAPIT Results Aggregation to Track Model Information
 
+**Status**: ✅ Implementation Complete - Ready for Archive
+
 ## Problem Statement
 
 The current `collect_results.R` script aggregates significant SNPs from GAPIT GWAS results but **loses critical model information** in the process. When users run analyses with multiple models (BLINK, FarmCPU), the aggregated output cannot distinguish which model identified each significant SNP, making the results incomplete and potentially misleading for downstream analysis.
@@ -98,3 +100,30 @@ Rscript scripts/collect_results.R --output-dir /path/to/existing/outputs
 ```
 
 Downstream scripts may need updates if they parse CSV by column position (not name).
+
+## Implementation Summary
+
+**Completed**: December 2024
+
+All functionality has been implemented in `scripts/collect_results.R` (493 lines):
+
+### Core Implementation
+- `read_filter_file()` function (lines 134-201) - reads Filter files with model parsing
+- `select_best_trait_dirs()` function (lines 67-132) - deduplicates retry directories
+- `read_gwas_results_fallback()` function (lines 208-262) - fallback when Filter missing
+- Model extraction from `traits` column with compound model support (FarmCPU.LM, Blink.LM)
+- Output to `all_traits_significant_snps.csv` with `model` column
+- Per-model statistics in `summary_stats.json` (`snps_by_model` field)
+- Sorting by P.value
+- Console output with per-model counts
+
+### Test Coverage
+- 6 test fixture directories in `tests/fixtures/aggregation/`
+- 407 lines of unit tests in `tests/testthat/test-aggregation.R`
+- Integration test script `tests/integration/test-aggregation.sh`
+
+### Files Changed
+- `scripts/collect_results.R` - Core implementation
+- `tests/testthat/test-aggregation.R` - Unit tests
+- `tests/integration/test-aggregation.sh` - Integration tests (new)
+- `tests/fixtures/aggregation/*` - Test fixtures

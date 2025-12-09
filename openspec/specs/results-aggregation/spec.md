@@ -1,7 +1,9 @@
-# Spec: GAPIT Results Aggregation with Model Tracking
+# results-aggregation Specification
 
-## ADDED Requirements
+## Purpose
 
+This spec defines the behavior of the GAPIT results aggregation script (`scripts/collect_results.R`), which collects significant SNPs from multiple trait analyses into a single summary output with model tracking.
+## Requirements
 ### Requirement: Aggregation must read GAPIT Filter files instead of complete GWAS_Results files
 
 The aggregation script MUST read `GAPIT.Association.Filter_GWAS_results.csv` files which contain only significant SNPs instead of reading complete `GAPIT.Association.GWAS_Results.*.csv` files which contain all SNPs.
@@ -186,15 +188,11 @@ Collecting significant SNPs...
 
 ---
 
-## MODIFIED Requirements
-
 ### Requirement: Results aggregation produces output CSV with complete SNP information
 
 The aggregation script MUST produce a CSV file containing all significant SNPs from all traits with complete statistical information and model tracking.
 
-**Previously**: Output CSV had columns: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait` (missing model information)
-
-**Now**: Output CSV has columns: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model` (includes model column)
+The output CSV has columns: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model` (includes model column for filtering by GWAS model).
 
 #### Scenario: Complete aggregated output format
 
@@ -209,8 +207,3 @@ The aggregation script MUST produce a CSV file containing all significant SNPs f
 - Be sorted by P.value ascending
 - Have one row per (SNP, model) combination
 
----
-
-## REMOVED Requirements
-
-None. This change adds functionality without removing existing features.
