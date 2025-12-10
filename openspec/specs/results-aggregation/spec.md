@@ -145,26 +145,6 @@ Row 4: P.value = 3.4e-8
 
 ---
 
-### Requirement: Fallback to GWAS_Results when Filter file missing
-
-When `GAPIT.Association.Filter_GWAS_results.csv` does not exist, the aggregation script MUST fall back to reading GWAS_Results files with a warning.
-
-#### Scenario: Filter file missing for a trait
-
-**Given** a trait directory without `GAPIT.Association.Filter_GWAS_results.csv`
-**And** directory contains `GAPIT.Association.GWAS_Results.BLINK.trait_name.csv`
-
-**When** the aggregation script processes this trait
-
-**Then** the script MUST:
-- Detect Filter file is missing
-- Emit warning: `"WARNING: Filter file missing for trait_XXX, using GWAS_Results fallback"`
-- Read GWAS_Results file and filter for P.value < threshold
-- Infer model from filename or set model="unknown"
-- Continue processing remaining traits
-
----
-
 ### Requirement: Console output must report per-model statistics
 
 The aggregation script console output MUST display per-model SNP counts.
@@ -206,4 +186,42 @@ The output CSV has columns: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,tra
 - Contain all significant SNPs from all traits
 - Be sorted by P.value ascending
 - Have one row per (SNP, model) combination
+
+### Requirement: Fail-fast on incomplete traits
+
+When `GAPIT.Association.Filter_GWAS_results.csv` does not exist for a trait, the aggregation script MUST fail with a clear error message by default. The Filter file is the definitive completion signal - GAPIT only creates it after ALL models finish successfully.
+
+#### Scenario: Aggregation fails when any trait is incomplete
+
+- **GIVEN** 185 trait directories where 181 have Filter files and 4 are missing Filter files
+- **AND** the `--allow-incomplete` flag is NOT set
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - NOT create any output files
+  - Exit with code 1 (error)
+  - Print error: `"ERROR: 4 traits are incomplete (missing Filter file)"`
+  - List each incomplete trait directory
+  - Suggest: `"Run retry-argo-traits.sh --output-dir <path> first, or use --allow-incomplete to skip."`
+
+#### Scenario: Aggregation succeeds with all complete traits
+
+- **GIVEN** 185 trait directories where ALL have Filter files
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Process all 185 traits
+  - Create `all_traits_significant_snps.csv`
+  - Create `summary_table.csv`
+  - Exit with code 0 (success)
+
+#### Scenario: Allow-incomplete flag skips incomplete traits with warning
+
+- **GIVEN** 185 trait directories where 181 have Filter files and 4 are missing Filter files
+- **AND** the `--allow-incomplete` flag IS set
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Emit warning for each incomplete trait: `"WARNING: Skipping trait_XXX (missing Filter file)"`
+  - Process only the 181 complete traits
+  - Create output files with partial results
+  - Print summary: `"Aggregated 181 of 185 traits (4 skipped due to missing Filter file)"`
+  - Exit with code 0 (success)
 
