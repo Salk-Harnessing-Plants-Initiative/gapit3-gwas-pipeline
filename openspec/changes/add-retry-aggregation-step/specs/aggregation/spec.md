@@ -55,6 +55,31 @@ The aggregation script SHALL handle multiple output directories for the same tra
 - **AND** it logs which directory was selected for each
 - **AND** aggregation continues with selected directories
 
+### Requirement: SNP FDR Parameter Propagation
+
+The retry workflow generation SHALL propagate the `snp-fdr` parameter from the original workflow.
+
+#### Scenario: Extract snp-fdr from original workflow
+- **GIVEN** an original workflow was submitted with `snp-fdr=0.05`
+- **WHEN** a retry workflow is generated from that workflow
+- **THEN** the retry workflow includes `snp-fdr` in its workflow parameters
+- **AND** the value matches the original workflow (0.05)
+- **AND** each retry-trait-* task passes snp-fdr to the templateRef
+
+#### Scenario: Original workflow has no snp-fdr
+- **GIVEN** an original workflow was submitted without `snp-fdr` parameter
+- **WHEN** a retry workflow is generated from that workflow
+- **THEN** the retry workflow omits snp-fdr (or uses empty default)
+- **AND** backward compatibility is maintained
+
+#### Scenario: SNP FDR in generated YAML
+- **GIVEN** a retry workflow is being generated
+- **WHEN** the original workflow has `snp-fdr=0.05`
+- **THEN** the generated YAML includes:
+  - `snp-fdr` in arguments.parameters section
+  - `snp-fdr` parameter passed to each trait task's templateRef arguments
+- **AND** the workflow can be validated with `argo lint`
+
 ## MODIFIED Requirements
 
 ### Requirement: Retry Script Aggregation Flag

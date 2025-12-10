@@ -1,10 +1,43 @@
 {
+  "schema_version": "2.0.0",
   "execution": {
     "trait_index": 2,
     "start_time": "2025-01-01T10:00:00Z",
     "end_time": "2025-01-01T10:20:00Z",
     "duration_minutes": 20.1,
-    "status": "success"
+    "status": "success",
+    "hostname": "test-node-02",
+    "r_version": "R version 4.4.1 (2024-06-14)",
+    "gapit_version": "3.0"
+  },
+  "argo": {
+    "workflow_name": "gapit3-gwas-test-abc123",
+    "workflow_uid": "test-uid-001-0000-0000-000000000001",
+    "namespace": "runai-talmo-lab",
+    "pod_name": "gapit3-gwas-test-abc123-run-all-traits-xyz002",
+    "node_name": "gpu-node-02",
+    "retry_attempt": 0,
+    "max_retries": 5
+  },
+  "container": {
+    "image": "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-test123"
+  },
+  "inputs": {
+    "genotype_file": "/data/genotype/test_snps.hmp.txt",
+    "genotype_md5": "abc123def456abc123def456abc12345",
+    "phenotype_file": "/data/phenotype/test_traits.txt",
+    "phenotype_md5": "def456abc123def456abc123def45678",
+    "ids_file": "/data/metadata/test_ids.txt",
+    "ids_md5": "123456789abcdef123456789abcdef12"
+  },
+  "parameters": {
+    "models": ["BLINK", "FarmCPU"],
+    "pca_components": 3,
+    "multiple_analysis": true,
+    "maf_filter": 0.05,
+    "snp_fdr": 0.05,
+    "openblas_threads": 12,
+    "omp_threads": 12
   },
   "trait": {
     "name": "test_trait_B",
@@ -15,6 +48,10 @@
   },
   "genotype": {
     "n_snps": 1400000,
-    "n_accessions": 500
+    "n_accessions": 500,
+    "load_time_seconds": 48.7
+  },
+  "resources": {
+    "threads": "12"
   }
 }

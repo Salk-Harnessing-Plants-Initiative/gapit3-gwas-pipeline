@@ -21,19 +21,14 @@ Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide associa
 
 ## Current Status
 
-### Argo Workflows (⚠️ RBAC Permissions Pending)
+### Fully Operational
 
-The pipeline is fully functional but currently requires **manual RunAI execution** due to pending RBAC permissions in the cluster. Once permissions are granted, full Argo orchestration will work automatically.
+Both execution methods are working:
 
-**Current workarounds available:**
-- ✅ **Manual RunAI CLI** - Working now (see [Manual RunAI Execution Guide](docs/MANUAL_RUNAI_EXECUTION.md))
-- ✅ **Batch submission script** - [scripts/submit-all-traits-runai.sh](scripts/submit-all-traits-runai.sh)
-- ✅ **Aggregation script** - [scripts/aggregate-runai-results.sh](scripts/aggregate-runai-results.sh)
-- ✅ **Monitoring dashboard** - [scripts/monitor-runai-jobs.sh](scripts/monitor-runai-jobs.sh)
-- ✅ **Cleanup helper** - [scripts/cleanup-runai.sh](scripts/cleanup-runai.sh)
-- ⏳ **Argo Workflows** - Waiting for RBAC fix (see [RBAC Issue](docs/RBAC_PERMISSIONS_ISSUE.md))
+- **Argo Workflows** - Full orchestration with parallel execution
+- **RunAI CLI** - Direct job submission (alternative method)
 
-**For administrators:** See [RBAC_PERMISSIONS_ISSUE.md](docs/RBAC_PERMISSIONS_ISSUE.md) for required permissions.
+See [QUICKSTART.md](QUICKSTART.md) to get started.
 
 ---
 
@@ -263,8 +258,9 @@ data/
 - **[RBAC Permissions Issue](docs/RBAC_PERMISSIONS_ISSUE.md)** - For cluster administrators
 
 ### Usage & Configuration
-- **[Usage Guide](docs/USAGE.md)** - Parameter descriptions and advanced usage
-- **[Data Dictionary](docs/DATA_DICTIONARY.md)** - Trait descriptions and metadata
+- **[Usage Guide](docs/USAGE.md)** - Parameter reference and configuration recipes
+- **[Data Requirements](docs/DATA_REQUIREMENTS.md)** - Input/output file formats
+- **[.env.example](.env.example)** - Complete runtime configuration reference
 
 ### Testing & Troubleshooting
 - **[Deployment Testing](docs/DEPLOYMENT_TESTING.md)** - Test results and validation
@@ -523,6 +519,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-**Status**: Production-ready ✅ (Manual RunAI execution) / ⏳ (Argo orchestration pending RBAC)
+**Status**: Production-ready ✅
 
-Last updated: 2025-11-07
+Last updated: 2025-12-09

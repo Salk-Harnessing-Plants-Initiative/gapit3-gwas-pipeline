@@ -162,7 +162,7 @@ Installing templates in namespace: runai-talmo-lab
 ✓ results-collector
 ```
 
-**NOTE**: May fail if RBAC permissions not yet granted. If so, mention this is the workaround reason for using RunAI direct scripts.
+**NOTE**: RBAC permissions have been granted. Argo workflows should work correctly.
 
 ### Submit Test Workflow
 ```bash
@@ -345,4 +345,4 @@ rm -rf /z/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs/trait_*
 - **Traits**: Testing with 3 traits (2, 3, 4) instead of full 186
 - **Data**: Test dataset at `/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/`
 - **Duration**: Each trait takes ~15-20 minutes
-- **RBAC**: Argo may fail if permissions not granted; RunAI scripts work as workaround
+- **RBAC**: Permissions have been granted; both Argo and RunAI work correctly

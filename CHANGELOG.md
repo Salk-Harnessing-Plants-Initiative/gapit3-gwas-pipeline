@@ -62,6 +62,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `openspec/changes/add-dotenv-configuration/` - Runtime configuration proposal
 
 ### Fixed
+- **Duplicate Parameter Passing** - Removed CLI argument passing from Argo WorkflowTemplates
+  - Parameters are now passed exclusively via environment variables (env section)
+  - Container args contain only the command selector (`run-single-trait`), not runtime parameters
+  - Eliminates silent failures where CLI args appeared to work but were ignored by entrypoint.sh
+  - Added documentation comments in WorkflowTemplate explaining env-var-only pattern
+  - See `openspec/specs/argo-workflow-configuration/spec.md` for requirements
 - **Performance**: Eliminated unnecessary GWAS_Results fallback for empty Filter files
   - Filter files without `traits` column now return empty immediately (no significant SNPs)
   - Prevents reading 1.4M row files when Filter already indicates no results

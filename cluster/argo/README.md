@@ -124,19 +124,17 @@ extract-traits
 # Using helper script (recommended)
 ./scripts/submit_workflow.sh full \
   --data-path /your/data/path \
-  --output-path /your/output/path \
-  --max-parallel 50
+  --output-path /your/output/path
 
 # Or manually
 argo submit workflows/gapit3-parallel-pipeline.yaml \
   --namespace runai-talmo-lab \
   --parameter data-hostpath=/your/data/path \
   --parameter output-hostpath=/your/output/path \
-  --parameter max-parallelism=50 \
   --watch
 ```
 
-**Expected Runtime**: ~3-4 hours (with 50 parallel jobs)
+**Expected Runtime**: ~3-4 hours (with 30 parallel jobs)
 
 **DAG Structure**:
 ```
@@ -144,7 +142,7 @@ validate-inputs
     ↓
 extract-traits
     ↓
-[run-trait-2, run-trait-3, ..., run-trait-187] (parallel, max 50)
+[run-trait-2, run-trait-3, ..., run-trait-187] (parallel, max 30)
     ↓
 collect-results
 ```
@@ -153,8 +151,10 @@ collect-results
 - `data-hostpath` - Path to input data directory
 - `output-hostpath` - Path to output directory
 - `image` - Docker image tag (default: `sha-bc10fc8-test`)
-- `models` - GAPIT models to run (default: `BLINK,FarmCPU`)
-- `max-parallelism` - Max concurrent jobs (default: `50`)
+- `models` - GAPIT models to run (default: `BLINK,FarmCPU,MLM`)
+- `snp-fdr` - FDR threshold for Benjamini-Hochberg correction (default: empty/disabled, e.g., `0.05` for 5% FDR)
+
+> **Note**: Resource allocation (CPU, memory) and parallelism are configured directly in YAML files, not via CLI parameters. See [Resource Requirements](#resource-requirements) for details.
 
 ### 3. scripts/ - Helper Scripts
 
@@ -174,10 +174,7 @@ collect-results
 # Submit full workflow
 ./scripts/submit_workflow.sh full \
   --data-path /path/to/data \
-  --output-path /path/to/outputs \
-  --max-parallel 50 \
-  --cpu 12 \
-  --memory 32
+  --output-path /path/to/outputs
 ```
 
 **Features**:
@@ -185,6 +182,8 @@ collect-results
 - Automatic parameter handling
 - Confirmation prompts
 - Live progress display
+
+> **Note**: CPU/memory resources are configured in the WorkflowTemplate YAML, not via CLI flags. Edit `workflow-templates/gapit3-single-trait-template.yaml` to change resource allocation.
 
 #### monitor_workflow.sh
 **Purpose**: Monitor running workflows with live updates
@@ -256,9 +255,62 @@ After test succeeds:
 ```bash
 ./scripts/submit_workflow.sh full \
   --data-path /hpi/hpi_dev/users/YOUR_USERNAME/data \
-  --output-path /hpi/hpi_dev/users/YOUR_USERNAME/outputs \
-  --max-parallel 50
+  --output-path /hpi/hpi_dev/users/YOUR_USERNAME/outputs
 ```
+
+---
+
+## Running Commands from Windows via WSL
+
+When running `argo` or `kubectl` commands from Windows (e.g., from VS Code terminal or Claude Code), you must explicitly set the `KUBECONFIG` environment variable. The login shell initialization doesn't work reliably when invoking WSL from Windows.
+
+### Command Pattern
+
+**DO use this pattern:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && <your-command>"
+```
+
+**DON'T use these patterns** (they hang or fail to authenticate):
+```bash
+# These don't work reliably from Windows:
+wsl bash --login -c "<your-command>"           # Hangs on fstab
+wsl -e bash -c "source ~/.bashrc && <command>" # runai not found
+```
+
+### Common Commands
+
+**List workflows:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo list -n runai-talmo-lab"
+```
+
+**Get workflow details:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo get <workflow-name> -n runai-talmo-lab"
+```
+
+**Watch workflow progress:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo watch <workflow-name> -n runai-talmo-lab"
+```
+
+**View logs:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo logs <workflow-name> -n runai-talmo-lab --follow=false | tail -50"
+```
+
+**Submit workflow:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo submit cluster/argo/workflows/gapit3-parallel-pipeline.yaml -n runai-talmo-lab --watch"
+```
+
+**Stop workflow:**
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo stop <workflow-name> -n runai-talmo-lab"
+```
+
+> **Note**: The "wsl: Processing /etc/fstab with mount -a failed" warning is harmless and can be ignored.
 
 ---
 
@@ -428,6 +480,42 @@ If you know which traits failed:
   --submit
 ```
 
+### Retry with Aggregation
+
+Run retries and automatically aggregate results when complete:
+
+```bash
+./scripts/retry-argo-traits.sh \
+  --workflow gapit3-gwas-parallel-8nj24 \
+  --output-dir "Z:/users/eberrigan/.../outputs" \
+  --highmem \
+  --aggregate \
+  --watch
+```
+
+**`--aggregate` flag behavior:**
+- Adds a `collect-results` task to the retry workflow DAG
+- Aggregation runs **in-cluster** after all retry tasks complete
+- References the `gapit3-results-collector` WorkflowTemplate
+- No local R script or RunAI CLI required
+- SNP FDR threshold is automatically propagated from the original workflow
+
+### Duplicate Trait Directory Handling
+
+When retries create multiple directories for the same trait (e.g., `trait_005_20231112_*` and `trait_005_20231123_*`), the aggregation script automatically selects the best directory:
+
+1. **Priority: Model completeness** - Directory with most complete model outputs wins
+2. **Tie-breaker: Newest** - If completeness is equal, most recent timestamp wins
+
+Example output:
+```
+Note: Found multiple directories for 3 trait(s)
+Selecting most complete directory for each:
+  - Trait 5: 2 directories
+    Selected: trait_005_Zn_ICP_20231123_120000 (3/3 models)
+    Skipped: trait_005_Zn_ICP_20231112_200000 (2/3 models)
+```
+
 ### Install High-Memory Template
 
 Before using `--highmem`, install the template:
@@ -512,4 +600,4 @@ For detailed technical documentation about the workflow architecture, see:
 
 ---
 
-**Last Updated**: 2025-11-07
+**Last Updated**: 2025-12-08

@@ -62,7 +62,7 @@ ${BLUE}Options:${NC}
   --dry-run          Generate YAML and print to stdout, don't submit
   --submit           Submit the generated workflow to cluster
   --watch            Watch workflow after submission (implies --submit)
-  --aggregate        Run aggregation after workflow completes
+  --aggregate        Include aggregation step in workflow (runs in-cluster after retries)
   --output FILE      Write generated YAML to file
   --help             Show this help message
 
@@ -81,8 +81,11 @@ ${BLUE}Examples:${NC}
      --highmem --watch --aggregate
 
 ${BLUE}Notes:${NC}
-  - Uses output directory inspection to find incomplete traits (missing model outputs)
+  - Uses Filter file (GAPIT.Association.Filter_GWAS_results.csv) as definitive completion signal
+  - GAPIT only creates the Filter file after ALL models complete successfully
+  - Traits with partial outputs (GWAS_Results but no Filter) are correctly detected as incomplete
   - Models list comes from the original workflow parameters (not hardcoded)
+  - SNP FDR threshold is automatically propagated from the original workflow
   - Use --highmem for traits that failed with OOMKilled (exit code 137)
 
 EOF
@@ -211,6 +214,7 @@ IMAGE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.na
 MODELS=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "models") | .value')
 START_TRAIT=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "start-trait-index") | .value // "2"')
 END_TRAIT=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "end-trait-index") | .value // "187"')
+SNP_FDR=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "snp-fdr") | .value // ""')
 
 echo ""
 log_info "Workflow parameters:"
@@ -219,6 +223,11 @@ echo "  Output path (cluster): $OUTPUT_HOSTPATH"
 echo "  Image: $IMAGE"
 echo "  Models: $MODELS"
 echo "  Trait range: $START_TRAIT - $END_TRAIT"
+if [[ -n "$SNP_FDR" ]]; then
+    echo "  SNP FDR threshold: $SNP_FDR"
+else
+    echo "  SNP FDR threshold: (not set)"
+fi
 echo ""
 
 # Parse models into array
@@ -232,6 +241,7 @@ log_info "Expected models: ${MODEL_ARRAY[*]}"
 TRAIT_ARRAY=()
 MISSING_TRAITS=()
 INCOMPLETE_TRAITS=()
+NO_FILTER_TRAITS=()
 
 if [[ -n "$TRAITS" ]]; then
     # Parse comma-separated traits
@@ -261,18 +271,29 @@ elif [[ -n "$OUTPUT_DIR" ]]; then
             MISSING_TRAITS+=("$trait")
             TRAIT_ARRAY+=("$trait")
         else
-            # Check for each expected model
-            MISSING_MODELS=()
-            for model in "${MODEL_ARRAY[@]}"; do
-                # Look for GWAS_Results file for this model
-                if ! ls "$TRAIT_DIR"/GAPIT.Association.GWAS_Results.${model}.* &>/dev/null 2>&1; then
-                    MISSING_MODELS+=("$model")
-                fi
-            done
+            # CRITICAL: Check for Filter file first - definitive completion signal
+            # GAPIT only creates Filter_GWAS_results.csv after ALL models complete
+            FILTER_FILE="$TRAIT_DIR/GAPIT.Association.Filter_GWAS_results.csv"
 
-            if [[ ${#MISSING_MODELS[@]} -gt 0 ]]; then
-                INCOMPLETE_TRAITS+=("$trait:${MISSING_MODELS[*]}")
+            if [[ ! -f "$FILTER_FILE" ]]; then
+                # Missing Filter file = incomplete (regardless of GWAS_Results files)
+                NO_FILTER_TRAITS+=("$trait")
                 TRAIT_ARRAY+=("$trait")
+            else
+                # Filter file exists - trait is complete
+                # Check for missing models only for informational purposes
+                MISSING_MODELS=()
+                for model in "${MODEL_ARRAY[@]}"; do
+                    if ! ls "$TRAIT_DIR"/GAPIT.Association.GWAS_Results.${model}.* &>/dev/null 2>&1; then
+                        MISSING_MODELS+=("$model")
+                    fi
+                done
+
+                if [[ ${#MISSING_MODELS[@]} -gt 0 ]]; then
+                    # Has Filter file but missing some GWAS_Results - unusual but complete
+                    # (Filter file is the authoritative completion signal)
+                    log_warn "Trait $trait has Filter file but missing GWAS_Results for: ${MISSING_MODELS[*]}"
+                fi
             fi
         fi
     done
@@ -280,7 +301,7 @@ elif [[ -n "$OUTPUT_DIR" ]]; then
     # Display summary
     echo ""
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-    echo -e "${BLUE}Trait Analysis Summary${NC}"
+    echo -e "${BLUE}Trait Completeness Summary${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo ""
 
@@ -288,9 +309,12 @@ elif [[ -n "$OUTPUT_DIR" ]]; then
     COMPLETE_TRAITS=$((TOTAL_TRAITS - ${#TRAIT_ARRAY[@]}))
 
     echo "Total traits in range: $TOTAL_TRAITS"
-    echo -e "Complete traits: ${GREEN}$COMPLETE_TRAITS${NC}"
-    echo -e "Missing (no output): ${RED}${#MISSING_TRAITS[@]}${NC}"
-    echo -e "Incomplete (missing models): ${YELLOW}${#INCOMPLETE_TRAITS[@]}${NC}"
+    echo -e "Complete traits (Filter file present): ${GREEN}$COMPLETE_TRAITS${NC}"
+    echo -e "Missing (no output directory): ${RED}${#MISSING_TRAITS[@]}${NC}"
+    echo -e "Incomplete (missing Filter file): ${YELLOW}${#NO_FILTER_TRAITS[@]}${NC}"
+    echo ""
+    echo -e "${BLUE}Note:${NC} Filter file (GAPIT.Association.Filter_GWAS_results.csv) is the"
+    echo "      definitive completion signal - GAPIT creates it only after ALL models finish."
     echo ""
 
     if [[ ${#MISSING_TRAITS[@]} -gt 0 ]]; then
@@ -301,12 +325,10 @@ elif [[ -n "$OUTPUT_DIR" ]]; then
         echo ""
     fi
 
-    if [[ ${#INCOMPLETE_TRAITS[@]} -gt 0 ]]; then
-        echo "Incomplete traits (missing models):"
-        for item in "${INCOMPLETE_TRAITS[@]}"; do
-            trait="${item%%:*}"
-            models="${item#*:}"
-            echo "  - Trait $trait: missing $models"
+    if [[ ${#NO_FILTER_TRAITS[@]} -gt 0 ]]; then
+        echo "Incomplete traits (missing Filter file):"
+        for trait in "${NO_FILTER_TRAITS[@]}"; do
+            echo "  - Trait $trait"
         done
         echo ""
     fi
@@ -338,7 +360,9 @@ WORKFLOW_SUFFIX=$(echo "$WORKFLOW" | sed 's/gapit3-gwas-parallel-//' | sed 's/ga
 
 # Build DAG tasks YAML
 TASKS_YAML=""
+TASK_NAMES=()
 for trait in "${TRAIT_ARRAY[@]}"; do
+    TASK_NAMES+=("retry-trait-${trait}")
     TASKS_YAML+="      - name: retry-trait-${trait}
         templateRef:
           name: ${TEMPLATE_NAME}
@@ -353,8 +377,30 @@ for trait in "${TRAIT_ARRAY[@]}"; do
             value: \"{{workflow.parameters.image}}\"
           - name: models
             value: \"{{workflow.parameters.models}}\"
+          - name: snp-fdr
+            value: \"{{workflow.parameters.snp-fdr}}\"
 "
 done
+
+# Add collect-results task if --aggregate flag is set
+COLLECT_RESULTS_YAML=""
+if [[ "$AGGREGATE" == "true" ]]; then
+    log_info "Including aggregation step in workflow (runs after all retries complete)"
+    # Build dependencies string for all retry tasks
+    DEPS_STRING=$(IFS=,; echo "${TASK_NAMES[*]}")
+    COLLECT_RESULTS_YAML="      - name: collect-results
+        dependencies: [${DEPS_STRING}]
+        templateRef:
+          name: gapit3-results-collector
+          template: collect-results
+        arguments:
+          parameters:
+          - name: image
+            value: \"{{workflow.parameters.image}}\"
+          - name: batch-id
+            value: \"{{workflow.name}}\"
+"
+fi
 
 # Generate full workflow YAML
 RETRY_YAML="apiVersion: argoproj.io/v1alpha1
@@ -389,6 +435,8 @@ spec:
       value: \"${OUTPUT_HOSTPATH}\"
     - name: models
       value: \"${MODELS}\"
+    - name: snp-fdr
+      value: \"${SNP_FDR}\"
 
   # Global timeout (7 days - effectively no limit for retries)
   activeDeadlineSeconds: 604800
@@ -408,7 +456,7 @@ spec:
   - name: retry-traits
     dag:
       tasks:
-${TASKS_YAML}
+${TASKS_YAML}${COLLECT_RESULTS_YAML}
   # Parallelism - run all retry traits in parallel (small count)
   parallelism: ${#TRAIT_ARRAY[@]}
 "
@@ -465,17 +513,11 @@ if [[ "$SUBMIT" == "true" ]]; then
     echo "Get status:"
     echo "  argo get $SUBMITTED_NAME -n $NAMESPACE"
 
-    # Run aggregation if requested
-    if [[ "$AGGREGATE" == "true" && "$WATCH" != "true" ]]; then
-        echo ""
-        log_info "Waiting for workflow to complete before aggregation..."
-        argo wait "$SUBMITTED_NAME" -n "$NAMESPACE"
-    fi
-
+    # Note: When --aggregate is set, aggregation runs as part of the workflow DAG (in-cluster)
+    # No local aggregation call needed
     if [[ "$AGGREGATE" == "true" ]]; then
         echo ""
-        log_info "Running aggregation..."
-        "$SCRIPT_DIR/aggregate-runai-results.sh" --force --output-dir "$OUTPUT_HOSTPATH"
+        log_info "Aggregation will run in-cluster after all retry tasks complete"
     fi
 else
     if [[ -z "$OUTPUT_FILE" ]]; then

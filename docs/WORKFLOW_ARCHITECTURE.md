@@ -382,19 +382,13 @@ exit 2   # Validation error (missing files, bad config)
 exit 64  # RBAC permissions error (Argo-specific)
 ```
 
-### RBAC Permissions Issue
+### RBAC Permissions Issue (Resolved)
 
-**Current Blocker**: Service account lacks permissions to create `workflowtaskresults`:
+**Status**: RESOLVED - RBAC permissions have been granted.
 
-```
-Error (exit code 64): workflowtaskresults.argoproj.io is forbidden
-```
+The service account now has permissions to create `workflowtaskresults`. Both Argo Workflows and RunAI CLI execution work correctly.
 
-**Impact**: Pods execute successfully but Argo cannot record results.
-
-**Workaround**: Manual RunAI CLI execution (see [MANUAL_RUNAI_EXECUTION.md](MANUAL_RUNAI_EXECUTION.md))
-
-**Resolution**: Cluster administrator must grant RBAC permissions (see [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md))
+**Historical context**: See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for details on the original issue and resolution.
 
 ---
 

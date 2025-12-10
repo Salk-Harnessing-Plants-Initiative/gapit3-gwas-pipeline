@@ -739,31 +739,17 @@ Fixed Argo Workflows validation error where parameterized `hostPath` volumes in 
 
 See [openspec/changes/fix-argo-workflow-validation/](../openspec/changes/fix-argo-workflow-validation/) for complete technical details.
 
-### RBAC Permissions Issue
-**Status**: ⏳ PENDING (Administrator Action Required)
+### RBAC Permissions Issue (Resolved)
+**Status**: ✅ RESOLVED
 
-Argo Workflows successfully submit but fail at runtime with RBAC permissions error.
+RBAC permissions have been granted. Argo Workflows and RunAI CLI execution both work correctly.
 
-**Error**:
-```
-Error (exit code 64): workflowtaskresults.argoproj.io is forbidden:
-User "system:serviceaccount:runai-talmo-lab:default" cannot create resource
-"workflowtaskresults" in API group "argoproj.io" in the namespace "runai-talmo-lab"
-```
-
-**Impact**:
-- Workflow pods execute successfully (exit code 0)
-- Argo cannot save task results due to missing permissions
-- Subsequent DAG tasks are not triggered
-
-**Workaround**: Manual RunAI CLI execution (fully functional)
-
-See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for administrator resolution steps.
+See [RBAC_PERMISSIONS_ISSUE.md](RBAC_PERMISSIONS_ISSUE.md) for historical context.
 
 ### Successful Manual RunAI Test (2025-11-07)
 **Status**: ✅ SUCCESS
 
-Successfully tested single trait execution using RunAI CLI directly as workaround for RBAC issue.
+Successfully tested single trait execution using RunAI CLI.
 
 **Test Configuration**:
 - **Trait**: Index 2 (first phenotype trait)

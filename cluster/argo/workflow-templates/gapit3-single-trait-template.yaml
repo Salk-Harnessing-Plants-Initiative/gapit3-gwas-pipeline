@@ -24,7 +24,9 @@ spec:
     - name: image
       value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
     - name: models
-      value: "BLINK,FarmCPU"
+      value: "BLINK,FarmCPU,MLM"
+    - name: snp-fdr
+      value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
 
   templates:
   # ===========================================================================
@@ -42,6 +44,7 @@ spec:
       - name: trait-name
       - name: image
       - name: models
+      - name: snp-fdr
 
     metadata:
       labels:
@@ -89,12 +92,29 @@ spec:
         value: "{{inputs.parameters.trait-index}}"
       - name: TRAIT_NAME
         value: "{{inputs.parameters.trait-name}}"
+      # Provenance metadata for traceability
       - name: WORKFLOW_NAME
         value: "{{workflow.name}}"
+      - name: WORKFLOW_UID
+        value: "{{workflow.uid}}"
       - name: POD_NAME
         valueFrom:
           fieldRef:
             fieldPath: metadata.name
+      - name: NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+      - name: WORKFLOW_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: CONTAINER_IMAGE
+        value: "{{inputs.parameters.image}}"
+      - name: RETRY_ATTEMPT
+        value: "{{retries}}"
+      - name: SNP_FDR
+        value: "{{inputs.parameters.snp-fdr}}"
 
       # Resource allocation - increased for large datasets (1.4M+ SNPs, 2.2GB genotype file)
       # Note: Resources must be fixed values in WorkflowTemplates when using templateRef

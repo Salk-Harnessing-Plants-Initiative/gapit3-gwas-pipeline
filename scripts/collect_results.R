@@ -10,11 +10,28 @@
 suppressPackageStartupMessages({
   library(data.table)
   library(dplyr)
+  library(tidyr)
   library(ggplot2)
   library(gridExtra)
   library(jsonlite)
   library(optparse)
 })
+
+# ==============================================================================
+# Helper function for environment variables
+# ==============================================================================
+
+#' Get environment variable with NULL fallback for empty strings
+#' @param name Environment variable name
+#' @param default Default value if not set or empty
+#' @return The value or NULL if empty/unset
+get_env_or_null <- function(name, default = NULL) {
+  value <- Sys.getenv(name, "")
+  if (value == "" || value == "null" || value == "NULL") {
+    return(default)
+  }
+  return(value)
+}
 
 # ==============================================================================
 # Parse arguments
@@ -27,7 +44,9 @@ option_list <- list(
   make_option(c("-t", "--threshold"), type = "numeric", default = 5e-8,
               help = "Genome-wide significance threshold [default: %default]", metavar = "FLOAT"),
   make_option(c("-m", "--models"), type = "character", default = "BLINK,FarmCPU,MLM",
-              help = "Expected models for completeness check [default: %default]", metavar = "STRING")
+              help = "Expected models for completeness check [default: %default]", metavar = "STRING"),
+  make_option(c("--allow-incomplete"), action = "store_true", default = FALSE,
+              help = "Allow aggregation with incomplete traits (skip them with warning)")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
@@ -41,6 +60,7 @@ output_dir <- opt$`output-dir`
 batch_id <- opt$`batch-id`
 threshold <- opt$threshold
 expected_models <- strsplit(opt$models, ",")[[1]]
+allow_incomplete <- opt$`allow-incomplete`
 
 cat(strrep("=", 78), "\n")
 cat("GAPIT3 Results Collector\n")
@@ -49,11 +69,528 @@ cat("Output directory:", output_dir, "\n")
 cat("Batch ID:", batch_id, "\n")
 cat("Significance threshold:", threshold, "\n")
 cat("Expected models:", paste(expected_models, collapse = ", "), "\n")
+cat("Allow incomplete:", allow_incomplete, "\n")
 cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
 # Helper Functions
 # ==============================================================================
+
+# ------------------------------------------------------------------------------
+# Formatting helpers for markdown generation
+# ------------------------------------------------------------------------------
+
+#' Format p-value for display
+#' @param pval Numeric p-value
+#' @return Character string in scientific notation
+format_pvalue <- function(pval) {
+  if (is.na(pval)) return("NA")
+  sprintf("%.2e", pval)
+}
+
+#' Format number with thousand separators
+#' @param n Numeric value
+#' @return Character string with commas
+format_number <- function(n) {
+  if (is.na(n)) return("NA")
+  format(n, big.mark = ",", scientific = FALSE)
+}
+
+#' Format duration for display
+#' @param minutes Numeric duration in minutes
+#' @param unit Output unit ("minutes" or "hours")
+#' @return Character string with unit
+format_duration <- function(minutes, unit = "minutes") {
+  if (unit == "hours") {
+    sprintf("%.1f hours", minutes)
+  } else {
+    sprintf("%.1f minutes", minutes)
+  }
+}
+
+#' Truncate string with ellipsis
+#' @param s Character string
+#' @param max_length Maximum length
+#' @return Truncated string
+truncate_string <- function(s, max_length = 40) {
+  if (nchar(s) <= max_length) return(s)
+  paste0(substr(s, 1, max_length - 3), "...")
+}
+
+# ------------------------------------------------------------------------------
+# Markdown section generators
+# ------------------------------------------------------------------------------
+
+#' Generate executive summary section
+#' @param stats Summary statistics list
+#' @param top_snp Data frame with top SNP (first row used)
+#' @param top_trait List with name and count of top trait
+#' @return Character string with markdown
+generate_executive_summary <- function(stats, top_snp, top_trait) {
+  success_rate <- if (stats$total_traits_attempted > 0) {
+    sprintf("%.1f%%", 100 * stats$successful_traits / stats$total_traits_attempted)
+  } else {
+    "N/A"
+  }
+
+  top_hit_str <- if (!is.null(top_snp) && nrow(top_snp) > 0) {
+    sprintf("%s (p = %s)", top_snp$SNP[1], format_pvalue(top_snp$P.value[1]))
+  } else {
+    "N/A"
+  }
+
+  top_trait_str <- if (!is.null(top_trait) && !is.null(top_trait$name)) {
+    sprintf("%s (%s SNPs)", top_trait$name, format_number(top_trait$count))
+  } else {
+    "N/A"
+  }
+
+  lines <- c(
+    "## Executive Summary",
+    "",
+    "| Metric | Value |",
+    "|--------|-------|",
+    sprintf("| Workflow ID | `%s` |", stats$batch_id),
+    sprintf("| Analysis Date | %s |", format(as.Date(stats$collection_time), "%Y-%m-%d")),
+    sprintf("| Total Traits Analyzed | %s |", format_number(stats$total_traits_attempted)),
+    sprintf("| Successful | %s (%s) |", format_number(stats$successful_traits), success_rate),
+    sprintf("| Failed | %s |", format_number(stats$failed_traits)),
+    sprintf("| **Total Significant SNPs** | **%s** |", format_number(stats$total_significant_snps)),
+    sprintf("| Top Hit | %s |", top_hit_str),
+    sprintf("| Top Trait | %s |", top_trait_str),
+    sprintf("| Total Runtime | %s |", format_duration(stats$total_duration_hours * 60, "hours")),
+    sprintf("| Avg Runtime per Trait | %s |", format_duration(stats$average_duration_minutes)),
+    ""
+  )
+
+  paste(lines, collapse = "\n")
+}
+
+#' Generate configuration section
+#' @param metadata Metadata list from first trait
+#' @param summary_table Summary data frame
+#' @return Character string with markdown
+generate_configuration_section <- function(metadata, summary_table) {
+  # Extract parameters with defaults
+  models <- if (!is.null(metadata$parameters$models)) {
+    paste(metadata$parameters$models, collapse = ", ")
+  } else {
+    "N/A"
+  }
+
+  pca <- if (!is.null(metadata$parameters$pca_components)) {
+    metadata$parameters$pca_components
+  } else {
+    "N/A"
+  }
+
+  maf <- if (!is.null(metadata$parameters$maf_filter)) {
+    metadata$parameters$maf_filter
+  } else {
+    "N/A"
+  }
+
+  n_snps <- if (!is.null(metadata$genotype$n_snps)) {
+    format_number(metadata$genotype$n_snps)
+  } else if (nrow(summary_table) > 0 && "n_snps" %in% colnames(summary_table)) {
+    format_number(summary_table$n_snps[1])
+  } else {
+    "N/A"
+  }
+
+  n_accessions <- if (!is.null(metadata$genotype$n_accessions)) {
+    format_number(metadata$genotype$n_accessions)
+  } else if (nrow(summary_table) > 0 && "n_samples" %in% colnames(summary_table)) {
+    format_number(summary_table$n_samples[1])
+  } else {
+    "N/A"
+  }
+
+  lines <- c(
+    "## Configuration",
+    "",
+    "| Parameter | Value |",
+    "|-----------|-------|",
+    sprintf("| Models | %s |", models),
+    sprintf("| PCA Components | %s |", pca),
+    sprintf("| MAF Filter | %s |", maf),
+    sprintf("| SNPs Tested | %s |", n_snps),
+    sprintf("| Accessions | %s |", n_accessions),
+    ""
+  )
+
+  # Add input files if available
+  if (!is.null(metadata$inputs)) {
+    geno_file <- if (!is.null(metadata$inputs$genotype_file)) metadata$inputs$genotype_file else "N/A"
+    pheno_file <- if (!is.null(metadata$inputs$phenotype_file)) metadata$inputs$phenotype_file else "N/A"
+    lines <- c(lines,
+      "### Input Files",
+      sprintf("- **Genotype:** `%s`", geno_file),
+      sprintf("- **Phenotype:** `%s`", pheno_file),
+      ""
+    )
+  }
+
+  paste(lines, collapse = "\n")
+}
+
+#' Generate top SNPs table
+#' @param snps_df Data frame of significant SNPs
+#' @param top_n Number of SNPs to show
+#' @return Character string with markdown
+generate_top_snps_table <- function(snps_df, top_n = 20) {
+  if (is.null(snps_df) || nrow(snps_df) == 0) {
+    return(paste(c(
+      "### Top Significant SNPs",
+      "",
+      "*No significant SNPs found at the specified threshold.*",
+      ""
+    ), collapse = "\n"))
+  }
+
+  # Ensure sorted by P.value
+  snps_df <- snps_df[order(snps_df$P.value), ]
+
+  # Take top N
+  top_snps <- head(snps_df, top_n)
+
+  lines <- c(
+    sprintf("### Top %d Significant SNPs", min(top_n, nrow(snps_df))),
+    "",
+    "| Rank | SNP | Chr | Position | P-value | MAF | Model | Trait |",
+    "|------|-----|-----|----------|---------|-----|-------|-------|"
+  )
+
+  for (i in seq_len(nrow(top_snps))) {
+    row <- top_snps[i, ]
+    model_val <- if ("model" %in% names(row) && !is.na(row$model)) row$model else "N/A"
+    trait_val <- if ("trait" %in% names(row) && !is.na(row$trait)) truncate_string(row$trait, 35) else "N/A"
+    lines <- c(lines, sprintf(
+      "| %d | %s | %s | %s | %s | %.3f | %s | %s |",
+      i,
+      row$SNP,
+      row$Chr,
+      format_number(row$Pos),
+      format_pvalue(row$P.value),
+      row$MAF,
+      model_val,
+      trait_val
+    ))
+  }
+
+  if (nrow(snps_df) > top_n) {
+    lines <- c(lines, "",
+      sprintf("*Showing top %d of %s total significant SNPs. See `all_traits_significant_snps.csv` for complete data.*",
+              top_n, format_number(nrow(snps_df))))
+  }
+
+  lines <- c(lines, "")
+  paste(lines, collapse = "\n")
+}
+
+#' Generate traits with most hits table
+#' @param snps_df Data frame of significant SNPs
+#' @param top_n Number of traits to show
+#' @return Character string with markdown
+generate_traits_table <- function(snps_df, top_n = 10) {
+  if (is.null(snps_df) || nrow(snps_df) == 0 || !"trait" %in% colnames(snps_df)) {
+    return("")
+  }
+
+  # Count SNPs per trait
+  trait_counts <- snps_df %>%
+    group_by(trait) %>%
+    summarise(
+      total = n(),
+      .groups = "drop"
+    ) %>%
+    arrange(desc(total)) %>%
+    head(top_n)
+
+  # Get per-model counts if model column exists
+  if ("model" %in% colnames(snps_df)) {
+    model_counts <- snps_df %>%
+      group_by(trait, model) %>%
+      summarise(n = n(), .groups = "drop") %>%
+      tidyr::pivot_wider(names_from = model, values_from = n, values_fill = 0)
+
+    trait_counts <- trait_counts %>%
+      left_join(model_counts, by = "trait")
+  }
+
+  # Build table
+  models <- setdiff(colnames(trait_counts), c("trait", "total"))
+
+  header <- paste0("| Rank | Trait | Total SNPs |",
+                   paste(sapply(models, function(m) sprintf(" %s |", m)), collapse = ""))
+
+  sep <- paste0("|------|-------|------------|",
+                paste(rep("-----|", length(models)), collapse = ""))
+
+  lines <- c(
+    "### Traits with Most Significant Hits",
+    "",
+    header,
+    sep
+  )
+
+  for (i in seq_len(nrow(trait_counts))) {
+    row <- trait_counts[i, ]
+    row_str <- sprintf("| %d | %s | %s |",
+                       i,
+                       truncate_string(as.character(row$trait), 35),
+                       format_number(row$total))
+    for (m in models) {
+      row_str <- paste0(row_str, sprintf(" %s |", format_number(row[[m]])))
+    }
+    lines <- c(lines, row_str)
+  }
+
+  lines <- c(lines, "",
+             sprintf("*Showing top %d traits by significant SNP count.*", min(top_n, nrow(trait_counts))),
+             "")
+
+  paste(lines, collapse = "\n")
+}
+
+#' Generate model statistics section
+#' @param stats Summary statistics list with snps_by_model
+#' @return Character string with markdown
+generate_model_statistics <- function(stats) {
+  if (is.null(stats$snps_by_model)) {
+    return("")
+  }
+
+  snps_by_model <- stats$snps_by_model
+  total <- stats$total_significant_snps
+
+  # Get model names (exclude metadata fields)
+  model_names <- setdiff(names(snps_by_model), c("both_models", "overlap_snps"))
+
+  lines <- c(
+    "## Model Statistics",
+    "",
+    "| Model | SNPs Found | % of Total |",
+    "|-------|------------|------------|"
+  )
+
+  for (model in model_names) {
+    count <- snps_by_model[[model]]
+    pct <- if (total > 0) sprintf("%.1f%%", 100 * count / total) else "N/A"
+    lines <- c(lines, sprintf("| %s | %s | %s |", model, format_number(count), pct))
+  }
+
+  # Add overlap info
+  if (!is.null(snps_by_model$both_models) && snps_by_model$both_models > 0) {
+    overlap <- snps_by_model$both_models
+    overlap_pct <- if (total > 0) sprintf("%.1f%%", 100 * overlap / total) else "N/A"
+    lines <- c(lines, "",
+               "### Cross-Model Validation",
+               "",
+               sprintf("- **SNPs found by multiple models:** %s (%s of total)",
+                       format_number(overlap), overlap_pct),
+               "- **Model agreement indicates high-confidence hits**",
+               "")
+  }
+
+  lines <- c(lines, "")
+  paste(lines, collapse = "\n")
+}
+
+#' Generate chromosome distribution section
+#' @param snps_df Data frame of significant SNPs
+#' @return Character string with markdown
+generate_chromosome_distribution <- function(snps_df) {
+  if (is.null(snps_df) || nrow(snps_df) == 0 || !"Chr" %in% colnames(snps_df)) {
+    return("")
+  }
+
+  total <- nrow(snps_df)
+
+  chr_counts <- snps_df %>%
+    group_by(Chr) %>%
+    summarise(count = n(), .groups = "drop") %>%
+    arrange(desc(count))
+
+  lines <- c(
+    "## Chromosome Distribution",
+    "",
+    "| Chromosome | SNP Count | % of Total |",
+    "|------------|-----------|------------|"
+  )
+
+  for (i in seq_len(nrow(chr_counts))) {
+    row <- chr_counts[i, ]
+    pct <- sprintf("%.1f%%", 100 * row$count / total)
+    lines <- c(lines, sprintf("| %s | %s | %s |", row$Chr, format_number(row$count), pct))
+  }
+
+  lines <- c(lines, "")
+  paste(lines, collapse = "\n")
+}
+
+#' Generate quality metrics section
+#' @param stats Summary statistics list
+#' @param summary_table Summary data frame
+#' @return Character string with markdown
+generate_quality_metrics <- function(stats, summary_table) {
+  lines <- c(
+    "## Quality Metrics",
+    "",
+    "### Completion Status",
+    sprintf("- **Traits Attempted:** %s", format_number(stats$total_traits_attempted)),
+    sprintf("- **Traits Completed:** %s (%.0f%%)",
+            format_number(stats$successful_traits),
+            if (stats$total_traits_attempted > 0) 100 * stats$successful_traits / stats$total_traits_attempted else 0),
+    sprintf("- **Traits Failed:** %s", format_number(stats$failed_traits)),
+    ""
+  )
+
+  # Runtime stats
+  if (!is.null(stats$average_duration_minutes)) {
+    lines <- c(lines,
+               "### Runtime Distribution",
+               sprintf("- **Average:** %s", format_duration(stats$average_duration_minutes)),
+               sprintf("- **Total Compute Time:** %s", format_duration(stats$total_duration_hours * 60, "hours")),
+               "")
+  }
+
+  # Sample coverage from summary table
+  if (nrow(summary_table) > 0 && "n_samples" %in% colnames(summary_table)) {
+    lines <- c(lines,
+               "### Sample Coverage",
+               sprintf("- **Total Accessions:** %s", format_number(summary_table$n_samples[1])),
+               "")
+  }
+
+  paste(lines, collapse = "\n")
+}
+
+#' Generate reproducibility section
+#' @param stats Summary statistics list
+#' @param metadata Metadata from first trait (optional)
+#' @return Character string with markdown
+generate_reproducibility_section <- function(stats, metadata = NULL) {
+  lines <- c(
+    "## Reproducibility",
+    "",
+    "| Field | Value |",
+    "|-------|-------|",
+    sprintf("| Workflow ID | `%s` |", stats$batch_id)
+  )
+
+  # Add workflow UID if available
+  if (!is.null(stats$provenance$workflow_uid)) {
+    lines <- c(lines, sprintf("| Workflow UID | `%s` |", stats$provenance$workflow_uid))
+  }
+
+  lines <- c(lines, sprintf("| Collection Time | %s |", stats$collection_time))
+
+  # Add R/GAPIT version from metadata
+  if (!is.null(metadata) && !is.null(metadata$execution$r_version)) {
+    lines <- c(lines, sprintf("| R Version | %s |", metadata$execution$r_version))
+  } else {
+    lines <- c(lines, "| R Version | N/A |")
+  }
+
+  if (!is.null(metadata) && !is.null(metadata$execution$gapit_version)) {
+    lines <- c(lines, sprintf("| GAPIT Version | %s |", metadata$execution$gapit_version))
+  } else {
+    lines <- c(lines, "| GAPIT Version | N/A |")
+  }
+
+  # Add output files reference
+  lines <- c(lines, "",
+             "### Output Files",
+             "| File | Description |",
+             "|------|-------------|",
+             "| `summary_stats.json` | Machine-readable statistics and provenance |",
+             "| `all_traits_significant_snps.csv` | All significant SNPs with full details |",
+             "| `summary_table.csv` | Per-trait summary |",
+             "")
+
+  paste(lines, collapse = "\n")
+}
+
+#' Generate complete markdown summary report
+#' @param output_dir Directory to write report
+#' @param stats Summary statistics list
+#' @param summary_table Summary data frame
+#' @param snps_df Data frame of significant SNPs
+#' @param metadata Metadata from first trait (optional)
+#' @param contact Contact name for report footer (optional)
+#' @return Path to generated markdown file
+generate_markdown_summary <- function(output_dir, stats, summary_table, snps_df,
+                                       metadata = NULL, contact = NULL) {
+  # Find top SNP
+  top_snp <- if (!is.null(snps_df) && nrow(snps_df) > 0) {
+    snps_df[which.min(snps_df$P.value), , drop = FALSE]
+  } else {
+    NULL
+  }
+
+  # Find top trait
+  top_trait <- if (!is.null(snps_df) && nrow(snps_df) > 0 && "trait" %in% colnames(snps_df)) {
+    trait_counts <- table(snps_df$trait)
+    top_name <- names(trait_counts)[which.max(trait_counts)]
+    list(name = top_name, count = max(trait_counts))
+  } else {
+    NULL
+  }
+
+  # Build report sections
+  sections <- c(
+    "# GWAS Pipeline Summary Report",
+    "",
+    sprintf("**Generated:** %s", stats$collection_time),
+    "",
+    "---",
+    "",
+    generate_executive_summary(stats, top_snp, top_trait),
+    "---",
+    "",
+    generate_configuration_section(metadata, summary_table),
+    "---",
+    "",
+    "## Results Overview",
+    "",
+    generate_top_snps_table(snps_df, top_n = 20),
+    "---",
+    "",
+    generate_traits_table(snps_df, top_n = 10),
+    "---",
+    "",
+    generate_model_statistics(stats),
+    "---",
+    "",
+    generate_chromosome_distribution(snps_df),
+    "---",
+    "",
+    generate_quality_metrics(stats, summary_table),
+    "---",
+    "",
+    generate_reproducibility_section(stats, metadata),
+    "---",
+    "",
+    "*Report generated by collect_results.R*"
+  )
+
+  if (!is.null(contact)) {
+    sections <- c(sections, sprintf("*Contact: %s*", contact))
+  }
+
+  # Write to file
+  md_file <- file.path(output_dir, "pipeline_summary.md")
+  writeLines(paste(sections, collapse = "\n"), md_file)
+
+  cat("Pipeline summary saved:", md_file, "\n")
+
+  return(md_file)
+}
+
+# ------------------------------------------------------------------------------
+# Deduplication and trait completeness
+# ------------------------------------------------------------------------------
 
 #' Select best directory for each trait index (deduplication)
 #'
@@ -131,21 +668,39 @@ select_best_trait_dirs <- function(trait_dirs, expected_models) {
   return(selected$path)
 }
 
+#' Check trait directories for completeness (Filter file present)
+#'
+#' @param trait_dirs Vector of trait directory paths
+#' @return Vector of incomplete trait directory paths (missing Filter file)
+check_trait_completeness <- function(trait_dirs) {
+  incomplete <- character(0)
+  for (dir in trait_dirs) {
+    filter_file <- file.path(dir, "GAPIT.Association.Filter_GWAS_results.csv")
+    if (!file.exists(filter_file)) {
+      incomplete <- c(incomplete, dir)
+    }
+  }
+  return(incomplete)
+}
+
 #' Read GAPIT Filter file and parse model information
 #'
 #' Reads GAPIT.Association.Filter_GWAS_results.csv which contains only
 #' significant SNPs with model information in the traits column.
 #' Format: "<MODEL>.<TraitName>" (e.g., "BLINK.root_length")
 #'
+#' Returns NULL if Filter file is missing (trait incomplete).
+#' Returns empty data.frame if Filter file exists but has no significant SNPs.
+#'
 #' @param trait_dir Path to trait result directory
-#' @param threshold Significance threshold (for fallback only)
-#' @return data.frame with columns including model and trait
+#' @param threshold Significance threshold (unused, kept for API compatibility)
+#' @return data.frame with columns including model, trait, and trait_dir, or NULL if incomplete
 read_filter_file <- function(trait_dir, threshold = 5e-8) {
   filter_file <- file.path(trait_dir, "GAPIT.Association.Filter_GWAS_results.csv")
 
+  # Missing Filter file = incomplete trait (fail-fast)
   if (!file.exists(filter_file)) {
-    # Fall back to reading GWAS_Results files
-    return(read_gwas_results_fallback(trait_dir, threshold))
+    return(NULL)
   }
 
   tryCatch({
@@ -179,6 +734,9 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
              sub("^[^.]+\\.", "", filter_data$traits))
     )
 
+    # Add trait_dir for provenance tracking
+    filter_data$trait_dir <- basename(trait_dir)
+
     # Validate model names (warn if unexpected, but continue)
     expected_models <- c("BLINK", "FarmCPU", "GLM", "MLM", "MLMM",
                          "FarmCPU.LM", "Blink.LM")
@@ -196,69 +754,8 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
   }, error = function(e) {
     cat("  Warning: Error reading Filter file for", basename(trait_dir), ":",
         e$message, "\n")
-    return(read_gwas_results_fallback(trait_dir, threshold))
+    return(NULL)
   })
-}
-
-#' Fallback to reading complete GWAS_Results files when Filter file unavailable
-#'
-#' @param trait_dir Path to trait result directory
-#' @param threshold Significance threshold for filtering
-#' @return data.frame with model and trait columns
-read_gwas_results_fallback <- function(trait_dir, threshold) {
-  cat("  Warning: Filter file missing for", basename(trait_dir),
-      "- using GWAS_Results fallback (slower)\n")
-
-  # Find GWAS_Results files
-  gwas_files <- list.files(trait_dir, pattern = "GAPIT.*GWAS_Results.*csv$",
-                          full.names = TRUE)
-
-  if (length(gwas_files) == 0) {
-    return(data.frame())
-  }
-
-  # Get trait name from metadata
-  meta_file <- file.path(trait_dir, "metadata.json")
-  trait_name <- if (file.exists(meta_file)) {
-    name <- tryCatch(fromJSON(meta_file)$trait$name, error = function(e) NULL)
-    if (is.null(name)) basename(trait_dir) else name
-  } else {
-    basename(trait_dir)
-  }
-
-  all_snps <- data.frame()
-
-  for (gwas_file in gwas_files) {
-    tryCatch({
-      gwas_data <- fread(gwas_file, data.table = FALSE)
-
-      if ("P.value" %in% colnames(gwas_data)) {
-        # Filter for significant SNPs
-        sig_snps <- gwas_data[gwas_data$P.value < threshold, ]
-
-        if (nrow(sig_snps) > 0) {
-          # Try to infer model from filename
-          # Pattern: GAPIT.Association.GWAS_Results.<MODEL>.<TraitName>.csv
-          filename <- basename(gwas_file)
-          model_match <- regmatches(filename,
-                                   regexpr("GWAS_Results\\.(\\w+)\\.", filename))
-          if (length(model_match) > 0) {
-            model <- sub("GWAS_Results\\.", "", sub("\\.$", "", model_match))
-          } else {
-            model <- "unknown"
-          }
-
-          sig_snps$model <- model
-          sig_snps$trait <- trait_name
-          all_snps <- rbind(all_snps, sig_snps)
-        }
-      }
-    }, error = function(e) {
-      cat("  Warning: Could not read", basename(gwas_file), "\n")
-    })
-  }
-
-  return(all_snps)
 }
 
 # ==============================================================================
@@ -280,19 +777,34 @@ trait_dirs <- select_best_trait_dirs(all_trait_dirs, expected_models)
 cat("After deduplication:", length(trait_dirs), "unique traits\n\n")
 
 # ==============================================================================
-# Collect metadata from all traits
+# Collect metadata from all traits (with provenance tracking)
 # ==============================================================================
 cat("Collecting metadata...\n")
 
 metadata_list <- list()
 success_count <- 0
 failed_count <- 0
+traits_with_metadata <- 0
+traits_missing_metadata <- 0
+traits_with_provenance <- 0
+
+# Track unique workflow UIDs for lineage
+workflow_uids <- character(0)
 
 for (dir in trait_dirs) {
   metadata_file <- file.path(dir, "metadata.json")
 
   if (file.exists(metadata_file)) {
+    traits_with_metadata <- traits_with_metadata + 1
     meta <- fromJSON(metadata_file)
+
+    # Track provenance info
+    if (!is.null(meta$argo) && !is.null(meta$argo$workflow_uid)) {
+      traits_with_provenance <- traits_with_provenance + 1
+      if (!(meta$argo$workflow_uid %in% workflow_uids)) {
+        workflow_uids <- c(workflow_uids, meta$argo$workflow_uid)
+      }
+    }
 
     if (!is.null(meta$execution$status) && meta$execution$status == "success") {
       metadata_list[[length(metadata_list) + 1]] <- meta
@@ -300,11 +812,19 @@ for (dir in trait_dirs) {
     } else {
       failed_count <- failed_count + 1
     }
+  } else {
+    traits_missing_metadata <- traits_missing_metadata + 1
   }
 }
 
 cat("  - Successful:", success_count, "\n")
-cat("  - Failed:", failed_count, "\n\n")
+cat("  - Failed:", failed_count, "\n")
+cat("  - With metadata:", traits_with_metadata, "\n")
+cat("  - With provenance:", traits_with_provenance, "\n")
+if (length(workflow_uids) > 0) {
+  cat("  - Unique workflow UIDs:", length(workflow_uids), "\n")
+}
+cat("\n")
 
 # ==============================================================================
 # Create summary dataframe
@@ -348,20 +868,59 @@ write.csv(summary_df, summary_file, row.names = FALSE)
 cat("Summary table saved:", summary_file, "\n\n")
 
 # ==============================================================================
+# Check trait completeness (Filter files present)
+# ==============================================================================
+cat("Checking trait completeness...\n")
+incomplete_traits <- check_trait_completeness(trait_dirs)
+
+if (length(incomplete_traits) > 0) {
+  cat("\nERROR:", length(incomplete_traits), "traits are incomplete (missing Filter file)\n")
+  cat("Incomplete traits:\n")
+  for (dir in incomplete_traits) {
+    cat("  -", basename(dir), "\n")
+  }
+  cat("\nRun retry-argo-traits.sh --output-dir", output_dir, "first,\n")
+  cat("or use --allow-incomplete to skip incomplete traits.\n\n")
+
+  if (!allow_incomplete) {
+    quit(status = 1)
+  }
+
+  cat("--allow-incomplete flag set: skipping incomplete traits\n\n")
+  # Filter out incomplete traits
+  trait_dirs <- setdiff(trait_dirs, incomplete_traits)
+  cat("Proceeding with", length(trait_dirs), "complete traits\n\n")
+} else {
+  cat("  - All", length(trait_dirs), "traits have Filter files\n\n")
+}
+
+# ==============================================================================
 # Collect significant SNPs using Filter files
 # ==============================================================================
 cat("Collecting significant SNPs...\n")
 cat("  - Reading Filter files (fast mode)\n")
 
-all_snps <- data.frame()
+# Collect dataframes in a list, then combine with bind_rows
+snps_list <- list()
+skipped_count <- 0
 
 for (dir in trait_dirs) {
   trait_snps <- read_filter_file(dir, threshold)
 
+  if (is.null(trait_snps)) {
+    # Should not happen after completeness check, but handle gracefully
+    cat("  WARNING: Skipping", basename(dir), "(missing Filter file)\n")
+    skipped_count <- skipped_count + 1
+    next
+  }
+
   if (nrow(trait_snps) > 0) {
-    all_snps <- rbind(all_snps, trait_snps)
+    snps_list[[length(snps_list) + 1]] <- trait_snps
   }
 }
+
+# Use bind_rows for robust combining (handles column differences gracefully)
+all_snps <- if (length(snps_list) > 0) bind_rows(snps_list) else data.frame()
 
 # Sort by P.value (most significant first)
 if (nrow(all_snps) > 0) {
@@ -405,21 +964,39 @@ if (nrow(all_snps) > 0) {
 cat("\n")
 
 # ==============================================================================
-# Generate summary statistics
+# Generate summary statistics (with provenance)
 # ==============================================================================
 cat("Generating summary statistics...\n")
 
 stats <- list(
   batch_id = batch_id,
-  collection_time = Sys.time(),
+  collection_time = format(Sys.time(), "%Y-%m-%d %H:%M:%S"),
   total_directories_found = length(all_trait_dirs),
   unique_traits = length(trait_dirs),
+  total_traits_attempted = length(trait_dirs) + length(incomplete_traits),
   successful_traits = success_count,
   failed_traits = failed_count,
   total_significant_snps = nrow(all_snps),
   average_duration_minutes = mean(summary_df$duration_minutes, na.rm = TRUE),
   total_duration_hours = sum(summary_df$duration_minutes, na.rm = TRUE) / 60,
-  expected_models = expected_models
+  expected_models = expected_models,
+  # Provenance section for traceability
+  provenance = list(
+    workflow_name = get_env_or_null("WORKFLOW_NAME"),
+    workflow_uid = get_env_or_null("WORKFLOW_UID"),
+    aggregation_timestamp = format(Sys.time(), "%Y-%m-%dT%H:%M:%SZ"),
+    aggregation_hostname = Sys.info()["nodename"],
+    aggregation_pod = get_env_or_null("POD_NAME"),
+    aggregation_node = get_env_or_null("NODE_NAME"),
+    container_image = get_env_or_null("CONTAINER_IMAGE"),
+    source_workflow_uids = if (length(workflow_uids) > 0) workflow_uids else NULL
+  ),
+  # Metadata coverage tracking
+  metadata_coverage = list(
+    traits_with_metadata = traits_with_metadata,
+    traits_missing_metadata = traits_missing_metadata,
+    traits_with_provenance = traits_with_provenance
+  )
 )
 
 # Add per-model statistics if model column exists
@@ -458,6 +1035,24 @@ write_json(stats, stats_file, pretty = TRUE, auto_unbox = TRUE)
 cat("Summary statistics saved:", stats_file, "\n\n")
 
 # ==============================================================================
+# Generate markdown summary report
+# ==============================================================================
+cat("Generating markdown summary report...\n")
+
+# Get first metadata for configuration details
+first_metadata <- if (length(metadata_list) > 0) metadata_list[[1]] else NULL
+
+generate_markdown_summary(
+  output_dir = file.path(output_dir, "aggregated_results"),
+  stats = stats,
+  summary_table = summary_df,
+  snps_df = all_snps,
+  metadata = first_metadata
+)
+
+cat("\n")
+
+# ==============================================================================
 # Print summary
 # ==============================================================================
 cat(strrep("=", 78), "\n")
@@ -468,7 +1063,11 @@ cat("Collection time:", format(Sys.time(), "%Y-%m-%d %H:%M:%S"), "\n\n")
 
 cat("Traits:\n")
 cat("  - Directories found:", length(all_trait_dirs), "\n")
-cat("  - Unique traits:", length(trait_dirs), "\n")
+cat("  - Unique traits:", length(trait_dirs) + length(incomplete_traits), "\n")
+cat("  - Complete:", length(trait_dirs), "\n")
+if (length(incomplete_traits) > 0) {
+  cat("  - Incomplete (skipped):", length(incomplete_traits), "\n")
+}
 cat("  - Successful:", success_count, "\n")
 cat("  - Failed:", failed_count, "\n\n")
 

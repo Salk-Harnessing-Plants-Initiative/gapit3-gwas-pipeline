@@ -8,10 +8,13 @@ metadata:
     stage: production
 spec:
   # ===========================================================================
-  # GAPIT3 GWAS - Full Parallel Pipeline (184 Traits)
+  # GAPIT3 GWAS - Full Parallel Pipeline (186 Traits)
   # ===========================================================================
-  # Production workflow: runs all 184 traits in parallel
-  # DAG structure: Validate → Extract → 184 parallel GWAS → Collect Results
+  # Production workflow: runs all 186 traits in parallel
+  # DAG structure: Validate → Extract → 186 parallel GWAS → Collect Results
+  #
+  # NOTE: Resource allocation (CPU, memory) is configured in WorkflowTemplate:
+  #   cluster/argo/workflow-templates/gapit3-single-trait-template.yaml
   # ===========================================================================
 
   entrypoint: parallel-pipeline
@@ -23,21 +26,17 @@ spec:
     - name: image
       value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data"
+      value: "/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
+      value: "/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
     - name: start-trait-index
       value: "2"      # First trait column (after Taxa)
     - name: end-trait-index
       value: "187"    # Last trait column (186 traits total)
-    - name: cpu-cores
-      value: "12"
-    - name: memory-gb
-      value: "32"
     - name: models
       value: "BLINK,FarmCPU,MLM"
-    - name: max-parallelism
-      value: "50"     # Limit concurrent jobs to avoid cluster overload
+    - name: snp-fdr
+      value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
 
   # Global timeout (7 days - effectively no limit, can terminate manually if needed)
   activeDeadlineSeconds: 604800
@@ -85,6 +84,8 @@ spec:
             value: "{{workflow.parameters.image}}"
           - name: models
             value: "{{workflow.parameters.models}}"
+          - name: snp-fdr
+            value: "{{workflow.parameters.snp-fdr}}"
         withSequence:
           start: "{{workflow.parameters.start-trait-index}}"
           end: "{{workflow.parameters.end-trait-index}}"
@@ -119,6 +120,8 @@ spec:
         value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
       - name: PHENOTYPE_FILE
         value: "/data/phenotype/iron_traits_edited.txt"
+      - name: ACCESSION_IDS_FILE
+        value: "/data/metadata/ids_gwas.txt"
 
       volumeMounts:
       - name: nfs-data

@@ -59,6 +59,8 @@ spec:
           value: "BLINK,FarmCPU"
         - name: PCA_COMPONENTS
           value: "3"
+        - name: SNP_FDR
+          value: "{{ SNP_FDR }}"  # Optional: FDR threshold (0.0-1.0), empty to disable
         - name: OUTPUT_PATH
           value: "/outputs"
 

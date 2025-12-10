@@ -15,20 +15,27 @@ Run GWAS analysis on a single trait (trait index 2):
 ```bash
 runai workspace submit gapit3-trait-2-test \
   --project talmo-lab \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
+  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
   --cpu-core-request 12 \
   --cpu-memory-request 32G \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
+  --environment TRAIT_INDEX=2 \
+  --environment DATA_PATH=/data \
+  --environment OUTPUT_PATH=/outputs \
+  --environment GENOTYPE_FILE=/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt \
+  --environment PHENOTYPE_FILE=/data/phenotype/iron_traits_edited.txt \
+  --environment MODELS=BLINK,FarmCPU \
+  --environment PCA_COMPONENTS=3 \
+  --environment SNP_THRESHOLD=0.00000001 \
+  --environment SNP_FDR=0.05 \
+  --environment MAF_FILTER=0.05 \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
-  --command -- /scripts/entrypoint.sh run-single-trait \
-    --trait-index 2 \
-    --config /config/config.yaml \
-    --output-dir /outputs \
-    --models BLINK,FarmCPU \
-    --threads 12
+  --command -- /scripts/entrypoint.sh run-single-trait
 ```
+
+> **Note**: The `SNP_FDR` parameter enables Benjamini-Hochberg FDR correction for multiple testing. Set to a value between 0.0 and 1.0 (e.g., 0.05 for 5% FDR). Omit this parameter to disable FDR filtering.
 
 **Monitor the workspace**:
 ```bash
@@ -78,19 +85,24 @@ Test with one trait before running all traits:
 ```bash
 runai workspace submit gapit3-trait-2-test \
   --project talmo-lab \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
+  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
   --cpu-core-request 12 \
   --cpu-memory-request 32G \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
+  --environment TRAIT_INDEX=2 \
+  --environment DATA_PATH=/data \
+  --environment OUTPUT_PATH=/outputs \
+  --environment GENOTYPE_FILE=/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt \
+  --environment PHENOTYPE_FILE=/data/phenotype/iron_traits_edited.txt \
+  --environment MODELS=BLINK,FarmCPU \
+  --environment PCA_COMPONENTS=3 \
+  --environment SNP_THRESHOLD=0.00000001 \
+  --environment SNP_FDR=0.05 \
+  --environment MAF_FILTER=0.05 \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
-  --command -- /scripts/entrypoint.sh run-single-trait \
-    --trait-index 2 \
-    --config /config/config.yaml \
-    --output-dir /outputs \
-    --models BLINK,FarmCPU \
-    --threads 12
+  --command -- /scripts/entrypoint.sh run-single-trait
 ```
 
 **Monitor**:
@@ -122,47 +134,33 @@ Once the single trait test succeeds, you can run multiple traits. You have two o
 
 #### Option A: Submit Multiple Jobs Manually
 
-Run 3 test traits in parallel:
+Run 3 test traits in parallel. For simplicity, use the helper script in Option B below.
+
+If you prefer manual submission, use the same pattern as the Quick Start example, changing `TRAIT_INDEX` for each trait:
 
 ```bash
-# Trait 2
+# Example: Trait 2 (see Quick Start for full command)
 runai workspace submit gapit3-trait-2 \
   --project talmo-lab \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
+  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
   --cpu-core-request 12 --cpu-memory-request 32G \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
   --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
+  --environment TRAIT_INDEX=2 \
+  --environment DATA_PATH=/data \
+  --environment OUTPUT_PATH=/outputs \
+  --environment GENOTYPE_FILE=/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt \
+  --environment PHENOTYPE_FILE=/data/phenotype/iron_traits_edited.txt \
+  --environment MODELS=BLINK,FarmCPU \
+  --environment PCA_COMPONENTS=3 \
+  --environment SNP_THRESHOLD=0.00000001 \
+  --environment SNP_FDR=0.05 \
+  --environment MAF_FILTER=0.05 \
   --environment OPENBLAS_NUM_THREADS=12 \
   --environment OMP_NUM_THREADS=12 \
-  --command -- /scripts/entrypoint.sh run-single-trait \
-    --trait-index 2 --config /config/config.yaml --output-dir /outputs \
-    --models BLINK,FarmCPU --threads 12
+  --command -- /scripts/entrypoint.sh run-single-trait
 
-# Trait 3
-runai workspace submit gapit3-trait-3 \
-  --project talmo-lab \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu-core-request 12 --cpu-memory-request 32G \
-  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
-  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
-  --environment OPENBLAS_NUM_THREADS=12 \
-  --environment OMP_NUM_THREADS=12 \
-  --command -- /scripts/entrypoint.sh run-single-trait \
-    --trait-index 3 --config /config/config.yaml --output-dir /outputs \
-    --models BLINK,FarmCPU --threads 12
-
-# Trait 4
-runai workspace submit gapit3-trait-4 \
-  --project talmo-lab \
-  --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test \
-  --cpu-core-request 12 --cpu-memory-request 32G \
-  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data,mount=/data,mount-propagation=HostToContainer \
-  --host-path path=/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs,mount=/outputs,mount-propagation=HostToContainer,readwrite \
-  --environment OPENBLAS_NUM_THREADS=12 \
-  --environment OMP_NUM_THREADS=12 \
-  --command -- /scripts/entrypoint.sh run-single-trait \
-    --trait-index 4 --config /config/config.yaml --output-dir /outputs \
-    --models BLINK,FarmCPU --threads 12
+# Repeat for traits 3, 4, etc. changing TRAIT_INDEX
 ```
 
 **Monitor all jobs**:
@@ -170,66 +168,25 @@ runai workspace submit gapit3-trait-4 \
 runai workspace list -p talmo-lab | grep gapit3-trait
 ```
 
-#### Option B: Use a Bash Script to Submit All Traits
+#### Option B: Use the Production Script
 
-Create a script to submit all 186 traits:
+Use the production script `scripts/submit-all-traits-runai.sh` which handles all environment variables correctly:
 
 ```bash
-#!/bin/bash
-# File: scripts/submit-all-traits.sh
+# Submit all traits (defaults to traits 2-187)
+./scripts/submit-all-traits-runai.sh \
+  --data-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data \
+  --output-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs
 
-PROJECT="talmo-lab"
-IMAGE="ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
-DATA_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
-OUTPUT_PATH="/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
-START_TRAIT=2
-END_TRAIT=187
-MAX_CONCURRENT=50  # Limit to avoid overwhelming cluster
-
-echo "Submitting GWAS jobs for traits $START_TRAIT to $END_TRAIT"
-echo "Maximum concurrent jobs: $MAX_CONCURRENT"
-
-for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
-  # Check number of running jobs
-  RUNNING=$(runai workspace list -p $PROJECT | grep -c "Running")
-
-  # Wait if at max concurrency
-  while [ $RUNNING -ge $MAX_CONCURRENT ]; do
-    echo "Waiting... ($RUNNING jobs running)"
-    sleep 30
-    RUNNING=$(runai workspace list -p $PROJECT | grep -c "Running")
-  done
-
-  # Submit job
-  echo "Submitting trait $trait_idx..."
-  runai workspace submit gapit3-trait-$trait_idx \
-    --project $PROJECT \
-    --image $IMAGE \
-    --cpu-core-request 12 \
-    --cpu-memory-request 32G \
-    --host-path path=$DATA_PATH,mount=/data,mount-propagation=HostToContainer \
-    --host-path path=$OUTPUT_PATH,mount=/outputs,mount-propagation=HostToContainer,readwrite \
-    --environment OPENBLAS_NUM_THREADS=12 \
-    --environment OMP_NUM_THREADS=12 \
-    --command -- /scripts/entrypoint.sh run-single-trait \
-      --trait-index $trait_idx \
-      --config /config/config.yaml \
-      --output-dir /outputs \
-      --models BLINK,FarmCPU \
-      --threads 12
-
-  # Small delay to avoid API rate limits
-  sleep 2
-done
-
-echo "All jobs submitted!"
+# Or submit specific trait range
+./scripts/submit-all-traits-runai.sh \
+  --start-trait 2 \
+  --end-trait 10 \
+  --data-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data \
+  --output-path /hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs
 ```
 
-Make it executable and run:
-```bash
-chmod +x scripts/submit-all-traits.sh
-./scripts/submit-all-traits.sh
-```
+See `./scripts/submit-all-traits-runai.sh --help` for all options including SNP_FDR support.
 
 ## Monitoring Jobs
 

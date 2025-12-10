@@ -48,7 +48,7 @@ Usage:
 
 Commands:
   test              Submit test workflow (3 traits)
-  full              Submit full production workflow (184 traits)
+  full              Submit full production workflow (186 traits)
   templates         Install WorkflowTemplates to cluster
   list              List running workflows
   help              Show this help message
@@ -58,10 +58,11 @@ Options:
   --image IMAGE             Container image [default: latest]
   --data-path PATH          Host path for data [required]
   --output-path PATH        Host path for outputs [required]
-  --cpu CORES               CPU cores per job [default: 12]
-  --memory GB               Memory in GB per job [default: 32]
-  --max-parallel N          Max concurrent jobs [default: 50]
   --dry-run                 Print workflow without submitting
+
+Note: CPU/memory resources are configured in WorkflowTemplate, not via CLI flags.
+      Edit: workflow-templates/gapit3-single-trait-template.yaml
+      Parallelism is set via spec.parallelism in workflow YAML files.
 
 Environment Variables:
   ARGO_NAMESPACE            Argo namespace
@@ -81,8 +82,7 @@ Examples:
   # Run full pipeline
   ./submit_workflow.sh full \\
     --data-path /path/to/data \\
-    --output-path /path/to/outputs \\
-    --max-parallel 30
+    --output-path /path/to/outputs
 
   # Dry run
   ./submit_workflow.sh test --dry-run
@@ -171,9 +171,6 @@ submit_workflow() {
     shift  # Remove first argument
 
     # Parse additional options
-    local cpu_cores=12
-    local memory_gb=32
-    local max_parallel=50
     local dry_run=false
 
     while [[ $# -gt 0 ]]; do
@@ -192,18 +189,6 @@ submit_workflow() {
                 ;;
             --output-path)
                 OUTPUT_PATH="$2"
-                shift 2
-                ;;
-            --cpu)
-                cpu_cores="$2"
-                shift 2
-                ;;
-            --memory)
-                memory_gb="$2"
-                shift 2
-                ;;
-            --max-parallel)
-                max_parallel="$2"
                 shift 2
                 ;;
             --dry-run)
@@ -259,12 +244,10 @@ Paths:
   Data:            $DATA_PATH
   Outputs:         $OUTPUT_PATH
 
-Resources per job:
-  CPU:             $cpu_cores cores
-  Memory:          ${memory_gb}Gi
-
-Parallelism:       $max_parallel concurrent jobs
 Dry Run:           $dry_run
+
+Note: Resources (CPU/memory) are configured in WorkflowTemplate YAML.
+      Parallelism is configured via spec.parallelism in workflow YAML.
 ================================================================================
 
 EOF
@@ -275,14 +258,7 @@ EOF
         --parameter image=$IMAGE \\
         --parameter data-hostpath=$DATA_PATH \\
         --parameter output-hostpath=$OUTPUT_PATH \\
-        --parameter cpu-cores=$cpu_cores \\
-        --parameter memory-gb=$memory_gb \\
         --watch"
-
-    # Add max-parallelism for full workflow
-    if [[ "$workflow_type" == "full" ]]; then
-        ARGO_CMD="$ARGO_CMD --parameter max-parallelism=$max_parallel"
-    fi
 
     # Dry run or execute
     if [[ "$dry_run" == "true" ]]; then

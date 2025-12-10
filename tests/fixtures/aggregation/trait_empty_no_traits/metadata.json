@@ -1,7 +1,57 @@
 {
-  "trait_name": "test_empty_no_traits",
-  "description": "Test fixture for empty Filter file without traits column",
-  "expected_significant_snps": 0,
-  "models": [],
-  "notes": "This represents a GAPIT run that found no significant SNPs"
+  "schema_version": "2.0.0",
+  "execution": {
+    "trait_index": 5,
+    "start_time": "2025-01-01T13:00:00Z",
+    "end_time": "2025-01-01T13:15:00Z",
+    "duration_minutes": 15.0,
+    "status": "success",
+    "hostname": "test-node-05",
+    "r_version": "R version 4.4.1 (2024-06-14)",
+    "gapit_version": "3.0"
+  },
+  "argo": {
+    "workflow_name": "gapit3-gwas-test-abc123",
+    "workflow_uid": "test-uid-001-0000-0000-000000000001",
+    "namespace": "runai-talmo-lab",
+    "pod_name": "gapit3-gwas-test-abc123-run-all-traits-xyz005",
+    "node_name": "gpu-node-05",
+    "retry_attempt": 0,
+    "max_retries": 5
+  },
+  "container": {
+    "image": "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-test123"
+  },
+  "inputs": {
+    "genotype_file": "/data/genotype/test_snps.hmp.txt",
+    "genotype_md5": "abc123def456abc123def456abc12345",
+    "phenotype_file": "/data/phenotype/test_traits.txt",
+    "phenotype_md5": "def456abc123def456abc123def45678",
+    "ids_file": null,
+    "ids_md5": null
+  },
+  "parameters": {
+    "models": ["BLINK"],
+    "pca_components": 3,
+    "multiple_analysis": true,
+    "maf_filter": 0.05,
+    "snp_fdr": null,
+    "openblas_threads": 12,
+    "omp_threads": 12
+  },
+  "trait": {
+    "name": "test_empty_no_traits",
+    "column_index": 6,
+    "n_total": 500,
+    "n_valid": 500,
+    "n_missing": 0
+  },
+  "genotype": {
+    "n_snps": 1400000,
+    "n_accessions": 500,
+    "load_time_seconds": 44.8
+  },
+  "resources": {
+    "threads": "12"
+  }
 }

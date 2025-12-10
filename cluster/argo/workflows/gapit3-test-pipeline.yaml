@@ -10,8 +10,11 @@ spec:
   # ===========================================================================
   # GAPIT3 GWAS - Test Pipeline (3 Traits)
   # ===========================================================================
-  # Test workflow for validating pipeline before running all 184 traits
+  # Test workflow for validating pipeline before running all 186 traits
   # Runs 3 traits in parallel: indices 2, 3, 4
+  #
+  # NOTE: Resource allocation (CPU, memory) is configured in WorkflowTemplate:
+  #   cluster/argo/workflow-templates/gapit3-single-trait-template.yaml
   # ===========================================================================
 
   entrypoint: test-pipeline
@@ -26,10 +29,8 @@ spec:
       value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
     - name: output-hostpath
       value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
-    - name: cpu-cores
-      value: "12"
-    - name: memory-gb
-      value: "32"
+    - name: snp-fdr
+      value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
 
   # Global timeout
   activeDeadlineSeconds: 14400  # 4 hours max
@@ -77,6 +78,8 @@ spec:
             value: "{{workflow.parameters.image}}"
           - name: models
             value: "BLINK,FarmCPU,MLM"
+          - name: snp-fdr
+            value: "{{workflow.parameters.snp-fdr}}"
 
       - name: run-trait-3
         dependencies: [extract-traits]
@@ -93,6 +96,8 @@ spec:
             value: "{{workflow.parameters.image}}"
           - name: models
             value: "BLINK,FarmCPU,MLM"
+          - name: snp-fdr
+            value: "{{workflow.parameters.snp-fdr}}"
 
       - name: run-trait-4
         dependencies: [extract-traits]
@@ -109,6 +114,8 @@ spec:
             value: "{{workflow.parameters.image}}"
           - name: models
             value: "BLINK,FarmCPU,MLM"
+          - name: snp-fdr
+            value: "{{workflow.parameters.snp-fdr}}"
 
   # ===========================================================================
   # Template: Validation

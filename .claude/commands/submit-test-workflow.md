@@ -143,17 +143,22 @@ kubectl auth can-i create workflows
 ./scripts/check-argo-permissions.sh
 ```
 
-## RunAI Alternative (Current Workaround)
+## RunAI Alternative
 
-If Argo permissions pending, use RunAI:
+For RunAI-based submission (alternative to Argo):
+
 ```bash
 ./scripts/submit-all-traits-runai.sh --traits "2 3 4" --data-path /your/path/data
 ```
+
+Or use the `/submit-runai-test` Claude command for guided single-trait submission.
 
 See [docs/MANUAL_RUNAI_EXECUTION.md](../../docs/MANUAL_RUNAI_EXECUTION.md) for details.
 
 ## Related Commands
 
+- `/submit-runai-test` - Submit test job via RunAI
+- `/validate-data` - Validate data before submission
 - `/monitor-jobs` - Monitor workflow progress
 - `/validate-yaml` - Validate workflow before submission
 - `/cleanup-jobs` - Clean up completed workflows

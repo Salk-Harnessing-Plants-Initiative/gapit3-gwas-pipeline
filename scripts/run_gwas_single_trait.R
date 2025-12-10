@@ -17,7 +17,45 @@ suppressPackageStartupMessages({
   library(gridExtra)
   library(optparse)
   library(jsonlite)
+  library(tools)  # For md5sum
 })
+
+# ==============================================================================
+# Helper functions
+# ==============================================================================
+
+#' Get environment variable with NULL fallback for empty strings
+#' @param name Environment variable name
+#' @param default Default value if not set or empty
+#' @return The value or NULL if empty/unset
+get_env_or_null <- function(name, default = NULL) {
+  value <- Sys.getenv(name, "")
+  if (value == "" || value == "null" || value == "NULL") {
+    return(default)
+  }
+  return(value)
+}
+
+#' Compute MD5 checksum for a file
+#' @param file_path Path to file
+#' @return MD5 hash string or NULL if file doesn't exist or checksums disabled
+compute_file_md5 <- function(file_path) {
+  # Check if checksums are disabled
+  if (toupper(Sys.getenv("SKIP_INPUT_CHECKSUMS", "false")) == "TRUE") {
+    return(NULL)
+  }
+
+  if (is.null(file_path) || !file.exists(file_path)) {
+    return(NULL)
+  }
+
+  tryCatch({
+    md5sum(file_path)[[1]]
+  }, error = function(e) {
+    cat("  Warning: Could not compute MD5 for", file_path, ":", e$message, "\n")
+    return(NULL)
+  })
+}
 
 # ==============================================================================
 # Parse command line arguments and environment variables
@@ -120,9 +158,28 @@ cat("PCA components:", pca_components, "\n")
 cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
-# Metadata tracking
+# Metadata tracking (schema v2.0.0 with provenance)
 # ==============================================================================
+
+# Compute input file checksums (if enabled)
+cat("Computing input file checksums...\n")
+genotype_md5 <- compute_file_md5(genotype_file)
+phenotype_md5 <- compute_file_md5(phenotype_file)
+ids_md5 <- if (!is.null(ids_file) && ids_file != "") compute_file_md5(ids_file) else NULL
+
+if (toupper(Sys.getenv("SKIP_INPUT_CHECKSUMS", "false")) == "TRUE") {
+  cat("  - Checksums disabled (SKIP_INPUT_CHECKSUMS=true)\n")
+} else {
+  cat("  - Genotype MD5:", ifelse(is.null(genotype_md5), "N/A", genotype_md5), "\n")
+  cat("  - Phenotype MD5:", ifelse(is.null(phenotype_md5), "N/A", phenotype_md5), "\n")
+}
+
+# Parse retry attempt (Argo provides as string, may be empty for first attempt)
+retry_attempt_str <- get_env_or_null("RETRY_ATTEMPT")
+retry_attempt <- if (!is.null(retry_attempt_str)) as.integer(retry_attempt_str) else NULL
+
 metadata <- list(
+  schema_version = "2.0.0",
   execution = list(
     trait_index = trait_index,
     start_time = Sys.time(),
@@ -130,17 +187,34 @@ metadata <- list(
     r_version = R.version.string,
     gapit_version = as.character(packageVersion("GAPIT"))
   ),
+  argo = list(
+    workflow_name = get_env_or_null("WORKFLOW_NAME"),
+    workflow_uid = get_env_or_null("WORKFLOW_UID"),
+    namespace = get_env_or_null("WORKFLOW_NAMESPACE"),
+    pod_name = get_env_or_null("POD_NAME"),
+    node_name = get_env_or_null("NODE_NAME"),
+    retry_attempt = retry_attempt,
+    max_retries = 5  # Default from workflow template
+  ),
+  container = list(
+    image = get_env_or_null("CONTAINER_IMAGE")
+  ),
   inputs = list(
     genotype_file = genotype_file,
+    genotype_md5 = genotype_md5,
     phenotype_file = phenotype_file,
-    ids_file = ids_file
+    phenotype_md5 = phenotype_md5,
+    ids_file = if (ids_file != "") ids_file else NULL,
+    ids_md5 = ids_md5
   ),
   parameters = list(
     models = models,
     pca_components = pca_components,
     multiple_analysis = multiple_analysis,
     maf_filter = opt$maf,
-    snp_fdr = opt$`snp-fdr`
+    snp_fdr = opt$`snp-fdr`,
+    openblas_threads = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
+    omp_threads = as.integer(Sys.getenv("OMP_NUM_THREADS", "12"))
   ),
   resources = list(
     threads = Sys.getenv("OPENBLAS_NUM_THREADS")

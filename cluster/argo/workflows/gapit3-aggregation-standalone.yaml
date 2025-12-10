@@ -1,0 +1,59 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: gapit3-aggregate-  # Argo appends unique suffix
+  namespace: runai-talmo-lab
+  labels:
+    pipeline: gapit3-gwas
+    stage: aggregation
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Standalone Aggregation Workflow
+  # ===========================================================================
+  # Run results aggregation independently (e.g., after retry workflows complete)
+  # Uses the gapit3-results-collector WorkflowTemplate
+  #
+  # Usage:
+  #   argo submit cluster/argo/workflows/gapit3-aggregation-standalone.yaml \
+  #     -p output-hostpath="/hpi/hpi_dev/users/USERNAME/PROJECT/outputs" \
+  #     -p batch-id="gapit3-gwas-parallel-XXXXX" \
+  #     -n runai-talmo-lab
+  # ===========================================================================
+
+  entrypoint: run-aggregation
+  serviceAccountName: default
+
+  # Workflow-level parameters
+  arguments:
+    parameters:
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
+    - name: output-hostpath
+      value: "/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
+    - name: batch-id
+      value: "gapit3-gwas-parallel-6hjx8"  # Override with -p batch-id="..."
+
+  # Workflow-level volumes
+  volumes:
+  - name: nfs-outputs
+    hostPath:
+      path: "{{workflow.parameters.output-hostpath}}"
+      type: Directory
+
+  templates:
+  # ===========================================================================
+  # Main template: run aggregation via WorkflowTemplate
+  # ===========================================================================
+  - name: run-aggregation
+    dag:
+      tasks:
+      - name: collect-results
+        templateRef:
+          name: gapit3-results-collector
+          template: collect-results
+        arguments:
+          parameters:
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: batch-id
+            value: "{{workflow.parameters.batch-id}}"

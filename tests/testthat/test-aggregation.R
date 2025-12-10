@@ -24,17 +24,27 @@ source_aggregation_functions <- function() {
   select_end <- grep("^}", script_lines)
   select_end <- select_end[select_end > select_start][1]
 
-  # Find read_filter_file and read_gwas_results_fallback functions
+  # Find check_trait_completeness function
+  check_start <- grep("^check_trait_completeness <- function", script_lines)[1]
+  check_end <- grep("^}", script_lines)
+  check_end <- check_end[check_end > check_start][1]
+
+  # Find read_filter_file function (no longer has fallback)
   read_filter_start <- grep("^read_filter_file <- function", script_lines)[1]
-  fallback_end <- grep("^}", script_lines)
-  fallback_end <- fallback_end[fallback_end > read_filter_start][2]
+  read_filter_end <- grep("^}", script_lines)
+  read_filter_end <- read_filter_end[read_filter_end > read_filter_start][1]
 
   # Extract and evaluate function definitions
   select_code <- paste(script_lines[select_start:select_end], collapse = "\n")
-  functions_code <- paste(script_lines[read_filter_start:fallback_end], collapse = "\n")
-
   eval(parse(text = select_code), envir = .GlobalEnv)
-  eval(parse(text = functions_code), envir = .GlobalEnv)
+
+  if (!is.na(check_start)) {
+    check_code <- paste(script_lines[check_start:check_end], collapse = "\n")
+    eval(parse(text = check_code), envir = .GlobalEnv)
+  }
+
+  filter_code <- paste(script_lines[read_filter_start:read_filter_end], collapse = "\n")
+  eval(parse(text = filter_code), envir = .GlobalEnv)
 }
 
 # Source the functions for testing
@@ -97,18 +107,116 @@ test_that("read_filter_file correctly parses trait names with periods", {
 })
 
 # ==============================================================================
-# Test: read_filter_file() falls back to GWAS_Results when Filter missing
+# Test: read_filter_file() returns NULL when Filter file missing (fail-fast)
 # ==============================================================================
-test_that("read_filter_file falls back to GWAS_Results when Filter file missing", {
+test_that("read_filter_file returns NULL when Filter file missing", {
   fixture_dir <- get_fixture_path(file.path("aggregation", "trait_004_no_filter"))
 
-  # Note: read_gwas_results_fallback uses cat() for warnings, not warning()
-  # So we can't use expect_warning() here. Just verify the fallback works.
+  # With fail-fast behavior, missing Filter file returns NULL (not fallback data)
   result <- read_filter_file(fixture_dir, threshold = 5e-8)
 
-  expect_s3_class(result, "data.frame")
-  expect_true("model" %in% colnames(result))
-  expect_true("trait" %in% colnames(result))
+  expect_null(result)
+})
+
+# ==============================================================================
+# Test: check_trait_completeness() detects incomplete traits
+# ==============================================================================
+test_that("check_trait_completeness detects incomplete traits", {
+  temp_output <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_output))
+
+  fixture_base <- get_fixture_path("aggregation")
+
+  # Copy complete traits (have Filter file)
+  for (trait_dir in c("trait_001_single_model", "trait_002_multi_model")) {
+    src_dir <- file.path(fixture_base, trait_dir)
+    dest_dir <- file.path(temp_output, trait_dir)
+    dir.create(dest_dir, recursive = TRUE)
+    for (file in list.files(src_dir, full.names = TRUE)) {
+      file.copy(file, dest_dir)
+    }
+  }
+
+  # Copy incomplete trait (no Filter file)
+  src_dir <- file.path(fixture_base, "trait_004_no_filter")
+  dest_dir <- file.path(temp_output, "trait_004_no_filter")
+  dir.create(dest_dir, recursive = TRUE)
+  for (file in list.files(src_dir, full.names = TRUE)) {
+    file.copy(file, dest_dir)
+  }
+
+  trait_dirs <- list.files(temp_output, pattern = "trait_", full.names = TRUE)
+  incomplete <- check_trait_completeness(trait_dirs)
+
+  expect_equal(length(incomplete), 1)
+  expect_true(grepl("trait_004_no_filter", incomplete[1]))
+})
+
+# ==============================================================================
+# Test: Aggregation fails by default when incomplete traits found
+# ==============================================================================
+test_that("aggregation workflow fails when incomplete traits present", {
+  temp_output <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_output))
+
+  fixture_base <- get_fixture_path("aggregation")
+
+  # Copy one complete and one incomplete trait
+  for (trait_dir in c("trait_001_single_model", "trait_004_no_filter")) {
+    src_dir <- file.path(fixture_base, trait_dir)
+    dest_dir <- file.path(temp_output, trait_dir)
+    dir.create(dest_dir, recursive = TRUE)
+    for (file in list.files(src_dir, full.names = TRUE)) {
+      file.copy(file, dest_dir)
+    }
+  }
+
+  trait_dirs <- list.files(temp_output, pattern = "trait_", full.names = TRUE)
+  incomplete <- check_trait_completeness(trait_dirs)
+
+  # Should detect 1 incomplete trait
+  expect_equal(length(incomplete), 1)
+
+  # Aggregation should not proceed without --allow-incomplete
+  # (We test this by checking incomplete list is not empty)
+  expect_gt(length(incomplete), 0)
+})
+
+# ==============================================================================
+# Test: Aggregation succeeds when all traits complete
+# ==============================================================================
+test_that("aggregation succeeds when all traits have Filter files", {
+  temp_output <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_output))
+
+  fixture_base <- get_fixture_path("aggregation")
+
+  # Copy only complete traits
+  for (trait_dir in c("trait_001_single_model", "trait_002_multi_model", "trait_003_period_in_name")) {
+    src_dir <- file.path(fixture_base, trait_dir)
+    dest_dir <- file.path(temp_output, trait_dir)
+    dir.create(dest_dir, recursive = TRUE)
+    for (file in list.files(src_dir, full.names = TRUE)) {
+      file.copy(file, dest_dir)
+    }
+  }
+
+  trait_dirs <- list.files(temp_output, pattern = "trait_", full.names = TRUE)
+  incomplete <- check_trait_completeness(trait_dirs)
+
+  # Should detect no incomplete traits
+  expect_equal(length(incomplete), 0)
+
+  # Aggregation should proceed
+  all_snps <- data.frame()
+  for (dir in trait_dirs) {
+    trait_snps <- read_filter_file(dir, threshold = 5e-8)
+    if (!is.null(trait_snps) && nrow(trait_snps) > 0) {
+      all_snps <- rbind(all_snps, trait_snps)
+    }
+  }
+
+  expect_gt(nrow(all_snps), 0)
 })
 
 # ==============================================================================

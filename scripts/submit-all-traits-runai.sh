@@ -85,6 +85,7 @@ MEMORY="${MEMORY:-32G}"
 MODELS="${MODELS:-BLINK,FarmCPU}"
 PCA_COMPONENTS="${PCA_COMPONENTS:-3}"
 SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"
+SNP_FDR="${SNP_FDR:-}"  # Empty default = disabled, set to 0.05 for FDR-controlled analysis
 MAF_FILTER="${MAF_FILTER:-0.05}"
 MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"
 
@@ -110,6 +111,7 @@ echo "GAPIT Parameters (passed as ENV to container):"
 echo "  Models:            $MODELS"
 echo "  PCA Components:    $PCA_COMPONENTS"
 echo "  SNP Threshold:     $SNP_THRESHOLD"
+echo "  SNP FDR:           ${SNP_FDR:-<disabled>}"
 echo "  MAF Filter:        $MAF_FILTER"
 echo "  Multiple Analysis: $MULTIPLE_ANALYSIS"
 echo ""
@@ -239,6 +241,12 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
     # Capture output for debugging (disable error trap temporarily)
     trap - ERR
     set +e
+    # Build SNP_FDR flag conditionally (only include if set)
+    SNP_FDR_FLAG=""
+    if [ -n "$SNP_FDR" ]; then
+        SNP_FDR_FLAG="--environment SNP_FDR=$SNP_FDR"
+    fi
+
     SUBMIT_OUTPUT=$(runai workspace submit $JOB_NAME \
         --project $PROJECT \
         --image $IMAGE \
@@ -255,6 +263,7 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
         --environment MODELS=$MODELS \
         --environment PCA_COMPONENTS=$PCA_COMPONENTS \
         --environment SNP_THRESHOLD=$SNP_THRESHOLD \
+        $SNP_FDR_FLAG \
         --environment MAF_FILTER=$MAF_FILTER \
         --environment MULTIPLE_ANALYSIS=$MULTIPLE_ANALYSIS \
         --environment OPENBLAS_NUM_THREADS=$CPU \
