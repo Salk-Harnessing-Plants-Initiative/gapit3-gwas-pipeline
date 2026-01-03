@@ -179,7 +179,7 @@ retry_attempt_str <- get_env_or_null("RETRY_ATTEMPT")
 retry_attempt <- if (!is.null(retry_attempt_str)) as.integer(retry_attempt_str) else NULL
 
 metadata <- list(
-  schema_version = "2.0.0",
+  schema_version = "3.0.0",
   execution = list(
     trait_index = trait_index,
     start_time = Sys.time(),
@@ -208,13 +208,25 @@ metadata <- list(
     ids_md5 = ids_md5
   ),
   parameters = list(
+    # GAPIT parameters using native GAPIT naming convention (v3.0.0)
+    gapit = list(
+      model = models,
+      PCA.total = pca_components,
+      Multiple_analysis = multiple_analysis,
+      SNP.MAF = opt$maf,
+      SNP.FDR = opt$`snp-fdr`
+    ),
+    # Compute resources
+    compute = list(
+      openblas_threads = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
+      omp_threads = as.integer(Sys.getenv("OMP_NUM_THREADS", "12"))
+    ),
+    # Legacy parameter names for backward compatibility (v2.0.0)
     models = models,
     pca_components = pca_components,
     multiple_analysis = multiple_analysis,
     maf_filter = opt$maf,
-    snp_fdr = opt$`snp-fdr`,
-    openblas_threads = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
-    omp_threads = as.integer(Sys.getenv("OMP_NUM_THREADS", "12"))
+    snp_fdr = opt$`snp-fdr`
   ),
   resources = list(
     threads = Sys.getenv("OPENBLAS_NUM_THREADS")
@@ -300,10 +312,11 @@ tryCatch({
     Multiple_analysis = multiple_analysis
   )
 
-  # Add MAF.Threshold if specified (fixes bug where MAF_FILTER was tracked but not passed)
+  # Add SNP.MAF if specified (GAPIT's native parameter name for MAF filtering)
+  # Note: Previous versions incorrectly used MAF.Threshold which is not a valid GAPIT parameter
   if (!is.null(opt$maf) && opt$maf > 0) {
-    cat("Applying MAF threshold:", opt$maf, "\n")
-    gapit_args$MAF.Threshold <- opt$maf
+    cat("Applying SNP.MAF threshold:", opt$maf, "\n")
+    gapit_args$SNP.MAF <- opt$maf
   }
 
   # Add SNP.FDR if specified

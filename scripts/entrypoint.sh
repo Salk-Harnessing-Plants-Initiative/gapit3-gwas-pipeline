@@ -27,22 +27,38 @@ GENOTYPE_FILE="${GENOTYPE_FILE:-${DATA_PATH}/genotype/all_chromosomes_binary.hmp
 PHENOTYPE_FILE="${PHENOTYPE_FILE:-${DATA_PATH}/phenotype/traits.txt}"
 ACCESSION_IDS_FILE="${ACCESSION_IDS_FILE:-${DATA_PATH}/phenotype/accession_ids.txt}"
 
-# GAPIT Analysis Parameters
-MODELS="${MODELS:-BLINK,FarmCPU}"
-PCA_COMPONENTS="${PCA_COMPONENTS:-3}"
-SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"
-MAF_FILTER="${MAF_FILTER:-0.05}"
-MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"
-SNP_FDR="${SNP_FDR:-}"  # FDR threshold (e.g., 0.05); empty = disabled
+# ==============================================================================
+# GAPIT Analysis Parameters (v3.0.0 naming convention)
+# ==============================================================================
+# Parameter names match GAPIT's native naming (dots replaced with underscores)
+# Legacy names (MODELS, PCA_COMPONENTS, MAF_FILTER) are supported with warnings
+
+# Core GAPIT Parameters (Tier 1)
+MODEL="${MODEL:-BLINK,FarmCPU}"           # GAPIT: model (comma-separated for multiple)
+PCA_TOTAL="${PCA_TOTAL:-3}"               # GAPIT: PCA.total
+MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"  # GAPIT: Multiple_analysis
+
+# SNP Filtering Parameters
+SNP_MAF="${SNP_MAF:-0.05}"                # GAPIT: SNP.MAF (0 = no filtering)
+SNP_FDR="${SNP_FDR:-}"                    # GAPIT: SNP.FDR (empty = disabled)
+SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"    # Legacy significance threshold
+
+# Advanced GAPIT Parameters (Tier 2)
+KINSHIP_ALGORITHM="${KINSHIP_ALGORITHM:-VanRaden}"  # GAPIT: kinship.algorithm
+SNP_EFFECT="${SNP_EFFECT:-Add}"           # GAPIT: SNP.effect (Add, Dom)
+SNP_IMPUTE="${SNP_IMPUTE:-Middle}"        # GAPIT: SNP.impute (Middle, Major, Minor)
+
+# Legacy parameter names (deprecated, for backward compatibility)
+MODELS="${MODELS:-}"
+PCA_COMPONENTS="${PCA_COMPONENTS:-}"
+MAF_FILTER="${MAF_FILTER:-}"
+KINSHIP_METHOD="${KINSHIP_METHOD:-}"
+CORRECTION_METHOD="${CORRECTION_METHOD:-FDR}"
+MAX_ITERATIONS="${MAX_ITERATIONS:-10}"
 
 # Computational Resources
 OPENBLAS_NUM_THREADS="${OPENBLAS_NUM_THREADS:-${CPU_LIMIT:-12}}"
 OMP_NUM_THREADS="${OMP_NUM_THREADS:-${CPU_LIMIT:-12}}"
-
-# Advanced Options (rarely changed)
-KINSHIP_METHOD="${KINSHIP_METHOD:-VanRaden}"
-CORRECTION_METHOD="${CORRECTION_METHOD:-FDR}"
-MAX_ITERATIONS="${MAX_ITERATIONS:-10}"
 
 # Export thread settings for R
 export OPENBLAS_NUM_THREADS
@@ -62,6 +78,52 @@ log_warn() {
 
 log_info() {
     echo -e "${GREEN}[INFO]${NC} $*"
+}
+
+# ==============================================================================
+# Deprecation Handling
+# ==============================================================================
+
+handle_deprecated_params() {
+    # Handle deprecated parameter names with warnings
+    # New names take precedence over deprecated names
+
+    # MODELS -> MODEL
+    if [ -n "${MODELS:-}" ]; then
+        if [ "$MODEL" = "BLINK,FarmCPU" ]; then
+            # MODEL has default value, use MODELS
+            log_warn "MODELS is deprecated, use MODEL instead"
+            MODEL="$MODELS"
+        fi
+        # If MODEL is explicitly set, it takes precedence (no warning)
+    fi
+
+    # PCA_COMPONENTS -> PCA_TOTAL
+    if [ -n "${PCA_COMPONENTS:-}" ]; then
+        if [ "$PCA_TOTAL" = "3" ]; then
+            # PCA_TOTAL has default value, use PCA_COMPONENTS
+            log_warn "PCA_COMPONENTS is deprecated, use PCA_TOTAL instead"
+            PCA_TOTAL="$PCA_COMPONENTS"
+        fi
+    fi
+
+    # MAF_FILTER -> SNP_MAF
+    if [ -n "${MAF_FILTER:-}" ]; then
+        if [ "$SNP_MAF" = "0.05" ]; then
+            # SNP_MAF has default value, use MAF_FILTER
+            log_warn "MAF_FILTER is deprecated, use SNP_MAF instead"
+            SNP_MAF="$MAF_FILTER"
+        fi
+    fi
+
+    # KINSHIP_METHOD -> KINSHIP_ALGORITHM
+    if [ -n "${KINSHIP_METHOD:-}" ]; then
+        if [ "$KINSHIP_ALGORITHM" = "VanRaden" ]; then
+            # KINSHIP_ALGORITHM has default value, use KINSHIP_METHOD
+            log_warn "KINSHIP_METHOD is deprecated, use KINSHIP_ALGORITHM instead"
+            KINSHIP_ALGORITHM="$KINSHIP_METHOD"
+        fi
+    fi
 }
 
 # ==============================================================================
@@ -99,12 +161,12 @@ detect_execution_environment() {
     return 0
 }
 
-validate_models() {
-    local valid_models="BLINK FarmCPU MLM MLMM SUPER CMLM"
+validate_model() {
+    local valid_models="BLINK FarmCPU MLM MLMM SUPER CMLM GLM"
     local models_array
 
     # Split comma-separated models
-    IFS=',' read -ra models_array <<< "$MODELS"
+    IFS=',' read -ra models_array <<< "$MODEL"
 
     for model in "${models_array[@]}"; do
         # Trim whitespace
@@ -120,15 +182,51 @@ validate_models() {
     return 0
 }
 
-validate_pca_components() {
-    if ! [[ "$PCA_COMPONENTS" =~ ^[0-9]+$ ]]; then
-        log_error "PCA_COMPONENTS must be an integer, got: '$PCA_COMPONENTS'"
+validate_pca_total() {
+    if ! [[ "$PCA_TOTAL" =~ ^[0-9]+$ ]]; then
+        log_error "PCA_TOTAL must be an integer, got: '$PCA_TOTAL'"
         return 1
     fi
 
-    if [ "$PCA_COMPONENTS" -lt 0 ] || [ "$PCA_COMPONENTS" -gt 20 ]; then
-        log_error "PCA_COMPONENTS must be between 0 and 20, got: $PCA_COMPONENTS"
+    if [ "$PCA_TOTAL" -lt 0 ] || [ "$PCA_TOTAL" -gt 20 ]; then
+        log_error "PCA_TOTAL must be between 0 and 20, got: $PCA_TOTAL"
         log_error "Use 0 to disable PCA correction"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_kinship_algorithm() {
+    local valid_algos="VanRaden Zhang Loiselle EMMA"
+
+    if [[ ! " $valid_algos " =~ " $KINSHIP_ALGORITHM " ]]; then
+        log_error "Invalid KINSHIP_ALGORITHM: '$KINSHIP_ALGORITHM'"
+        log_error "Valid options: $valid_algos"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_snp_effect() {
+    local valid_effects="Add Dom"
+
+    if [[ ! " $valid_effects " =~ " $SNP_EFFECT " ]]; then
+        log_error "Invalid SNP_EFFECT: '$SNP_EFFECT'"
+        log_error "Valid options: $valid_effects"
+        return 1
+    fi
+
+    return 0
+}
+
+validate_snp_impute() {
+    local valid_impute="Middle Major Minor"
+
+    if [[ ! " $valid_impute " =~ " $SNP_IMPUTE " ]]; then
+        log_error "Invalid SNP_IMPUTE: '$SNP_IMPUTE'"
+        log_error "Valid options: $valid_impute"
         return 1
     fi
 
@@ -145,16 +243,16 @@ validate_threshold() {
     return 0
 }
 
-validate_maf_filter() {
+validate_snp_maf() {
     # Check if it's a valid number
-    if ! echo "$MAF_FILTER" | grep -qE '^[0-9]+\.?[0-9]*$'; then
-        log_error "MAF_FILTER must be a number, got: '$MAF_FILTER'"
+    if ! echo "$SNP_MAF" | grep -qE '^[0-9]+\.?[0-9]*$'; then
+        log_error "SNP_MAF must be a number, got: '$SNP_MAF'"
         return 1
     fi
 
     # Check range (using awk for floating point comparison)
-    if awk -v maf="$MAF_FILTER" 'BEGIN { exit !(maf < 0.0 || maf > 0.5) }'; then
-        log_error "MAF_FILTER must be between 0.0 and 0.5, got: $MAF_FILTER"
+    if awk -v maf="$SNP_MAF" 'BEGIN { exit !(maf < 0.0 || maf > 0.5) }'; then
+        log_error "SNP_MAF must be between 0.0 and 0.5, got: $SNP_MAF"
         log_error "Use 0.0 to disable filtering"
         return 1
     fi
@@ -307,17 +405,20 @@ validate_paths() {
 validate_config() {
     local errors=0
 
+    # Handle deprecated parameter names first
+    handle_deprecated_params
+
     log_info "Validating configuration..."
 
     if ! validate_trait_index; then
         errors=$((errors + 1))
     fi
 
-    if ! validate_models; then
+    if ! validate_model; then
         errors=$((errors + 1))
     fi
 
-    if ! validate_pca_components; then
+    if ! validate_pca_total; then
         errors=$((errors + 1))
     fi
 
@@ -325,11 +426,23 @@ validate_config() {
         errors=$((errors + 1))
     fi
 
-    if ! validate_maf_filter; then
+    if ! validate_snp_maf; then
         errors=$((errors + 1))
     fi
 
     if ! validate_snp_fdr; then
+        errors=$((errors + 1))
+    fi
+
+    if ! validate_kinship_algorithm; then
+        errors=$((errors + 1))
+    fi
+
+    if ! validate_snp_effect; then
+        errors=$((errors + 1))
+    fi
+
+    if ! validate_snp_impute; then
         errors=$((errors + 1))
     fi
 
@@ -372,21 +485,23 @@ log_config() {
     echo "  Output Path:      $OUTPUT_PATH"
     echo ""
     echo -e "${BLUE}GAPIT Parameters:${NC}"
-    echo "  Models:           $MODELS"
-    echo "  PCA Components:   $PCA_COMPONENTS"
-    echo "  SNP Threshold:    $SNP_THRESHOLD"
-    echo "  SNP FDR:          ${SNP_FDR:-disabled}"
-    echo "  MAF Filter:       $MAF_FILTER"
-    echo "  Multiple Analysis: $MULTIPLE_ANALYSIS"
+    echo "  model:            $MODEL"
+    echo "  PCA.total:        $PCA_TOTAL"
+    echo "  Multiple_analysis: $MULTIPLE_ANALYSIS"
+    echo ""
+    echo -e "${BLUE}SNP Filtering:${NC}"
+    echo "  SNP.MAF:          $SNP_MAF"
+    echo "  SNP.FDR:          ${SNP_FDR:-disabled}"
+    echo "  SNP_THRESHOLD:    $SNP_THRESHOLD"
+    echo ""
+    echo -e "${BLUE}Advanced GAPIT Parameters:${NC}"
+    echo "  kinship.algorithm: $KINSHIP_ALGORITHM"
+    echo "  SNP.effect:       $SNP_EFFECT"
+    echo "  SNP.impute:       $SNP_IMPUTE"
     echo ""
     echo -e "${BLUE}Computational Resources:${NC}"
     echo "  OpenBLAS Threads: $OPENBLAS_NUM_THREADS"
     echo "  OMP Threads:      $OMP_NUM_THREADS"
-    echo ""
-    echo -e "${BLUE}Advanced Options:${NC}"
-    echo "  Kinship Method:   $KINSHIP_METHOD"
-    echo "  Correction:       $CORRECTION_METHOD"
-    echo "  Max Iterations:   $MAX_ITERATIONS"
     echo ""
     echo "==========================================================================="
     echo ""
@@ -409,14 +524,16 @@ run_single_trait() {
     log_config
 
     # Build R script command with parameters
+    # Note: R script still uses --models and --pca flags for backward compatibility
     local cmd="Rscript /scripts/run_gwas_single_trait.R \
         --trait-index $TRAIT_INDEX \
         --genotype $GENOTYPE_FILE \
         --phenotype $PHENOTYPE_FILE \
         --ids $ACCESSION_IDS_FILE \
         --output-dir $OUTPUT_PATH \
-        --models $MODELS \
-        --pca $PCA_COMPONENTS \
+        --models $MODEL \
+        --pca $PCA_TOTAL \
+        --maf $SNP_MAF \
         --threads $OPENBLAS_NUM_THREADS"
 
     # Add optional SNP_FDR parameter if set
@@ -466,17 +583,30 @@ ${BLUE}Available commands:${NC}
   run-aggregation     Aggregate results from multiple traits
   help                Show this help message
 
-${BLUE}Environment Variables:${NC}
+${BLUE}Environment Variables (v3.0.0):${NC}
   See .env.example for complete documentation
 
-  Key variables:
+  Core GAPIT Parameters:
     TRAIT_INDEX         Trait column index (default: 2)
-    MODELS              GWAS models (default: BLINK,FarmCPU)
-    PCA_COMPONENTS      PCA components (default: 3)
-    SNP_THRESHOLD       P-value threshold (default: 5e-8)
+    MODEL               GWAS models (default: BLINK,FarmCPU)
+    PCA_TOTAL           PCA components (default: 3)
+
+  SNP Filtering:
+    SNP_MAF             MAF threshold (default: 0.05, 0=disabled)
     SNP_FDR             FDR threshold (e.g., 0.05; default: disabled)
+    SNP_THRESHOLD       P-value threshold (default: 5e-8)
+
+  Advanced GAPIT Parameters:
+    KINSHIP_ALGORITHM   Kinship algorithm (default: VanRaden)
+    SNP_EFFECT          SNP effect model (default: Add)
+    SNP_IMPUTE          Imputation method (default: Middle)
+
+  Paths:
     DATA_PATH           Input data directory (default: /data)
     OUTPUT_PATH         Output directory (default: /outputs)
+
+  Deprecated (still supported with warnings):
+    MODELS -> MODEL, PCA_COMPONENTS -> PCA_TOTAL, MAF_FILTER -> SNP_MAF
 
 ${BLUE}Examples:${NC}
   # Run with defaults
@@ -485,11 +615,12 @@ ${BLUE}Examples:${NC}
     -v /outputs:/outputs \\
     gapit3:latest
 
-  # Run with custom parameters
+  # Run with custom parameters (v3.0.0 naming)
   docker run --rm \\
     -e TRAIT_INDEX=2 \\
-    -e MODELS=BLINK \\
-    -e PCA_COMPONENTS=5 \\
+    -e MODEL=BLINK \\
+    -e PCA_TOTAL=5 \\
+    -e SNP_MAF=0.05 \\
     gapit3:latest
 
   # Run aggregation
@@ -509,20 +640,30 @@ EOF
 show_current_config() {
     echo ""
     echo "==========================================================================="
-    echo "Current Environment Variable Values"
+    echo "Current Environment Variable Values (v3.0.0)"
     echo "==========================================================================="
     echo ""
-    echo "  TRAIT_INDEX:         $TRAIT_INDEX"
-    echo "  MODELS:              $MODELS"
-    echo "  PCA_COMPONENTS:      $PCA_COMPONENTS"
-    echo "  SNP_THRESHOLD:       $SNP_THRESHOLD"
-    echo "  SNP_FDR:             ${SNP_FDR:-disabled}"
-    echo "  MAF_FILTER:          $MAF_FILTER"
-    echo "  MULTIPLE_ANALYSIS:   $MULTIPLE_ANALYSIS"
-    echo "  DATA_PATH:           $DATA_PATH"
-    echo "  OUTPUT_PATH:         $OUTPUT_PATH"
-    echo "  GENOTYPE_FILE:       $GENOTYPE_FILE"
-    echo "  PHENOTYPE_FILE:      $PHENOTYPE_FILE"
+    echo "  Core GAPIT Parameters:"
+    echo "    TRAIT_INDEX:         $TRAIT_INDEX"
+    echo "    MODEL:               $MODEL"
+    echo "    PCA_TOTAL:           $PCA_TOTAL"
+    echo "    MULTIPLE_ANALYSIS:   $MULTIPLE_ANALYSIS"
+    echo ""
+    echo "  SNP Filtering:"
+    echo "    SNP_MAF:             $SNP_MAF"
+    echo "    SNP_FDR:             ${SNP_FDR:-disabled}"
+    echo "    SNP_THRESHOLD:       $SNP_THRESHOLD"
+    echo ""
+    echo "  Advanced GAPIT Parameters:"
+    echo "    KINSHIP_ALGORITHM:   $KINSHIP_ALGORITHM"
+    echo "    SNP_EFFECT:          $SNP_EFFECT"
+    echo "    SNP_IMPUTE:          $SNP_IMPUTE"
+    echo ""
+    echo "  Paths:"
+    echo "    DATA_PATH:           $DATA_PATH"
+    echo "    OUTPUT_PATH:         $OUTPUT_PATH"
+    echo "    GENOTYPE_FILE:       $GENOTYPE_FILE"
+    echo "    PHENOTYPE_FILE:      $PHENOTYPE_FILE"
     echo ""
     echo "==========================================================================="
     echo ""

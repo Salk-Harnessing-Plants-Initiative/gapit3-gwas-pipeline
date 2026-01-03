@@ -307,6 +307,7 @@ jobs:
         run: |
           chmod +x tests/integration/test-env-vars-e2e.sh
           chmod +x tests/integration/test-snp-fdr-e2e.sh
+          chmod +x tests/integration/test-gapit-params-e2e.sh
 
       - name: Run integration tests
         run: |
@@ -326,6 +327,15 @@ jobs:
 
           # Run SNP_FDR-specific integration tests
           bash tests/integration/test-snp-fdr-e2e.sh
+
+      - name: Run GAPIT parameters v3.0.0 integration tests
+        run: |
+          export TEST_IMAGE="${{ steps.image-ref.outputs.image-tag }}"
+          export CI_SKIP_BUILD=true
+          export CI_SKIP_CLEANUP=true
+
+          # Run GAPIT parameter naming and deprecation tests
+          bash tests/integration/test-gapit-params-e2e.sh
 
       - name: Test Docker help command
         if: always()
@@ -402,6 +412,9 @@ jobs:
           echo "- Fast failure on validation errors" >> $GITHUB_STEP_SUMMARY
           echo "- SNP_FDR parameter propagation" >> $GITHUB_STEP_SUMMARY
           echo "- MAF_FILTER and SNP_FDR independence" >> $GITHUB_STEP_SUMMARY
+          echo "- GAPIT v3.0.0 parameter naming (MODEL, PCA_TOTAL, SNP_MAF)" >> $GITHUB_STEP_SUMMARY
+          echo "- Deprecated parameter warnings (MODELS, PCA_COMPONENTS, MAF_FILTER)" >> $GITHUB_STEP_SUMMARY
+          echo "- Advanced GAPIT parameters (KINSHIP_ALGORITHM, SNP_EFFECT, SNP_IMPUTE)" >> $GITHUB_STEP_SUMMARY
 
       - name: Cleanup Docker images
         if: always()

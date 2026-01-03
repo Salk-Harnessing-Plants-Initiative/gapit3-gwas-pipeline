@@ -1,0 +1,34 @@
+{
+  "schema_version": "3.0.0",
+  "execution": {
+    "trait_index": 2,
+    "start_time": "2024-12-10T10:00:00",
+    "end_time": "2024-12-10T10:30:00",
+    "duration_minutes": 30,
+    "status": "success"
+  },
+  "parameters": {
+    "gapit": {
+      "model": ["BLINK", "FarmCPU", "MLM"],
+      "PCA.total": 3,
+      "Multiple_analysis": true,
+      "SNP.MAF": 0.0073,
+      "SNP.FDR": 0.05,
+      "kinship.algorithm": "VanRaden",
+      "SNP.effect": "Add",
+      "SNP.impute": "Middle"
+    },
+    "compute": {
+      "openblas_threads": 12,
+      "omp_threads": 12
+    }
+  },
+  "genotype": {
+    "n_snps": 287000,
+    "n_accessions": 1135
+  },
+  "inputs": {
+    "genotype_file": "/data/genotype/all_chromosomes.hmp.txt",
+    "phenotype_file": "/data/phenotype/traits.txt"
+  }
+}
