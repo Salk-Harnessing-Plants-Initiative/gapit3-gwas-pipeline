@@ -300,6 +300,12 @@ tryCatch({
     Multiple_analysis = multiple_analysis
   )
 
+  # Add MAF.Threshold if specified (fixes bug where MAF_FILTER was tracked but not passed)
+  if (!is.null(opt$maf) && opt$maf > 0) {
+    cat("Applying MAF threshold:", opt$maf, "\n")
+    gapit_args$MAF.Threshold <- opt$maf
+  }
+
   # Add SNP.FDR if specified
   if (!is.null(opt$`snp-fdr`)) {
     cat("Applying FDR threshold:", opt$`snp-fdr`, "\n")

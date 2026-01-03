@@ -303,8 +303,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Make test script executable
-        run: chmod +x tests/integration/test-env-vars-e2e.sh
+      - name: Make test scripts executable
+        run: |
+          chmod +x tests/integration/test-env-vars-e2e.sh
+          chmod +x tests/integration/test-snp-fdr-e2e.sh
 
       - name: Run integration tests
         run: |
@@ -315,6 +317,15 @@ jobs:
 
           # Run integration tests
           bash tests/integration/test-env-vars-e2e.sh
+
+      - name: Run SNP_FDR integration tests
+        run: |
+          export TEST_IMAGE="${{ steps.image-ref.outputs.image-tag }}"
+          export CI_SKIP_BUILD=true
+          export CI_SKIP_CLEANUP=true
+
+          # Run SNP_FDR-specific integration tests
+          bash tests/integration/test-snp-fdr-e2e.sh
 
       - name: Test Docker help command
         if: always()
@@ -389,6 +400,8 @@ jobs:
           echo "- Invalid configuration detection" >> $GITHUB_STEP_SUMMARY
           echo "- Error message quality" >> $GITHUB_STEP_SUMMARY
           echo "- Fast failure on validation errors" >> $GITHUB_STEP_SUMMARY
+          echo "- SNP_FDR parameter propagation" >> $GITHUB_STEP_SUMMARY
+          echo "- MAF_FILTER and SNP_FDR independence" >> $GITHUB_STEP_SUMMARY
 
       - name: Cleanup Docker images
         if: always()

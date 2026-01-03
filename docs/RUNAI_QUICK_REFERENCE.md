@@ -291,6 +291,50 @@ For batch operations, use the helper scripts:
 ./scripts/monitor-runai-jobs.sh --watch
 ```
 
+### Retry Failed Jobs
+
+When jobs fail due to transient infrastructure issues (mount failures), use the retry scripts:
+
+```bash
+# Dry-run: See what would be retried
+./scripts/retry-failed-traits.sh --dry-run
+
+# Retry mount failures with default settings (3 retries, 30s exponential backoff)
+./scripts/retry-failed-traits.sh
+
+# Custom retry settings
+./scripts/retry-failed-traits.sh --max-retries 5 --retry-delay 60
+```
+
+For manual bulk resubmission of specific traits:
+
+```bash
+# Resubmit specific failed traits
+./scripts/bulk-resubmit-traits.sh 37 50 61 66 70 76
+
+# Preview without executing
+./scripts/bulk-resubmit-traits.sh --dry-run 37 50 61
+
+# Get list of failed traits and resubmit
+failed=$(runai workspace list -p talmo-lab | grep "$JOB_PREFIX" | grep Failed | awk '{print $1}' | sed "s/${JOB_PREFIX}-//")
+./scripts/bulk-resubmit-traits.sh $failed
+```
+
+### Concurrency Control
+
+The submission script (`submit-all-traits-runai.sh`) enforces `MAX_CONCURRENT` limit:
+
+- **Counts only your batch jobs** (matches `JOB_PREFIX` from `.env`)
+- **Counts all active states** (Running, Pending, ContainerCreating)
+- **Excludes terminal states** (Succeeded, Failed, Completed)
+
+This ensures your batch doesn't interfere with other users in the shared project.
+
+```bash
+# Check active jobs in your batch
+runai workspace list -p talmo-lab | grep "^[[:space:]]*$JOB_PREFIX-" | grep -vE "Succeeded|Failed|Completed" | wc -l
+```
+
 ## Key Differences from Old RunAI CLI
 
 | Old Command | New Command |

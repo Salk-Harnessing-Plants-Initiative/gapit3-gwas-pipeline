@@ -58,9 +58,9 @@
 
 - [x] 8.1 Test with workflow that has OOMKilled failures
 - [x] 8.2 Test with workflow that has stuck pods
-- [ ] 8.3 Test with workflow that is fully complete (no retry needed)
-- [ ] 8.4 Test dry-run mode
-- [ ] 8.5 Test automated mode
+- [x] 8.3 Test with workflow that is fully complete (no retry needed)
+- [x] 8.4 Test dry-run mode
+- [x] 8.5 Test automated mode
 
 ## 9. Documentation
 
@@ -74,4 +74,4 @@
 
 ## 10. Cleanup
 
-- [ ] 10.1 Archive this OpenSpec change after deployment
+- [x] 10.1 Archive this OpenSpec change after deployment

@@ -1,0 +1,4 @@
+,SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,traits
+1,FDR_SNP1,1,100000,1.0e-12,0.15,500,0.10,1.4e-11,BLINK.fdr_test_trait
+2,FDR_SNP2,1,200000,5.0e-11,0.20,500,0.08,7.0e-10,FarmCPU.fdr_test_trait
+3,FDR_SNP3,2,150000,2.0e-10,0.18,500,0.07,2.8e-09,BLINK.fdr_test_trait

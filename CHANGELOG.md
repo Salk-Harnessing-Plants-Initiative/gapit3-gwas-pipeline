@@ -300,4 +300,4 @@ volumeMounts:
 
 **Maintained by**: Salk Institute Harnessing Plants Initiative
 
-**License**: MIT
+**License**: GPL-3.0

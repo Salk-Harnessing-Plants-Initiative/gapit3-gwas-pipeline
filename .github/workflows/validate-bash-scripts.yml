@@ -6,12 +6,14 @@ on:
       - main
     paths:
       - 'scripts/**/*.sh'
+      - 'tests/unit/**/*.sh'
       - '.github/workflows/validate-bash-scripts.yml'
   pull_request:
     branches:
       - '**'
     paths:
       - 'scripts/**/*.sh'
+      - 'tests/unit/**/*.sh'
       - '.github/workflows/validate-bash-scripts.yml'
   workflow_dispatch:
 
@@ -104,6 +106,22 @@ jobs:
           done
           echo "::endgroup::"
 
+      - name: Run unit tests for retry scripts
+        run: |
+          echo "::group::Retry Script Unit Tests"
+          if [ -f "tests/unit/test-retry-script.sh" ]; then
+            chmod +x tests/unit/test-retry-script.sh
+            if bash tests/unit/test-retry-script.sh; then
+              echo "✓ All retry script unit tests passed"
+            else
+              echo "::error::Retry script unit tests failed"
+              exit 1
+            fi
+          else
+            echo "No retry script unit tests found, skipping"
+          fi
+          echo "::endgroup::"
+
       - name: Validation summary
         if: always()
         run: |
@@ -116,6 +134,7 @@ jobs:
           echo "- ✅ ShellCheck static analysis" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Shebang consistency" >> $GITHUB_STEP_SUMMARY
           echo "- ✅ Safe bash options" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Retry script unit tests" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Scripts Checked:**" >> $GITHUB_STEP_SUMMARY
           for script in scripts/*.sh; do

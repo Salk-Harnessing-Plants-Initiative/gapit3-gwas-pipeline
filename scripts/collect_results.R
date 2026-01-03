@@ -46,7 +46,11 @@ option_list <- list(
   make_option(c("-m", "--models"), type = "character", default = "BLINK,FarmCPU,MLM",
               help = "Expected models for completeness check [default: %default]", metavar = "STRING"),
   make_option(c("--allow-incomplete"), action = "store_true", default = FALSE,
-              help = "Allow aggregation with incomplete traits (skip them with warning)")
+              help = "Allow aggregation with incomplete traits (skip them with warning)"),
+  make_option(c("--no-markdown"), action = "store_true", default = FALSE,
+              help = "Skip markdown summary generation"),
+  make_option(c("--markdown-only"), action = "store_true", default = FALSE,
+              help = "Only regenerate markdown from existing JSON/CSV (no re-aggregation)")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
@@ -61,6 +65,8 @@ batch_id <- opt$`batch-id`
 threshold <- opt$threshold
 expected_models <- strsplit(opt$models, ",")[[1]]
 allow_incomplete <- opt$`allow-incomplete`
+no_markdown <- opt$`no-markdown`
+markdown_only <- opt$`markdown-only`
 
 cat(strrep("=", 78), "\n")
 cat("GAPIT3 Results Collector\n")
@@ -70,7 +76,58 @@ cat("Batch ID:", batch_id, "\n")
 cat("Significance threshold:", threshold, "\n")
 cat("Expected models:", paste(expected_models, collapse = ", "), "\n")
 cat("Allow incomplete:", allow_incomplete, "\n")
+cat("No markdown:", no_markdown, "\n")
+cat("Markdown only:", markdown_only, "\n")
 cat(strrep("=", 78), "\n\n")
+
+# ==============================================================================
+# Markdown-only mode: regenerate from existing data
+# ==============================================================================
+if (markdown_only) {
+  cat("Running in markdown-only mode...\n")
+
+  agg_dir <- file.path(output_dir, "aggregated_results")
+  stats_file <- file.path(agg_dir, "summary_stats.json")
+  snps_file <- file.path(agg_dir, "all_traits_significant_snps.csv")
+  summary_file <- file.path(agg_dir, "summary_table.csv")
+
+  if (!file.exists(stats_file)) {
+    stop("Cannot find ", stats_file, ". Run full aggregation first.")
+  }
+  if (!file.exists(snps_file)) {
+    stop("Cannot find ", snps_file, ". Run full aggregation first.")
+  }
+  if (!file.exists(summary_file)) {
+    stop("Cannot find ", summary_file, ". Run full aggregation first.")
+  }
+
+  cat("Loading existing aggregated data...\n")
+  stats <- fromJSON(stats_file)
+  snps_df <- fread(snps_file)
+  summary_df <- fread(summary_file)
+
+  # Try to load first trait metadata for configuration details
+  trait_dirs <- list.dirs(output_dir, recursive = FALSE)
+  trait_dirs <- trait_dirs[grepl("^trait_\\d+", basename(trait_dirs))]
+  first_metadata <- NULL
+  if (length(trait_dirs) > 0) {
+    meta_file <- file.path(trait_dirs[1], "metadata.json")
+    if (file.exists(meta_file)) {
+      first_metadata <- fromJSON(meta_file)
+    }
+  }
+
+  generate_markdown_summary(
+    output_dir = agg_dir,
+    stats = stats,
+    summary_table = summary_df,
+    snps_df = snps_df,
+    metadata = first_metadata
+  )
+
+  cat("\n✓ Markdown regeneration complete!\n")
+  quit(save = "no", status = 0)
+}
 
 # ==============================================================================
 # Helper Functions
@@ -190,6 +247,12 @@ generate_configuration_section <- function(metadata, summary_table) {
     "N/A"
   }
 
+  snp_fdr <- if (!is.null(metadata$parameters$snp_fdr)) {
+    metadata$parameters$snp_fdr
+  } else {
+    "N/A (disabled)"
+  }
+
   n_snps <- if (!is.null(metadata$genotype$n_snps)) {
     format_number(metadata$genotype$n_snps)
   } else if (nrow(summary_table) > 0 && "n_snps" %in% colnames(summary_table)) {
@@ -214,6 +277,7 @@ generate_configuration_section <- function(metadata, summary_table) {
     sprintf("| Models | %s |", models),
     sprintf("| PCA Components | %s |", pca),
     sprintf("| MAF Filter | %s |", maf),
+    sprintf("| SNP FDR | %s |", snp_fdr),
     sprintf("| SNPs Tested | %s |", n_snps),
     sprintf("| Accessions | %s |", n_accessions),
     ""
@@ -1037,18 +1101,22 @@ cat("Summary statistics saved:", stats_file, "\n\n")
 # ==============================================================================
 # Generate markdown summary report
 # ==============================================================================
-cat("Generating markdown summary report...\n")
+if (!no_markdown) {
+  cat("Generating markdown summary report...\n")
 
-# Get first metadata for configuration details
-first_metadata <- if (length(metadata_list) > 0) metadata_list[[1]] else NULL
+  # Get first metadata for configuration details
+  first_metadata <- if (length(metadata_list) > 0) metadata_list[[1]] else NULL
 
-generate_markdown_summary(
-  output_dir = file.path(output_dir, "aggregated_results"),
-  stats = stats,
-  summary_table = summary_df,
-  snps_df = all_snps,
-  metadata = first_metadata
-)
+  generate_markdown_summary(
+    output_dir = file.path(output_dir, "aggregated_results"),
+    stats = stats,
+    summary_table = summary_df,
+    snps_df = all_snps,
+    metadata = first_metadata
+  )
+} else {
+  cat("Skipping markdown summary generation (--no-markdown)\n")
+}
 
 cat("\n")
 

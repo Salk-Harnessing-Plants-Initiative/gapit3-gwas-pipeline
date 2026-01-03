@@ -80,13 +80,11 @@ The retry workflow generation SHALL propagate the `snp-fdr` parameter from the o
   - `snp-fdr` parameter passed to each trait task's templateRef arguments
 - **AND** the workflow can be validated with `argo lint`
 
-## MODIFIED Requirements
-
 ### Requirement: Retry Script Aggregation Flag
 
-The `--aggregate` flag behavior SHALL change from local execution to in-cluster execution.
+The `--aggregate` flag SHALL trigger in-cluster aggregation execution.
 
-#### Scenario: Aggregate flag generates in-cluster task (CHANGED)
+#### Scenario: Aggregate flag generates in-cluster task
 - **GIVEN** a user runs `retry-argo-traits.sh --aggregate --submit`
 - **WHEN** the workflow is generated and submitted
 - **THEN** aggregation runs as part of the Argo workflow (in-cluster)

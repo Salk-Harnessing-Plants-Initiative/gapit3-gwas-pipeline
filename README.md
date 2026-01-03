@@ -3,7 +3,7 @@
 [![Docker Build](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/docker-build.yml)
 [![R Script Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-r-scripts.yml)
 [![Devcontainer Tests](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml/badge.svg)](https://github.com/Salk-Harnessing-Plants-Initiative/gapit3-gwas-pipeline/actions/workflows/test-devcontainer.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants and other organisms.
 
@@ -352,9 +352,26 @@ Each trait produces:
 
 ```
 outputs/aggregated_results/
+├── pipeline_summary.md                # Human-readable summary report
 ├── summary_table.csv                  # All traits: sample sizes, durations, status
 ├── all_traits_significant_snps.csv    # SNPs below p < 5e-8 (with model column)
 └── summary_stats.json                 # Per-model statistics and overlaps
+```
+
+**Pipeline Summary Report** (`pipeline_summary.md`):
+
+The markdown summary provides a shareable, human-readable overview including:
+- Executive summary (workflow ID, dates, totals, top hits)
+- Configuration (models, PCA, MAF, SNP count)
+- Top 20 significant SNPs table
+- Top 10 traits by hit count
+- Model statistics with cross-validation
+- Chromosome distribution
+- Quality metrics and reproducibility info
+
+To regenerate the markdown from existing results:
+```bash
+Rscript scripts/collect_results.R --output-dir /path/to/outputs --markdown-only
 ```
 
 **Output CSV format** (`all_traits_significant_snps.csv`):
@@ -498,7 +515,7 @@ See [openspec/project.md](openspec/project.md) for complete conventions.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
 
 ---
 

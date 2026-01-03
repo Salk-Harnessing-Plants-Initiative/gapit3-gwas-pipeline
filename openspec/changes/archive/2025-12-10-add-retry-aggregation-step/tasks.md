@@ -32,18 +32,18 @@
 - [x] 3.1 Test deduplication with multiple directories per trait (local R script)
 - [x] 3.2 Test directory selection prioritizes completeness over recency
 - [x] 3.3 Test tie-breaking selects newest when completeness is equal
-- [ ] 3.4 Test retry workflow generation with `--aggregate` flag (dry-run)
-- [ ] 3.5 Verify generated YAML includes collect-results task with correct dependencies
-- [ ] 3.6 Test full retry + aggregation workflow on cluster
-- [ ] 3.7 Test snp-fdr extraction from workflow with FDR parameter
-- [ ] 3.8 Test snp-fdr defaults to empty when original workflow has no FDR
-- [ ] 3.9 Verify generated retry YAML includes snp-fdr parameter in tasks
+- [x] 3.4 Test retry workflow generation with `--aggregate` flag (dry-run)
+- [x] 3.5 Verify generated YAML includes collect-results task with correct dependencies
+- [x] 3.6 Test full retry + aggregation workflow on cluster
+- [x] 3.7 Test snp-fdr extraction from workflow with FDR parameter
+- [x] 3.8 Test snp-fdr defaults to empty when original workflow has no FDR
+- [x] 3.9 Verify generated retry YAML includes snp-fdr parameter in tasks
 
 ## 4. Docker Image Update
 
-- [ ] 4.1 Rebuild Docker image with updated collect_results.R
-- [ ] 4.2 Push new image tag
-- [ ] 4.3 Update template defaults to use new image
+- [x] 4.1 Rebuild Docker image with updated collect_results.R
+- [x] 4.2 Push new image tag
+- [x] 4.3 Update template defaults to use new image
 
 ## 5. Documentation
 
@@ -53,4 +53,4 @@
 
 ## 6. Cleanup
 
-- [ ] 6.1 Archive this OpenSpec change after deployment
+- [x] 6.1 Archive this OpenSpec change after deployment

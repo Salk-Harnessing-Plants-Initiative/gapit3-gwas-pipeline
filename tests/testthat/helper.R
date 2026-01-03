@@ -196,6 +196,7 @@ cleanup_env_vars <- function() {
     "MODELS",
     "PCA_COMPONENTS",
     "SNP_THRESHOLD",
+    "SNP_FDR",
     "MAF_FILTER",
     "MULTIPLE_ANALYSIS",
     "OPENBLAS_NUM_THREADS",

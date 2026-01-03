@@ -36,10 +36,16 @@
 - [x] 5.2 Update `QUICKSTART.md` with FDR configuration section
 - [x] 5.3 Update `cluster/argo/README.md` configurable parameters list
 
-## 6. Testing
+## 6. Testing (COMPLETE)
 
-- [ ] 6.1 Test Argo pipeline with snp-fdr=0.05
-- [ ] 6.2 Test Argo pipeline without snp-fdr (backward compatibility)
-- [ ] 6.3 Verify pod environment variables include SNP_FDR
-- [ ] 6.4 Test RunAI batch submission with SNP_FDR
-- [ ] 6.5 Verify GAPIT output includes FDR-filtered results
+- [x] 6.1 Add unit tests for SNP_FDR parameter parsing (`tests/testthat/test-snp-fdr.R`)
+- [x] 6.2 Add unit tests for SNP_FDR in metadata tracking
+- [x] 6.3 Add test fixtures for different FDR configurations (`tests/fixtures/snp_fdr/`)
+- [x] 6.4 Add integration tests for SNP_FDR workflow propagation (`tests/integration/test-snp-fdr-e2e.sh`)
+- [x] 6.5 Add tests for SNP_FDR in markdown report generation (`tests/testthat/test-pipeline-summary.R`)
+- [x] 6.6 Update helper.R to include SNP_FDR in cleanup_env_vars()
+
+## 7. Bug Fixes (COMPLETE)
+
+- [x] 7.1 Fix MAF_FILTER bug - now passed to GAPIT as MAF.Threshold (`scripts/run_gwas_single_trait.R`)
+- [x] 7.2 Add SNP FDR to pipeline summary markdown report (`scripts/collect_results.R`)

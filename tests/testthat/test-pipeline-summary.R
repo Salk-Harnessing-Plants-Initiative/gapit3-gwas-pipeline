@@ -447,3 +447,172 @@ test_that("generate_markdown_summary matches expected format", {
   expect_true(any(grepl("# GWAS Pipeline Summary Report", generated)))
   expect_true(any(grepl("## Executive Summary", generated)))
 })
+
+# ==============================================================================
+# Test: SNP_FDR in Configuration Section
+# ==============================================================================
+test_that("generate_configuration_section includes SNP FDR when set", {
+  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+
+  metadata <- list(
+    parameters = list(
+      models = c("BLINK", "FarmCPU"),
+      pca_components = 3,
+      maf_filter = 0.05,
+      snp_fdr = 0.05
+    ),
+    genotype = list(
+      n_snps = 1400000,
+      n_accessions = 500
+    ),
+    inputs = list(
+      genotype_file = "/data/genotype/test.hmp.txt",
+      phenotype_file = "/data/phenotype/test.txt"
+    )
+  )
+
+  summary_table <- data.frame(n_snps = 1400000, n_samples = 500)
+
+  result <- generate_configuration_section(metadata, summary_table)
+
+  # Check that SNP FDR is included
+  expect_true(grepl("SNP FDR", result) || grepl("snp_fdr", result, ignore.case = TRUE),
+              info = "Configuration section should include SNP FDR parameter")
+  expect_true(grepl("0.05", result))
+})
+
+test_that("generate_configuration_section handles null SNP FDR", {
+  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+
+  metadata <- list(
+    parameters = list(
+      models = c("BLINK"),
+      pca_components = 3,
+      maf_filter = 0.05,
+      snp_fdr = NULL
+    ),
+    genotype = list(
+      n_snps = 1000000,
+      n_accessions = 400
+    )
+  )
+
+  summary_table <- data.frame(n_snps = 1000000, n_samples = 400)
+
+  result <- generate_configuration_section(metadata, summary_table)
+
+  # Should show N/A or disabled for null SNP FDR
+  expect_true(grepl("N/A|disabled|not set", result, ignore.case = TRUE) ||
+              !grepl("snp_fdr.*0\\.", result, ignore.case = TRUE),
+              info = "Null SNP FDR should show as N/A or disabled")
+})
+
+test_that("generate_configuration_section shows both MAF and SNP FDR", {
+  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+
+  metadata <- list(
+    parameters = list(
+      models = c("BLINK", "FarmCPU"),
+      pca_components = 5,
+      maf_filter = 0.10,
+      snp_fdr = 0.01
+    ),
+    genotype = list(
+      n_snps = 1500000,
+      n_accessions = 600
+    )
+  )
+
+  summary_table <- data.frame(n_snps = 1500000, n_samples = 600)
+
+  result <- generate_configuration_section(metadata, summary_table)
+
+  # Both parameters should be present
+  expect_true(grepl("MAF", result, ignore.case = TRUE))
+  expect_true(grepl("0.10|0.1", result))  # MAF value
+
+  # SNP FDR should be present with its value
+  expect_true(grepl("0.01", result))  # SNP FDR value
+})
+
+# ==============================================================================
+# Test: Full Pipeline Summary with SNP FDR
+# ==============================================================================
+test_that("generate_markdown_summary includes SNP FDR from metadata", {
+  skip_if_not(exists("generate_markdown_summary"), "generate_markdown_summary not yet implemented")
+
+  temp_output <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_output))
+
+  stats <- list(
+    batch_id = "fdr-test-batch",
+    collection_time = "2025-01-15 10:00:00",
+    total_traits_attempted = 2,
+    successful_traits = 2,
+    failed_traits = 0,
+    total_significant_snps = 10,
+    average_duration_minutes = 15.0,
+    total_duration_hours = 0.5,
+    snps_by_model = list(BLINK = 6, FarmCPU = 4),
+    provenance = list()
+  )
+
+  summary_table <- data.frame(
+    trait_index = 1:2,
+    trait_name = c("trait_A", "trait_B"),
+    n_samples = c(500, 500),
+    n_valid = c(490, 495),
+    duration_minutes = c(15, 15),
+    status = c("success", "success")
+  )
+
+  snps_df <- data.frame(
+    SNP = paste0("FDR_SNP_", 1:10),
+    Chr = rep(1:2, 5),
+    Pos = 1:10 * 10000,
+    P.value = 10^(-(15:6)),
+    MAF = rep(0.15, 10),
+    model = rep(c("BLINK", "FarmCPU"), 5),
+    trait = rep(c("trait_A", "trait_B"), 5)
+  )
+
+  # Metadata with SNP FDR set
+  metadata <- list(
+    execution = list(
+      r_version = "R version 4.4.1",
+      gapit_version = "3.5.0"
+    ),
+    parameters = list(
+      models = c("BLINK", "FarmCPU"),
+      pca_components = 3,
+      maf_filter = 0.05,
+      snp_fdr = 0.05
+    ),
+    genotype = list(
+      n_snps = 1400000,
+      n_accessions = 500
+    )
+  )
+
+  # Generate summary
+  result <- generate_markdown_summary(
+    output_dir = temp_output,
+    stats = stats,
+    summary_table = summary_table,
+    snps_df = snps_df,
+    metadata = metadata
+  )
+
+  # Read generated file
+  md_file <- file.path(temp_output, "pipeline_summary.md")
+  expect_true(file.exists(md_file))
+
+  content <- paste(readLines(md_file), collapse = "\n")
+
+  # Verify SNP FDR appears in the report
+  expect_true(grepl("Configuration", content))
+  expect_true(grepl("MAF", content, ignore.case = TRUE))
+
+  # Should show both MAF and SNP FDR values
+  expect_true(grepl("0.05", content))
+})

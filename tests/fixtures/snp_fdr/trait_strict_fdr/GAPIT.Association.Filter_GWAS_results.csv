@@ -1,0 +1,2 @@
+,SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,traits
+1,STRICT_SNP1,1,100000,1.0e-15,0.20,500,0.15,1.4e-14,BLINK.strict_fdr_trait

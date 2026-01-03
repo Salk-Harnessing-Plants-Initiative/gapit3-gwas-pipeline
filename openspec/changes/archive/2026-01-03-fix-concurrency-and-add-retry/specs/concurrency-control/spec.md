@@ -1,6 +1,6 @@
 # Spec: Concurrency Control
 
-## MODIFIED Requirements
+## ADDED Requirements
 
 ### Requirement: Batch-Specific Job Counting
 
@@ -123,8 +123,6 @@ The submission script MUST provide clear log messages that distinguish between b
 **When** confirmation message is displayed
 **Then** it MUST say "[SUBMIT] Trait N (job: <job-name>)"
 **And** it MUST follow with "→ Success"
-
-## ADDED Requirements
 
 ### Requirement: Variable Naming Consistency
 
