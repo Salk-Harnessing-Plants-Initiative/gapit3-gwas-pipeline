@@ -295,7 +295,7 @@ test_that("full aggregation workflow produces correct output", {
 
   for (dir in trait_dirs_full) {
     trait_snps <- read_filter_file(dir, threshold = 5e-8)
-    if (nrow(trait_snps) > 0) {
+    if (!is.null(trait_snps) && nrow(trait_snps) > 0) {
       all_snps <- rbind(all_snps, trait_snps)
     }
   }
