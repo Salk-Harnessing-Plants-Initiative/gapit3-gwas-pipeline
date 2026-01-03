@@ -29,4 +29,13 @@ Keep this managed block so 'openspec update' can refresh the instructions.
 
 The `Z:` drive in Windows maps to `/mnt/hpi_dev` in WSL, which corresponds to `/hpi/hpi_dev` on the cluster.
 
-**Current working dataset**: `20251122_Elohim_Bello_iron_deficiency_GAPIT_GWAS`
+**Current working dataset**: User-specified (check conversation context)
+
+## Documentation Guidelines
+
+When writing or updating documentation:
+- Use species-agnostic language ("plants and other organisms", "any species with HapMap data")
+- Avoid hardcoded dataset values (trait counts, sample counts, SNP counts)
+- Use ranges or "N" notation instead of specific numbers
+- Link to authoritative sources (.env.example for parameters, SCRIPTS_REFERENCE.md for scripts)
+- See `docs/CONTRIBUTING_DOCS.md` for full documentation standards

@@ -203,7 +203,7 @@ For complete technical documentation, see [openspec/changes/fix-argo-workflow-va
 
 ### Test Run (3 Traits)
 
-**Always start with a test run!** This validates your setup before running all 184 traits.
+**Always start with a test run!** This validates your setup before running all traits from your phenotype file.
 
 ```bash
 cd cluster/argo
@@ -229,9 +229,9 @@ The test workflow will:
 
 Expected duration: **~30-60 minutes** (depending on cluster speed)
 
-### Full Production Run (184 Traits)
+### Full Production Run (All Traits)
 
-Once the test succeeds, run the full pipeline:
+Once the test succeeds, run the full pipeline for all traits in your phenotype file:
 
 ```bash
 ./scripts/submit_workflow.sh full \
@@ -462,7 +462,7 @@ arguments:
 
 ### Chunked Execution (for resource-limited clusters)
 
-Instead of 184 parallel jobs, run in batches:
+Instead of running all traits in parallel, run in batches:
 
 ```bash
 # Batch 1: Traits 2-50

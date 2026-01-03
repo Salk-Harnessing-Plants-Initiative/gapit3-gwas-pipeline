@@ -91,15 +91,16 @@ SNP_1_2000	C/G	1	2000	+	TAIR10	NA	NA	NA	NA	NA	CC	CG	GG	CC	CC
 SNP_2_5000	A/G	2	5000	+	TAIR10	NA	NA	NA	NA	NA	AA	AA	AG	GG	AG
 ```
 
-### Production Example (Arabidopsis)
+### Dataset Size Examples
 
-For our production use case:
-- **File**: `acc_snps_filtered_maf_perl_edited_diploid.hmp.txt`
-- **Samples**: 546 Arabidopsis accessions
-- **SNPs**: ~1.4 million markers
-- **Chromosomes**: 1-5 (Arabidopsis has 5 chromosomes)
-- **File Size**: ~500 MB (compressed), ~2 GB (uncompressed)
-- **MAF Filter**: Minor allele frequency > 0.05 already applied
+> **Note**: Your dataset size will vary. The pipeline supports a wide range of dataset sizes.
+
+- **File**: `your_genotype_file.hmp.txt` (user-configured via `GENOTYPE_FILE`)
+- **Samples**: 50 to 10,000+ samples supported
+- **SNPs**: 1,000 to 10+ million markers supported
+- **Chromosomes**: Varies by organism (e.g., 5 for Arabidopsis, 10 for maize, 23 for human)
+- **File Size**: Depends on sample and SNP counts (typically 100 MB to 50+ GB)
+- **MAF Filter**: Recommend MAF > 0.05 before analysis
 
 ### Quality Recommendations
 
@@ -161,20 +162,15 @@ Kyo-1	142.8	368.9	46.5
 An-1	115.2	NA	43.7
 ```
 
-### Production Example (Arabidopsis Iron Traits)
+### Dataset Configuration
 
-For our production use case:
-- **File**: `iron_traits_edited.txt`
-- **Samples**: 546 Arabidopsis accessions (must match genotype file)
-- **Traits**: 184 iron-related phenotypes (columns 2-185)
-- **File Size**: ~200 KB
-- **Trait Types**:
-  - Shoot iron concentration (ppm)
-  - Root iron concentration (ppm)
-  - Chlorophyll content (SPAD)
-  - Flowering time (days)
-  - Biomass measurements (g)
-  - etc.
+> **Note**: The pipeline automatically detects traits from your phenotype file columns.
+
+- **File**: `your_phenotype_file.txt` (user-configured via `PHENOTYPE_FILE`)
+- **Samples**: Must match sample IDs in genotype file
+- **Traits**: Columns 2 through N become separate GWAS analyses (any number supported)
+- **File Size**: Typically small (< 10 MB for most datasets)
+- **Trait Types**: Any quantitative phenotypes relevant to your study
 
 ### Important Requirements
 
@@ -280,12 +276,14 @@ If you want to analyze **all samples** in your genotype/phenotype files, simply:
 
 ### Example Dataset Sizes
 
-| Data Type | Samples | Markers/Traits | File Size | Load Time |
-|-----------|---------|----------------|-----------|-----------|
-| **Small Test** | 10 | 1,000 SNPs, 5 traits | 500 KB | < 1 sec |
-| **Medium** | 100 | 50,000 SNPs, 20 traits | 50 MB | ~10 sec |
-| **Large (Our Production)** | 546 | 1.4M SNPs, 184 traits | 2 GB genotype, 200 KB phenotype | ~2 min |
-| **Very Large** | 5,000 | 10M SNPs, 500 traits | 50+ GB | ~30 min |
+> **Note**: These are approximate values for planning purposes. Actual sizes depend on your data.
+
+| Data Type | Samples | Markers/Traits | Approx. File Size | Load Time |
+|-----------|---------|----------------|-------------------|-----------|
+| **Small Test** | ~10 | ~1,000 SNPs, ~5 traits | ~500 KB | < 1 sec |
+| **Medium** | ~100 | ~50,000 SNPs, ~20 traits | ~50 MB | ~10 sec |
+| **Large** | ~500 | ~1-2M SNPs, ~100-200 traits | ~2 GB genotype | ~2 min |
+| **Very Large** | ~5,000 | ~10M SNPs, ~500 traits | ~50+ GB | ~30 min |
 
 ### Storage Requirements
 
@@ -301,18 +299,20 @@ df -h /hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data
 
 ### Output Storage
 
-GWAS results can be large:
+GWAS results can be large. Plan storage based on your trait count:
 
 ```
 Per-trait output: ~50-200 MB
-Total for 184 traits: ~10-30 GB
+Total: (number of traits) × ~100 MB average
 
-Breakdown:
-- GWAS results CSV: ~10-50 MB per trait
-- Manhattan plot PDF: ~1-5 MB per trait
-- QQ plot PDF: ~500 KB per trait
-- Metadata JSON: ~10 KB per trait
+Breakdown per trait:
+- GWAS results CSV: ~10-50 MB
+- Manhattan plot PNG: ~200-500 KB
+- QQ plot PNG: ~100-200 KB
+- Metadata JSON: ~10 KB
 ```
+
+See [RESOURCE_SIZING.md](RESOURCE_SIZING.md) for detailed disk space formulas.
 
 ---
 

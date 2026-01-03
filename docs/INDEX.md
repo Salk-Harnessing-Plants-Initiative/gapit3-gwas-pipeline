@@ -20,6 +20,7 @@
 | Document | Description |
 |----------|-------------|
 | [ARGO_SETUP.md](ARGO_SETUP.md) | Argo Workflows cluster deployment |
+| [KUBERNETES_PERMISSIONS.md](KUBERNETES_PERMISSIONS.md) | RBAC and permissions reference |
 | [MANUAL_RUNAI_EXECUTION.md](MANUAL_RUNAI_EXECUTION.md) | RunAI CLI direct execution |
 | [DEPLOYMENT_TESTING.md](DEPLOYMENT_TESTING.md) | WSL setup and cluster testing |
 
@@ -27,6 +28,8 @@
 
 | Document | Description |
 |----------|-------------|
+| [SCRIPTS_REFERENCE.md](SCRIPTS_REFERENCE.md) | **R scripts and parameters** (comprehensive reference) |
+| [RESOURCE_SIZING.md](RESOURCE_SIZING.md) | Memory, CPU, and disk sizing guide |
 | [WORKFLOW_ARCHITECTURE.md](WORKFLOW_ARCHITECTURE.md) | Technical architecture deep-dive |
 | [METADATA_SCHEMA.md](METADATA_SCHEMA.md) | Metadata schema and provenance tracking |
 | [TESTING.md](TESTING.md) | Unit tests and CI workflows |
@@ -39,10 +42,16 @@
 | [RUNAI_QUICK_REFERENCE.md](RUNAI_QUICK_REFERENCE.md) | RunAI command cheat sheet |
 | [DEMO_COMMANDS.md](DEMO_COMMANDS.md) | Live demo commands |
 
+## Contributing
+
+| Document | Description |
+|----------|-------------|
+| [CONTRIBUTING_DOCS.md](CONTRIBUTING_DOCS.md) | Documentation standards and DRY principles |
+
 ## By Audience
 
 **New Users:** QUICKSTART → USAGE → DATA_REQUIREMENTS
 
-**Cluster Operators:** ARGO_SETUP → DEPLOYMENT_TESTING → WORKFLOW_ARCHITECTURE
+**Cluster Operators:** ARGO_SETUP → KUBERNETES_PERMISSIONS → WORKFLOW_ARCHITECTURE
 
-**Developers:** TESTING → DOCKER_WORKFLOW → README (Contributing)
+**Developers:** TESTING → DOCKER_WORKFLOW → CONTRIBUTING_DOCS

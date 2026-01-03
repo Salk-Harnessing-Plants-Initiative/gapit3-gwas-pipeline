@@ -18,7 +18,7 @@ Technical deep dive into the Argo Workflows architecture and design decisions fo
 
 ## Architecture Overview
 
-The GAPIT3 pipeline uses Argo Workflows to orchestrate parallel GWAS analysis across 186 traits. The architecture follows a DAG (Directed Acyclic Graph) pattern with four main phases:
+The GAPIT3 pipeline uses Argo Workflows to orchestrate parallel GWAS analysis across N traits (detected from your phenotype file). The architecture follows a DAG (Directed Acyclic Graph) pattern with four main phases:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -33,7 +33,7 @@ Phase 1: Validation
            ↓
 Phase 2: Trait Extraction
 ┌──────────────────────┐
-│  extract-traits      │  ← Generates trait manifest (186 traits)
+│  extract-traits      │  ← Generates trait manifest (N traits)
 └──────────┬───────────┘
            │
            ↓
@@ -54,7 +54,7 @@ Phase 4: Results Collection
 ### Key Design Principles
 
 1. **Reusability**: WorkflowTemplates define reusable components
-2. **Scalability**: DAG parallelization for 186 concurrent tasks
+2. **Scalability**: DAG parallelization for N concurrent tasks (based on trait count)
 3. **Reliability**: Validation before execution, retry on failure
 4. **Traceability**: Metadata tracking for FAIR principles
 5. **Resource Efficiency**: Controlled parallelism to avoid cluster overload
@@ -115,14 +115,14 @@ Workflows define **specific executions** that reference WorkflowTemplates.
 validate-inputs → extract-traits → [run-trait-2, run-trait-3, run-trait-4]
 ```
 
-**Use Case**: Pre-flight check before running all 186 traits
+**Use Case**: Pre-flight check before running all traits
 
 #### gapit3-parallel-pipeline.yaml
-**Purpose**: Production workflow for all 186 traits
+**Purpose**: Production workflow for all traits in your phenotype file
 
 **DAG Structure**:
 ```yaml
-validate-inputs → extract-traits → [run-trait-2 ... run-trait-187] → collect-results
+validate-inputs → extract-traits → [run-trait-2 ... run-trait-N] → collect-results
 ```
 
 **Parallelism Control**: `max-parallelism: 50` (configurable)
@@ -254,7 +254,7 @@ Based on benchmarks with 546 accessions and ~1.4M SNPs:
 
 ### Cluster-Level Resource Planning
 
-For 186 traits with max parallelism = 50:
+For N traits with max parallelism = 50 (example calculation):
 
 ```
 Total Resources Required (at peak):
@@ -322,10 +322,10 @@ spec:
 
 ### Dynamic Trait Generation
 
-Instead of hardcoding 186 tasks, we can use `withItems` for dynamic generation:
+Instead of hardcoding N tasks, we use `withSequence` for dynamic generation:
 
 ```yaml
-# Alternative approach (not currently used)
+# Dynamic trait range (used in production)
 - name: run-all-traits
   dependencies: [extract-traits]
   templateRef:
@@ -336,8 +336,8 @@ Instead of hardcoding 186 tasks, we can use `withItems` for dynamic generation:
     - name: trait-index
       value: "{{item}}"
   withSequence:
-    start: "2"
-    end: "187"
+    start: "{{inputs.parameters.start-trait-index}}"  # e.g., "2"
+    end: "{{inputs.parameters.end-trait-index}}"      # e.g., trait count + 1
 ```
 
 **Current Approach**: Explicit task definitions for better visibility in Argo UI
@@ -370,7 +370,7 @@ retryStrategy:
 failFast: false  # Continue even if some traits fail
 ```
 
-**Rationale**: If trait 50 fails, we still want traits 51-187 to complete.
+**Rationale**: If one trait fails, we still want remaining traits to complete.
 
 ### Exit Codes
 
@@ -480,12 +480,12 @@ With 546 accessions, ~1.4M SNPs:
 | **Validation** | ~1 min | File checks, config validation |
 | **Trait Extraction** | ~1 min | Parse phenotype file |
 | **GWAS (single trait)** | ~15 min | BLINK + FarmCPU |
-| **Results Collection** | ~5 min | Aggregate 186 trait outputs |
+| **Results Collection** | ~5 min | Aggregate all trait outputs |
 
-**Total Time**:
-- Serial execution: 186 × 15 min = **~46 hours**
-- Parallel (50 jobs): ⌈186 / 50⌉ × 15 min = **~1 hour** (plus startup overhead)
-- Actual production time: **~3-4 hours** (includes scheduling, I/O, collection)
+**Total Time** (scales with trait count N):
+- Serial execution: N × 15 min (e.g., 200 traits = ~50 hours)
+- Parallel (50 jobs): ⌈N / 50⌉ × 15 min (e.g., 200 traits = ~1 hour, plus overhead)
+- Actual production: Add ~2-3 hours for scheduling, I/O, and collection
 
 ### Scaling Considerations
 

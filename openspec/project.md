@@ -1,9 +1,9 @@
 # Project Context
 
 ## Purpose
-Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants (specifically Arabidopsis thaliana) and other organisms.
+Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants and other organisms with HapMap-format genotype data.
 
-**Production Use Case**: Analysis of 546 Arabidopsis accessions across 184 iron-related traits with ~1.4M SNPs.
+**Supported Use Cases**: Any GWAS analysis with HapMap-format genotypes and tab-delimited phenotypes. Scales from small test datasets (50 samples, 5 traits) to large production runs (1000+ samples, hundreds of traits).
 
 ## Tech Stack
 
@@ -55,7 +55,7 @@ Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide associa
 
 #### Pipeline Structure (DAG)
 ```
-Validate Inputs → Extract Traits → Parallel GWAS (184 jobs) → Collect Results
+Validate Inputs → Extract Traits → Parallel GWAS (N jobs) → Collect Results
 ```
 
 #### Containerization
@@ -66,7 +66,7 @@ Validate Inputs → Extract Traits → Parallel GWAS (184 jobs) → Collect Resu
 
 #### Workflow Orchestration
 - **Templates**: Reusable WorkflowTemplates for single-trait execution, validation, extraction, collection
-- **Workflows**: Concrete workflow instances (test: 3 traits, full: 184 traits)
+- **Workflows**: Concrete workflow instances (test: 3 traits, full: all traits from phenotype file)
 - **Parallelism**: Controlled via `withSequence` for trait indices, limited by `max-parallelism` parameter
 - **Dependencies**: Explicit DAG task dependencies
 
@@ -151,7 +151,7 @@ Validate Inputs → Extract Traits → Parallel GWAS (184 jobs) → Collect Resu
 
 #### Performance Benchmarks
 - Single trait (BLINK only): ~15 minutes
-- 184 traits (BLINK + FarmCPU, 50 parallel): ~4 hours
+- Full pipeline (all traits, 50 parallel): scales linearly with trait count
 - Monitor for OOMKilled errors (increase memory if needed)
 
 #### Test Documentation
@@ -194,16 +194,13 @@ Validate Inputs → Extract Traits → Parallel GWAS (184 jobs) → Collect Resu
 - **Multiple Testing Correction**: Genome-wide significance threshold p < 5e-8
 - **Population Structure**: Corrected via PCA (3 components)
 
-### Arabidopsis thaliana
-- Model organism for plant biology
-- ~135 Mb genome, 5 chromosomes
-- 546 accessions (natural genetic variation)
-- ~1.4M SNPs after MAF filtering
+### Supported Organisms
+This pipeline works with any organism that has:
+- HapMap-format genotype data
+- Tab-delimited phenotype data with "Taxa" column
+- Minimum 50 samples for statistical power
 
-### Iron Traits
-- 184 phenotypic traits related to iron homeostasis
-- Measured across controlled conditions
-- Critical for plant nutrition and crop improvement
+Examples include plants (Arabidopsis, maize, rice), animals, and humans.
 
 ### HapMap Format
 - Standard genotype file format for GWAS
@@ -258,7 +255,7 @@ Validate Inputs → Extract Traits → Parallel GWAS (184 jobs) → Collect Resu
 
 ### Storage
 - NFS or hostPath storage provisioned on cluster
-- Sufficient capacity: ~5GB per trait × 184 traits = ~1TB recommended
+- Sufficient capacity: ~100 MB per trait (scales with trait count)
 
 ### Optional Services
 - GitHub Actions (for Docker image builds via .github/workflows/docker-build.yml)

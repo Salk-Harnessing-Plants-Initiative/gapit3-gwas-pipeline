@@ -7,15 +7,55 @@
 
 Dockerized, parallelized GAPIT3 pipeline for high-throughput genome-wide association studies (GWAS) on GPU/CPU clusters using Argo Workflows. Designed for reproducible, traceable, and FAIR-compliant GWAS analysis in plants and other organisms.
 
+## Pipeline Overview
+
+**What is GWAS?** Genome-Wide Association Studies identify genetic variants (SNPs) that are statistically associated with phenotypic traits. This pipeline automates GWAS analysis for any number of traits in parallel.
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Data Flow                                │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Genotype (HapMap)  +  Phenotype (N traits)                   │
+│          │                    │                                 │
+│          └────────┬───────────┘                                 │
+│                   ↓                                             │
+│   ┌───────────────────────────────────────┐                    │
+│   │  GAPIT3 Models (per trait, parallel)  │                    │
+│   │  • BLINK (fast, high power)           │                    │
+│   │  • FarmCPU (balanced)                 │                    │
+│   │  • MLM (traditional)                  │                    │
+│   └───────────────────────────────────────┘                    │
+│                   ↓                                             │
+│   ┌───────────────────────────────────────┐                    │
+│   │  Outputs (per trait)                  │                    │
+│   │  • Manhattan plots                    │                    │
+│   │  • QQ plots                           │                    │
+│   │  • Significant SNPs CSV               │                    │
+│   │  • Execution metadata (JSON)          │                    │
+│   └───────────────────────────────────────┘                    │
+│                   ↓                                             │
+│   Aggregated Results (all traits combined)                      │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**Learn More:**
+- [GAPIT3 Documentation](https://zzlab.net/GAPIT/) - Algorithm details and parameters
+- [docs/WORKFLOW_ARCHITECTURE.md](docs/WORKFLOW_ARCHITECTURE.md) - Technical implementation
+- [docs/SCRIPTS_REFERENCE.md](docs/SCRIPTS_REFERENCE.md) - Script parameters and usage
+
+---
+
 ## Features
 
-- 🚀 **Parallelized Execution**: Run 184 traits simultaneously on Argo Workflows
-- 🐳 **Fully Containerized**: Docker + devcontainer support for local development
-- 📊 **Multi-Model Support**: BLINK, FarmCPU, and other GAPIT3 models
-- 🔬 **FAIR Principles**: Metadata tracking, provenance, and reproducibility
-- ⚡ **Optimized Performance**: Multi-threaded OpenBLAS for fast linear algebra
-- 📈 **Auto-Aggregation**: Collect and summarize results from all traits
-- 🎯 **Production-Ready**: Used for Arabidopsis thaliana iron trait analysis (546 accessions, ~1.4M SNPs)
+- **Parallelized Execution**: Run N traits simultaneously on Argo Workflows (trait count detected from phenotype file)
+- **Fully Containerized**: Docker + devcontainer support for local development
+- **Multi-Model Support**: BLINK, FarmCPU, MLM, and other [GAPIT3 models](https://zzlab.net/GAPIT/)
+- **FAIR Principles**: Metadata tracking, provenance, and reproducibility
+- **Optimized Performance**: Multi-threaded OpenBLAS for fast linear algebra
+- **Auto-Aggregation**: Collect and summarize results from all traits
+- **Species-Agnostic**: Works with any organism using HapMap-format genotype data
 
 ---
 
@@ -52,7 +92,7 @@ cd cluster/argo
   --data-path /your/nfs/path/data \
   --output-path /your/nfs/path/outputs
 
-# 5. Run full pipeline (184 traits)
+# 5. Run full pipeline (all traits in phenotype file)
 ./scripts/submit_workflow.sh full \
   --data-path /your/nfs/path/data \
   --output-path /your/nfs/path/outputs \
@@ -163,13 +203,13 @@ docker run --rm --env-file .env gapit3:latest
 │     └─ Validate input files, config, parameters            │
 │                                                             │
 │  2. Trait Extraction (Generate manifest)                   │
-│     └─ Extract 184 trait names from phenotype file         │
+│     └─ Extract N trait names from phenotype file           │
 │                                                             │
-│  3. Parallel GWAS Execution (184 concurrent jobs)          │
-│     ├─ Trait 1: BLINK + FarmCPU  (32GB RAM, 12 CPUs)      │
-│     ├─ Trait 2: BLINK + FarmCPU  (32GB RAM, 12 CPUs)      │
+│  3. Parallel GWAS Execution (N concurrent jobs)            │
+│     ├─ Trait 1: BLINK + FarmCPU  (configurable resources) │
+│     ├─ Trait 2: BLINK + FarmCPU  (configurable resources) │
 │     ├─ ...                                                  │
-│     └─ Trait 184: BLINK + FarmCPU (32GB RAM, 12 CPUs)     │
+│     └─ Trait N: BLINK + FarmCPU  (configurable resources) │
 │        │                                                    │
 │        └─ Each job produces:                                │
 │           ├─ Manhattan plots                                │
@@ -185,6 +225,9 @@ docker run --rm --env-file .env gapit3:latest
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
+
+> **Note**: N = number of trait columns in your phenotype file (columns 2 through end).
+> See [docs/RESOURCE_SIZING.md](docs/RESOURCE_SIZING.md) for memory/CPU recommendations.
 
 ### File Structure
 
@@ -219,7 +262,7 @@ gapit3-gwas-pipeline/
 
 ### Computational Resources (Per Trait)
 
-Based on 546 accessions, ~1.4M SNPs:
+> **Example**: Based on reference dataset (546 samples, ~1.4M SNPs). Your requirements will vary based on dataset size. See [docs/RESOURCE_SIZING.md](docs/RESOURCE_SIZING.md) for sizing formulas.
 
 | Resource | Minimum | Recommended | Optimal |
 |----------|---------|-------------|---------|
@@ -285,12 +328,12 @@ cd cluster/argo
 
 # Expected output:
 # ✓ Validation passed
-# ✓ Extracted 186 traits
+# ✓ Extracted N traits (from phenotype file)
 # ✓ Running traits 2, 3, 4 in parallel
 # ✓ Workflow completed in ~45 minutes
 ```
 
-### Production Run (All 184 Traits)
+### Production Run (All Traits)
 
 ```bash
 # Submit full pipeline
@@ -306,8 +349,9 @@ cd cluster/argo
 
 # Results will be in:
 # outputs/
-# ├── trait_002_*/ ... trait_187_*/  (individual results)
-# └── aggregated_results/             (summary)
+# ├── trait_002_*/                    (per-trait results)
+# ├── trait_003_*/ ... trait_NNN_*/   (one directory per trait)
+# └── aggregated_results/             (summary across all traits)
 ```
 
 ---
@@ -400,13 +444,15 @@ SNP_123,1,12345,2.3e-9,0.15,500,0.06,3.1e-8,root_length,FarmCPU
 
 ## Performance
 
-### Benchmarks (546 accessions, 1.4M SNPs)
+### Benchmarks
+
+> **Reference dataset**: 546 samples, ~1.4M SNPs, 184 traits. Your runtime will scale with dataset size.
 
 | Configuration | Traits | Time | Notes |
 |---------------|--------|------|-------|
 | Single job (serial) | 1 trait | ~15 min | BLINK only |
-| Parallel (50 jobs) | 184 traits | ~4 hours | BLINK + FarmCPU |
-| Parallel (100 jobs) | 184 traits | ~2.5 hours | If cluster allows |
+| Parallel (50 jobs) | N traits | ~4 hours | BLINK + FarmCPU (reference dataset) |
+| Parallel (100 jobs) | N traits | ~2.5 hours | If cluster allows |
 
 ### Optimization Tips
 
