@@ -9,7 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **BLINK MAF Column Order Issue** - Fixed incorrect MAF values in aggregated results for BLINK model
+  - GAPIT's BLINK model outputs columns in wrong order (MAF contains sample count instead of frequency)
+  - Aggregation script now detects MAF > 1 and sets to NA with warning
+  - MLM and FarmCPU models retain correct MAF values
+  - Added test fixtures and unit tests for column handling
+
 ### Added
+- **Analysis Type Parsing** - Extract NYC/Kansas suffix from trait names into separate column
+  - `analysis_type` column added to aggregated output (values: NYC, Kansas, standard)
+  - Trait names cleaned of suffix for better readability
+  - Documented NYC/Kansas as duplicate outputs (identical data)
+- **GAPIT Output Quirks Documentation** - Added reference section to results-aggregation spec
+  - BLINK column order issue
+  - NYC/Kansas duplicate outputs
+  - Filter file column limitations
 - **RunAI CLI v2 Skill and Documentation Update** - Complete migration to RunAI CLI v2 syntax
   - `.claude/skills/runai/` - New Claude skill for RunAI CLI v2 assistance
     - `skill.md` - Comprehensive v2 command reference with migration guide

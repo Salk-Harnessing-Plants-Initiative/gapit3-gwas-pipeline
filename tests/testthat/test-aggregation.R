@@ -97,13 +97,18 @@ test_that("read_filter_file reads multi-model Filter file correctly", {
 test_that("read_filter_file correctly parses trait names with periods", {
   fixture_dir <- get_fixture_path(file.path("aggregation", "trait_003_period_in_name"))
 
-  result <- read_filter_file(fixture_dir, threshold = 5e-8)
+  result <- suppressWarnings(read_filter_file(fixture_dir, threshold = 5e-8))
 
   expect_equal(unique(result$model), "BLINK")
 
   trait_name <- unique(result$trait)
+  # Trait name should contain the period but NOT the (NYC) suffix (stripped)
   expect_true(grepl("day_1\\.2", trait_name))
-  expect_true(grepl("mean_GR_rootLength_day_1\\.2\\(NYC\\)", trait_name))
+  expect_equal(trait_name, "mean_GR_rootLength_day_1.2")
+
+  # analysis_type should be extracted
+  expect_true("analysis_type" %in% colnames(result))
+  expect_equal(unique(result$analysis_type), "NYC")
 })
 
 # ==============================================================================
@@ -512,4 +517,124 @@ test_that("select_best_trait_dirs handles multiple traits correctly", {
   expect_true(dirs[1] %in% result)  # Trait 1
   expect_true(dirs[3] %in% result)  # Trait 2 (newer)
   expect_false(dirs[2] %in% result)  # Old trait 2 excluded
+})
+
+# ==============================================================================
+# Tests for BLINK MAF column swap fix (fix-aggregation-column-handling)
+# ==============================================================================
+
+test_that("read_filter_file detects BLINK MAF > 1 and sets to NA", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_blink_maf_swap"))
+
+  # Capture warnings
+  result <- suppressWarnings(read_filter_file(fixture_dir, threshold = 5e-8))
+
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 2)
+  expect_true("MAF" %in% colnames(result))
+
+
+  # BLINK rows with MAF > 1 should be set to NA
+  expect_true(all(is.na(result$MAF)))
+  expect_equal(unique(result$model), "BLINK")
+})
+
+test_that("read_filter_file retains valid MAF for MLM/FarmCPU models", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_mixed_models"))
+
+  result <- suppressWarnings(read_filter_file(fixture_dir, threshold = 5e-8))
+
+  expect_s3_class(result, "data.frame")
+  expect_equal(nrow(result), 3)
+
+  # MLM and FarmCPU should have valid MAF values
+  mlm_row <- result[result$model == "MLM", ]
+  farmcpu_row <- result[result$model == "FarmCPU", ]
+
+  expect_false(is.na(mlm_row$MAF))
+  expect_false(is.na(farmcpu_row$MAF))
+  expect_true(mlm_row$MAF > 0 && mlm_row$MAF <= 0.5)
+  expect_true(farmcpu_row$MAF > 0 && farmcpu_row$MAF <= 0.5)
+
+  # BLINK should have NA MAF (was 536)
+  blink_row <- result[result$model == "BLINK", ]
+  expect_true(is.na(blink_row$MAF))
+})
+
+# ==============================================================================
+# Tests for analysis_type parsing (fix-aggregation-column-handling)
+# ==============================================================================
+
+test_that("read_filter_file extracts analysis_type=NYC from trait suffix", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_mixed_models"))
+
+  result <- suppressWarnings(read_filter_file(fixture_dir, threshold = 5e-8))
+
+  expect_true("analysis_type" %in% colnames(result))
+  expect_true(all(result$analysis_type == "NYC"))
+
+  # Trait name should NOT contain (NYC) suffix
+  expect_false(any(grepl("\\(NYC\\)", result$trait)))
+  expect_equal(unique(result$trait), "test_trait")
+})
+
+test_that("read_filter_file extracts analysis_type=Kansas from trait suffix", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_kansas_suffix"))
+
+  result <- suppressWarnings(read_filter_file(fixture_dir, threshold = 5e-8))
+
+  expect_true("analysis_type" %in% colnames(result))
+  expect_true(all(result$analysis_type == "Kansas"))
+
+  # Trait name should NOT contain (Kansas) suffix
+  expect_false(any(grepl("\\(Kansas\\)", result$trait)))
+  expect_equal(unique(result$trait), "shoot_iron_content")
+})
+
+test_that("read_filter_file sets analysis_type=standard when no suffix", {
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_no_suffix"))
+
+  result <- read_filter_file(fixture_dir, threshold = 5e-8)
+
+  expect_true("analysis_type" %in% colnames(result))
+  expect_true(all(result$analysis_type == "standard"))
+  expect_equal(unique(result$trait), "simple_trait")
+})
+
+test_that("aggregated output includes analysis_type and trait_dir columns", {
+  temp_output <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_output))
+
+  fixture_base <- get_fixture_path("aggregation")
+
+  # Copy fixtures to temp directory
+  for (trait_dir in c("trait_mixed_models", "trait_no_suffix")) {
+    src_dir <- file.path(fixture_base, trait_dir)
+    dest_dir <- file.path(temp_output, trait_dir)
+    dir.create(dest_dir, recursive = TRUE)
+    for (file in list.files(src_dir, full.names = TRUE)) {
+      file.copy(file, dest_dir)
+    }
+  }
+
+  # Aggregate results
+  all_snps <- data.frame()
+  trait_dirs_full <- list.files(temp_output, pattern = "trait_", full.names = TRUE)
+
+  for (dir in trait_dirs_full) {
+    trait_snps <- suppressWarnings(read_filter_file(dir, threshold = 5e-8))
+    if (!is.null(trait_snps) && nrow(trait_snps) > 0) {
+      all_snps <- rbind(all_snps, trait_snps)
+    }
+  }
+
+  # Verify required columns exist
+  expect_true("analysis_type" %in% colnames(all_snps))
+  expect_true("trait_dir" %in% colnames(all_snps))
+  expect_true("model" %in% colnames(all_snps))
+  expect_true("trait" %in% colnames(all_snps))
+
+  # Verify analysis_type values
+  expect_true("NYC" %in% all_snps$analysis_type)
+  expect_true("standard" %in% all_snps$analysis_type)
 })

@@ -437,3 +437,34 @@ The aggregation script MUST support a `--no-markdown` flag to skip markdown repo
   - NOT create `pipeline_summary.md`
   - Print message: "Skipping markdown report generation (--no-markdown)"
 
+---
+
+## Reference: GAPIT Output Quirks
+
+This section documents known GAPIT output format quirks that the aggregation script handles. This is a reference for maintainers and is not a normative requirement.
+
+### BLINK Column Order Issue
+
+GAPIT's BLINK model outputs the Filter file with columns in a different order than other models:
+
+| Model | MAF Column Contains |
+|-------|---------------------|
+| MLM, FarmCPU, GLM | Minor allele frequency (0.0-0.5) |
+| BLINK | Sample count (e.g., 536) - **incorrect** |
+
+The aggregation script detects MAF values > 1 and sets them to NA, logging a warning.
+
+### NYC/Kansas Duplicate Outputs
+
+When `Multiple_analysis=TRUE`, GAPIT generates two sets of output files:
+- Files ending in `(NYC)` - New York City method (standard single-locus)
+- Files ending in `(Kansas)` - Kansas method (multi-locus variant)
+
+**These contain identical data.** The Filter file only includes NYC results to avoid duplication. The aggregation script parses the suffix into an `analysis_type` column.
+
+### Filter File Column Limitations
+
+The Filter file (`GAPIT.Association.Filter_GWAS_results.csv`) contains only:
+- `SNP`, `Chr`, `Pos`, `P.value`, `MAF`, `traits`
+
+The full GWAS_Results files additionally contain `nobs`, `Effect`, `H&B.P.Value` but are not used for aggregation due to their size (1.4M rows per model per trait).

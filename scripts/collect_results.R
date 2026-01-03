@@ -223,35 +223,48 @@ generate_executive_summary <- function(stats, top_snp, top_trait) {
   paste(lines, collapse = "\n")
 }
 
+#' Extract GAPIT parameter with fallback to legacy names
+#' Supports both schema v3.0.0 (parameters.gapit.*) and v2.0.0 (parameters.*)
+#' @param metadata Metadata list
+#' @param gapit_name GAPIT native parameter name (e.g., "model", "PCA.total")
+#' @param legacy_name Legacy parameter name (e.g., "models", "pca_components")
+#' @param default Default value if not found
+#' @return Parameter value
+get_gapit_param <- function(metadata, gapit_name, legacy_name, default = NULL) {
+
+  # Try new schema first (parameters.gapit.*)
+  if (!is.null(metadata$parameters$gapit[[gapit_name]])) {
+    return(metadata$parameters$gapit[[gapit_name]])
+  }
+  # Fall back to legacy schema (parameters.*)
+  if (!is.null(metadata$parameters[[legacy_name]])) {
+    return(metadata$parameters[[legacy_name]])
+  }
+  return(default)
+}
+
 #' Generate configuration section
 #' @param metadata Metadata list from first trait
 #' @param summary_table Summary data frame
 #' @return Character string with markdown
 generate_configuration_section <- function(metadata, summary_table) {
-  # Extract parameters with defaults
-  models <- if (!is.null(metadata$parameters$models)) {
-    paste(metadata$parameters$models, collapse = ", ")
+  # Extract GAPIT parameters (supports both v3.0.0 and v2.0.0 schemas)
+  models <- get_gapit_param(metadata, "model", "models", NULL)
+  if (!is.null(models)) {
+    models <- paste(models, collapse = ", ")
   } else {
-    "N/A"
+    models <- "N/A"
   }
 
-  pca <- if (!is.null(metadata$parameters$pca_components)) {
-    metadata$parameters$pca_components
-  } else {
-    "N/A"
-  }
+  pca_total <- get_gapit_param(metadata, "PCA.total", "pca_components", "N/A")
+  snp_maf <- get_gapit_param(metadata, "SNP.MAF", "maf_filter", "N/A")
+  snp_fdr <- get_gapit_param(metadata, "SNP.FDR", "snp_fdr", NULL)
+  snp_fdr <- if (!is.null(snp_fdr)) snp_fdr else "N/A (disabled)"
 
-  maf <- if (!is.null(metadata$parameters$maf_filter)) {
-    metadata$parameters$maf_filter
-  } else {
-    "N/A"
-  }
-
-  snp_fdr <- if (!is.null(metadata$parameters$snp_fdr)) {
-    metadata$parameters$snp_fdr
-  } else {
-    "N/A (disabled)"
-  }
+  # New GAPIT parameters (v3.0.0 only)
+  kinship_algo <- get_gapit_param(metadata, "kinship.algorithm", NULL, NULL)
+  snp_effect <- get_gapit_param(metadata, "SNP.effect", NULL, NULL)
+  snp_impute <- get_gapit_param(metadata, "SNP.impute", NULL, NULL)
 
   n_snps <- if (!is.null(metadata$genotype$n_snps)) {
     format_number(metadata$genotype$n_snps)
@@ -269,15 +282,49 @@ generate_configuration_section <- function(metadata, summary_table) {
     "N/A"
   }
 
+  # Build configuration section with GAPIT naming
   lines <- c(
     "## Configuration",
     "",
+    "### GAPIT Parameters",
+    "",
     "| Parameter | Value |",
     "|-----------|-------|",
-    sprintf("| Models | %s |", models),
-    sprintf("| PCA Components | %s |", pca),
-    sprintf("| MAF Filter | %s |", maf),
-    sprintf("| SNP FDR | %s |", snp_fdr),
+    sprintf("| model | %s |", models),
+    sprintf("| PCA.total | %s |", pca_total)
+  )
+
+  # Add optional parameters if present
+
+  if (!is.null(kinship_algo)) {
+    lines <- c(lines, sprintf("| kinship.algorithm | %s |", kinship_algo))
+  }
+  if (!is.null(snp_effect)) {
+    lines <- c(lines, sprintf("| SNP.effect | %s |", snp_effect))
+  }
+  if (!is.null(snp_impute)) {
+    lines <- c(lines, sprintf("| SNP.impute | %s |", snp_impute))
+  }
+
+  lines <- c(lines, "")
+
+  # Filtering section
+  lines <- c(lines,
+    "### Filtering",
+    "",
+    "| Parameter | Value |",
+    "|-----------|-------|",
+    sprintf("| SNP.MAF | %s |", snp_maf),
+    sprintf("| SNP.FDR | %s |", snp_fdr),
+    ""
+  )
+
+  # Data section
+  lines <- c(lines,
+    "### Data",
+    "",
+    "| Parameter | Value |",
+    "|-----------|-------|",
     sprintf("| SNPs Tested | %s |", n_snps),
     sprintf("| Accessions | %s |", n_accessions),
     ""
@@ -289,6 +336,7 @@ generate_configuration_section <- function(metadata, summary_table) {
     pheno_file <- if (!is.null(metadata$inputs$phenotype_file)) metadata$inputs$phenotype_file else "N/A"
     lines <- c(lines,
       "### Input Files",
+      "",
       sprintf("- **Genotype:** `%s`", geno_file),
       sprintf("- **Phenotype:** `%s`", pheno_file),
       ""
@@ -753,12 +801,16 @@ check_trait_completeness <- function(trait_dirs) {
 #' significant SNPs with model information in the traits column.
 #' Format: "<MODEL>.<TraitName>" (e.g., "BLINK.root_length")
 #'
+#' Handles known GAPIT quirks:
+#' - BLINK model has swapped columns (MAF contains sample count instead of frequency)
+#' - Trait names may have (NYC) or (Kansas) suffix indicating analysis type
+#'
 #' Returns NULL if Filter file is missing (trait incomplete).
 #' Returns empty data.frame if Filter file exists but has no significant SNPs.
 #'
 #' @param trait_dir Path to trait result directory
 #' @param threshold Significance threshold (unused, kept for API compatibility)
-#' @return data.frame with columns including model, trait, and trait_dir, or NULL if incomplete
+#' @return data.frame with columns including model, trait, analysis_type, and trait_dir, or NULL if incomplete
 read_filter_file <- function(trait_dir, threshold = 5e-8) {
   filter_file <- file.path(trait_dir, "GAPIT.Association.Filter_GWAS_results.csv")
 
@@ -783,14 +835,16 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
     }
 
     # Parse model and trait from traits column
-    # Format: "<MODEL>.<TraitName>"
+    # Format: "<MODEL>.<TraitName>" or "<MODEL>.<TraitName>(NYC|Kansas)"
     # Handle compound models (FarmCPU.LM, Blink.LM) before simple split
     filter_data$model <- ifelse(
       grepl("^FarmCPU\\.LM\\.", filter_data$traits), "FarmCPU.LM",
       ifelse(grepl("^Blink\\.LM\\.", filter_data$traits), "Blink.LM",
              sub("\\..*", "", filter_data$traits))
     )
-    filter_data$trait <- ifelse(
+
+    # Extract raw trait (before stripping analysis_type suffix)
+    raw_trait <- ifelse(
       grepl("^FarmCPU\\.LM\\.", filter_data$traits),
       sub("^FarmCPU\\.LM\\.", "", filter_data$traits),
       ifelse(grepl("^Blink\\.LM\\.", filter_data$traits),
@@ -798,8 +852,43 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
              sub("^[^.]+\\.", "", filter_data$traits))
     )
 
+    # Parse analysis_type from trait suffix (NYC, Kansas, or standard)
+    filter_data$analysis_type <- ifelse(
+      grepl("\\(NYC\\)$", raw_trait), "NYC",
+      ifelse(grepl("\\(Kansas\\)$", raw_trait), "Kansas", "standard")
+    )
+
+    # Strip analysis_type suffix from trait name
+    filter_data$trait <- gsub("\\(NYC\\)$|\\(Kansas\\)$", "", raw_trait)
+
     # Add trait_dir for provenance tracking
     filter_data$trait_dir <- basename(trait_dir)
+
+    # -------------------------------------------------------------------------
+    # GAPIT BLINK column swap fix
+    # -------------------------------------------------------------------------
+    # GAPIT's BLINK model outputs columns in wrong order:
+    # Header claims: P.value, MAF, nobs, Effect, H&B.P.Value
+    # Actual data:   P.value, nobs, Effect, MAF, H&B.P.Value
+    #
+    # In the Filter file, only MAF column is present (no nobs, Effect, H&B).
+    # When MAF > 1, it's actually the sample count (nobs), not a frequency.
+    # Since we can't recover the true MAF from Filter file, set to NA.
+    # -------------------------------------------------------------------------
+    if ("MAF" %in% colnames(filter_data)) {
+      # Detect invalid MAF values (frequency must be in [0, 0.5] for minor allele)
+      invalid_maf <- !is.na(filter_data$MAF) & filter_data$MAF > 1
+
+      if (any(invalid_maf)) {
+        n_invalid <- sum(invalid_maf)
+        affected_models <- unique(filter_data$model[invalid_maf])
+        warning(sprintf(
+          "Detected BLINK column order issue in %s: %d rows have MAF > 1 (models: %s). Setting to NA.",
+          basename(trait_dir), n_invalid, paste(affected_models, collapse = ", ")
+        ))
+        filter_data$MAF[invalid_maf] <- NA
+      }
+    }
 
     # Validate model names (warn if unexpected, but continue)
     expected_models <- c("BLINK", "FarmCPU", "GLM", "MLM", "MLMM",
