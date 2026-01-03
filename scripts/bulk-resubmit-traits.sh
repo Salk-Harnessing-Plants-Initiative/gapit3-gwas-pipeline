@@ -9,7 +9,55 @@
 set -euo pipefail
 
 # ==============================================================================
-# Configuration
+# Parse Arguments (before loading config so --help works without .env)
+# ==============================================================================
+
+DRY_RUN=false
+TRAITS=()
+
+show_usage() {
+    echo "Usage: $0 [--dry-run] <trait1> <trait2> <trait3> ..."
+    echo ""
+    echo "Options:"
+    echo "  --dry-run    Show what would be resubmitted without actually doing it"
+    echo "  --help, -h   Show this help message"
+    echo ""
+    echo "Example:"
+    echo "  $0 --dry-run 37 50 61 66 70 76"
+    echo "  $0 37 50 61 66 70 76"
+    echo ""
+    echo "Or get failed traits from runai:"
+    echo "  failed_traits=\$(runai workspace list -p talmo-lab | grep \"\$JOB_PREFIX\" | grep Failed | awk '{print \$1}' | sed 's/\$JOB_PREFIX-//')"
+    echo "  $0 \$failed_traits"
+    echo ""
+    echo "Requires: .env file with PROJECT and JOB_PREFIX variables"
+}
+
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --help|-h)
+            show_usage
+            exit 0
+            ;;
+        *)
+            TRAITS+=("$1")
+            shift
+            ;;
+    esac
+done
+
+# Show usage and exit if no traits provided (before .env check)
+if [ ${#TRAITS[@]} -eq 0 ]; then
+    show_usage
+    exit 1
+fi
+
+# ==============================================================================
+# Configuration (loaded after args so --help works without .env)
 # ==============================================================================
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -31,46 +79,6 @@ fi
 
 if [ -z "${JOB_PREFIX:-}" ]; then
     echo "Error: JOB_PREFIX not set in .env"
-    exit 1
-fi
-
-# ==============================================================================
-# Parse Arguments
-# ==============================================================================
-
-DRY_RUN=false
-TRAITS=()
-
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --dry-run)
-            DRY_RUN=true
-            shift
-            ;;
-        *)
-            TRAITS+=("$1")
-            shift
-            ;;
-    esac
-done
-
-# ==============================================================================
-# Input Validation
-# ==============================================================================
-
-if [ ${#TRAITS[@]} -eq 0 ]; then
-    echo "Usage: $0 [--dry-run] <trait1> <trait2> <trait3> ..."
-    echo ""
-    echo "Options:"
-    echo "  --dry-run    Show what would be resubmitted without actually doing it"
-    echo ""
-    echo "Example:"
-    echo "  $0 --dry-run 37 50 61 66 70 76"
-    echo "  $0 37 50 61 66 70 76"
-    echo ""
-    echo "Or get failed traits from runai:"
-    echo "  failed_traits=\$(runai workspace list -p talmo-lab | grep \"$JOB_PREFIX\" | grep Failed | awk '{print \$1}' | sed 's/${JOB_PREFIX}-//')"
-    echo "  $0 \$failed_traits"
     exit 1
 fi
 
