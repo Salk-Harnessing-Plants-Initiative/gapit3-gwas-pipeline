@@ -21,16 +21,38 @@ spec:
   serviceAccountName: default
 
   # Workflow-level parameters (customize these!)
+  # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-834d729-test"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test"
     - name: data-hostpath
       value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/data"
     - name: output-hostpath
       value: "/hpi/hpi_dev/users/eberrigan/20251107_GAPIT_pipeline_tests/outputs"
+    # Data file paths (relative to /data mount point)
+    - name: genotype-file
+      value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+    - name: phenotype-file
+      value: "/data/phenotype/iron_traits_edited.txt"
+    - name: accession-ids-file
+      value: "/data/metadata/ids_gwas.txt"
+    # GAPIT parameters (v3.0.0 naming)
+    - name: model
+      value: "BLINK,FarmCPU,MLM"
+    - name: pca-total
+      value: "3"
+    - name: snp-maf
+      value: "0"
     - name: snp-fdr
       value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
+    # Advanced GAPIT parameters
+    - name: kinship-algorithm
+      value: "Zhang"
+    - name: snp-effect
+      value: "Add"
+    - name: snp-impute
+      value: "Middle"
 
   # Global timeout
   activeDeadlineSeconds: 14400  # 4 hours max
@@ -76,10 +98,26 @@ spec:
             value: "test-trait-2"
           - name: image
             value: "{{workflow.parameters.image}}"
-          - name: models
-            value: "BLINK,FarmCPU,MLM"
+          - name: genotype-file
+            value: "{{workflow.parameters.genotype-file}}"
+          - name: phenotype-file
+            value: "{{workflow.parameters.phenotype-file}}"
+          - name: accession-ids-file
+            value: "{{workflow.parameters.accession-ids-file}}"
+          - name: model
+            value: "{{workflow.parameters.model}}"
+          - name: pca-total
+            value: "{{workflow.parameters.pca-total}}"
+          - name: snp-maf
+            value: "{{workflow.parameters.snp-maf}}"
           - name: snp-fdr
             value: "{{workflow.parameters.snp-fdr}}"
+          - name: kinship-algorithm
+            value: "{{workflow.parameters.kinship-algorithm}}"
+          - name: snp-effect
+            value: "{{workflow.parameters.snp-effect}}"
+          - name: snp-impute
+            value: "{{workflow.parameters.snp-impute}}"
 
       - name: run-trait-3
         dependencies: [extract-traits]
@@ -94,10 +132,26 @@ spec:
             value: "test-trait-3"
           - name: image
             value: "{{workflow.parameters.image}}"
-          - name: models
-            value: "BLINK,FarmCPU,MLM"
+          - name: genotype-file
+            value: "{{workflow.parameters.genotype-file}}"
+          - name: phenotype-file
+            value: "{{workflow.parameters.phenotype-file}}"
+          - name: accession-ids-file
+            value: "{{workflow.parameters.accession-ids-file}}"
+          - name: model
+            value: "{{workflow.parameters.model}}"
+          - name: pca-total
+            value: "{{workflow.parameters.pca-total}}"
+          - name: snp-maf
+            value: "{{workflow.parameters.snp-maf}}"
           - name: snp-fdr
             value: "{{workflow.parameters.snp-fdr}}"
+          - name: kinship-algorithm
+            value: "{{workflow.parameters.kinship-algorithm}}"
+          - name: snp-effect
+            value: "{{workflow.parameters.snp-effect}}"
+          - name: snp-impute
+            value: "{{workflow.parameters.snp-impute}}"
 
       - name: run-trait-4
         dependencies: [extract-traits]
@@ -112,10 +166,26 @@ spec:
             value: "test-trait-4"
           - name: image
             value: "{{workflow.parameters.image}}"
-          - name: models
-            value: "BLINK,FarmCPU,MLM"
+          - name: genotype-file
+            value: "{{workflow.parameters.genotype-file}}"
+          - name: phenotype-file
+            value: "{{workflow.parameters.phenotype-file}}"
+          - name: accession-ids-file
+            value: "{{workflow.parameters.accession-ids-file}}"
+          - name: model
+            value: "{{workflow.parameters.model}}"
+          - name: pca-total
+            value: "{{workflow.parameters.pca-total}}"
+          - name: snp-maf
+            value: "{{workflow.parameters.snp-maf}}"
           - name: snp-fdr
             value: "{{workflow.parameters.snp-fdr}}"
+          - name: kinship-algorithm
+            value: "{{workflow.parameters.kinship-algorithm}}"
+          - name: snp-effect
+            value: "{{workflow.parameters.snp-effect}}"
+          - name: snp-impute
+            value: "{{workflow.parameters.snp-impute}}"
 
   # ===========================================================================
   # Template: Validation
@@ -129,11 +199,11 @@ spec:
 
       env:
       - name: GENOTYPE_FILE
-        value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+        value: "{{workflow.parameters.genotype-file}}"
       - name: PHENOTYPE_FILE
-        value: "/data/phenotype/iron_traits_edited.txt"
+        value: "{{workflow.parameters.phenotype-file}}"
       - name: ACCESSION_IDS_FILE
-        value: "/data/metadata/ids_gwas.txt"
+        value: "{{workflow.parameters.accession-ids-file}}"
 
       volumeMounts:
       - name: nfs-data
@@ -158,7 +228,7 @@ spec:
       command: ["/scripts/entrypoint.sh"]
       args:
         - "extract-traits"
-        - "/data/phenotype/iron_traits_edited.txt"
+        - "{{workflow.parameters.phenotype-file}}"
         - "/outputs/traits_manifest.yaml"
 
       volumeMounts:

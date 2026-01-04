@@ -44,11 +44,14 @@ kubectl apply -f workflow-templates/gapit3-single-trait-template.yaml -n runai-t
 - Supports all GAPIT3 models (BLINK, FarmCPU, MLM, MLMM, SUPER, CMLM)
 - Outputs metadata JSON for traceability
 
-**Parameters**:
+**Parameters** (v3.0.0 naming, see [docs/GAPIT_PARAMETERS.md](../../docs/GAPIT_PARAMETERS.md)):
 - `trait-index` - Phenotype column number (2-187)
 - `trait-name` - Descriptive name for the trait
 - `image` - Docker image tag to use
-- `models` - Comma-separated GAPIT models (e.g., "BLINK,FarmCPU,MLM")
+- `model` - Comma-separated GAPIT models (e.g., "BLINK,FarmCPU,MLM")
+- `pca-total` - Number of principal components (0-20)
+- `snp-maf` - Minor allele frequency threshold (0-0.5)
+- `snp-fdr` - FDR threshold for Benjamini-Hochberg (0-1, empty to disable)
 
 #### trait-extractor-template.yaml
 **Purpose**: Parse phenotype file and generate trait manifest
@@ -148,11 +151,16 @@ extract-traits
 collect-results
 ```
 
-**Configurable Parameters**:
+**Configurable Parameters** (v3.0.0 naming):
 - `data-hostpath` - Path to input data directory
 - `output-hostpath` - Path to output directory
-- `image` - Docker image tag (default: `sha-bc10fc8-test`)
-- `models` - GAPIT models to run (default: `BLINK,FarmCPU,MLM`)
+- `genotype-file` - Path to genotype file (relative to /data mount)
+- `phenotype-file` - Path to phenotype file (relative to /data mount)
+- `accession-ids-file` - Path to accession IDs file (relative to /data mount)
+- `image` - Docker image tag (default: `sha-539fe5c-test`)
+- `model` - GAPIT models to run (default: `BLINK,FarmCPU,MLM`)
+- `pca-total` - Number of principal components (default: `3`)
+- `snp-maf` - Minor allele frequency threshold (default: `0`)
 - `snp-fdr` - FDR threshold for Benjamini-Hochberg correction (default: empty/disabled, e.g., `0.05` for 5% FDR)
 
 > **Note**: Resource allocation (CPU, memory) and parallelism are configured directly in YAML files, not via CLI parameters. See [Resource Requirements](#resource-requirements) for details.

@@ -40,6 +40,7 @@ spec:
             cpu: "16"          # Allow burst to 16 cores
 
         # Environment variables - ALL configuration is passed here
+        # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
         env:
         - name: OPENBLAS_NUM_THREADS
           value: "12"
@@ -55,12 +56,24 @@ spec:
           value: "/data/phenotype/iron_traits_edited.txt"
         - name: ACCESSION_IDS_FILE
           value: "/data/metadata/ids_gwas.txt"
-        - name: MODELS
+        # Core GAPIT parameters (v3.0.0 naming)
+        - name: MODEL
           value: "BLINK,FarmCPU"
-        - name: PCA_COMPONENTS
+        - name: PCA_TOTAL
           value: "3"
+        - name: SNP_MAF
+          value: "0"
+        - name: SNP_THRESHOLD
+          value: "0.05"
         - name: SNP_FDR
           value: "{{ SNP_FDR }}"  # Optional: FDR threshold (0.0-1.0), empty to disable
+        # Advanced GAPIT parameters
+        - name: KINSHIP_ALGORITHM
+          value: "Zhang"
+        - name: SNP_EFFECT
+          value: "Add"
+        - name: SNP_IMPUTE
+          value: "Middle"
         - name: OUTPUT_PATH
           value: "/outputs"
 

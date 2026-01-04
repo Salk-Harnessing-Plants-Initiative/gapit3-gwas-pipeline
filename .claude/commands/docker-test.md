@@ -66,11 +66,13 @@ docker run --rm \
 ### Test 4: Environment Configuration
 
 ```bash
+# v3.0.0 parameter naming (MODEL, PCA_TOTAL, SNP_MAF)
 docker run --rm \
-  -e MODELS=BLINK \
-  -e PCA_COMPONENTS=5 \
+  -e MODEL=BLINK \
+  -e PCA_TOTAL=5 \
+  -e SNP_MAF=0.05 \
   -e OPENBLAS_NUM_THREADS=12 \
-  gapit3-gwas-pipeline:latest bash -c 'env | grep -E "MODELS|PCA|OPENBLAS"'
+  gapit3-gwas-pipeline:latest bash -c 'env | grep -E "MODEL|PCA_TOTAL|SNP_MAF|OPENBLAS"'
 ```
 
 **Expected output**: Environment variables set correctly

@@ -114,11 +114,12 @@ check_environment_file() {
     success ".env file is readable"
 
     # Check required variables
+    # Note: v3.0.0 uses MODEL/PCA_TOTAL/SNP_MAF, but we accept legacy MODELS/PCA_COMPONENTS/MAF_FILTER
+    # DATA_PATH and OUTPUT_PATH are also accepted as alternatives to DATA_PATH_HOST/OUTPUT_PATH_HOST
     local required_vars=(
-        "IMAGE" "DATA_PATH_HOST" "OUTPUT_PATH_HOST"
+        "IMAGE"
         "GENOTYPE_FILE" "PHENOTYPE_FILE"
         "START_TRAIT" "END_TRAIT"
-        "MODELS" "PCA_COMPONENTS"
         "PROJECT" "JOB_PREFIX"
         "CPU" "MEMORY" "MAX_CONCURRENT"
     )
@@ -130,6 +131,46 @@ check_environment_file() {
             success "$var is set"
         fi
     done
+
+    # Check DATA_PATH (v3.0.0) or DATA_PATH_HOST (legacy)
+    if [[ -z "${DATA_PATH:-}" ]] && [[ -z "${DATA_PATH_HOST:-}" ]]; then
+        error "DATA_PATH or DATA_PATH_HOST not set"
+    elif [[ -n "${DATA_PATH_HOST:-}" ]] && [[ -z "${DATA_PATH:-}" ]]; then
+        warning "DATA_PATH_HOST is deprecated, use DATA_PATH instead"
+        success "DATA_PATH_HOST is set (legacy)"
+    else
+        success "DATA_PATH is set"
+    fi
+
+    # Check OUTPUT_PATH (v3.0.0) or OUTPUT_PATH_HOST (legacy)
+    if [[ -z "${OUTPUT_PATH:-}" ]] && [[ -z "${OUTPUT_PATH_HOST:-}" ]]; then
+        error "OUTPUT_PATH or OUTPUT_PATH_HOST not set"
+    elif [[ -n "${OUTPUT_PATH_HOST:-}" ]] && [[ -z "${OUTPUT_PATH:-}" ]]; then
+        warning "OUTPUT_PATH_HOST is deprecated, use OUTPUT_PATH instead"
+        success "OUTPUT_PATH_HOST is set (legacy)"
+    else
+        success "OUTPUT_PATH is set"
+    fi
+
+    # Check MODEL (v3.0.0) or MODELS (legacy)
+    if [[ -z "${MODEL:-}" ]] && [[ -z "${MODELS:-}" ]]; then
+        error "MODEL or MODELS not set"
+    elif [[ -n "${MODELS:-}" ]] && [[ -z "${MODEL:-}" ]]; then
+        warning "MODELS is deprecated, use MODEL instead"
+        success "MODELS is set (legacy)"
+    else
+        success "MODEL is set"
+    fi
+
+    # Check PCA_TOTAL (v3.0.0) or PCA_COMPONENTS (legacy)
+    if [[ -z "${PCA_TOTAL:-}" ]] && [[ -z "${PCA_COMPONENTS:-}" ]]; then
+        warning "PCA_TOTAL not set (will use GAPIT default: 0)"
+    elif [[ -n "${PCA_COMPONENTS:-}" ]] && [[ -z "${PCA_TOTAL:-}" ]]; then
+        warning "PCA_COMPONENTS is deprecated, use PCA_TOTAL instead"
+        success "PCA_COMPONENTS is set (legacy)"
+    else
+        success "PCA_TOTAL is set"
+    fi
 }
 
 check_docker_image() {
@@ -180,15 +221,16 @@ check_docker_image() {
 check_cluster_paths() {
     section "Cluster Paths"
 
-    # Check DATA_PATH_HOST
-    if [[ -z "${DATA_PATH_HOST:-}" ]]; then
-        error "DATA_PATH_HOST not set"
+    # Check DATA_PATH (v3.0.0) or DATA_PATH_HOST (legacy)
+    local data_path="${DATA_PATH:-${DATA_PATH_HOST:-}}"
+    if [[ -z "$data_path" ]]; then
+        error "DATA_PATH or DATA_PATH_HOST not set"
     else
         # Check is absolute path
-        if [[ ! "$DATA_PATH_HOST" =~ ^/ ]]; then
-            error "DATA_PATH_HOST must be absolute path: $DATA_PATH_HOST"
+        if [[ ! "$data_path" =~ ^/ ]]; then
+            error "DATA_PATH must be absolute path: $data_path"
         else
-            success "DATA_PATH_HOST is absolute: $DATA_PATH_HOST"
+            success "DATA_PATH is absolute: $data_path"
         fi
 
         # Note: We cannot reliably verify cluster paths exist from local machine
@@ -196,15 +238,16 @@ check_cluster_paths() {
         info "Cluster path existence will be validated when jobs start"
     fi
 
-    # Check OUTPUT_PATH_HOST
-    if [[ -z "${OUTPUT_PATH_HOST:-}" ]]; then
-        error "OUTPUT_PATH_HOST not set"
+    # Check OUTPUT_PATH (v3.0.0) or OUTPUT_PATH_HOST (legacy)
+    local output_path="${OUTPUT_PATH:-${OUTPUT_PATH_HOST:-}}"
+    if [[ -z "$output_path" ]]; then
+        error "OUTPUT_PATH or OUTPUT_PATH_HOST not set"
     else
         # Check is absolute path
-        if [[ ! "$OUTPUT_PATH_HOST" =~ ^/ ]]; then
-            error "OUTPUT_PATH_HOST must be absolute path: $OUTPUT_PATH_HOST"
+        if [[ ! "$output_path" =~ ^/ ]]; then
+            error "OUTPUT_PATH must be absolute path: $output_path"
         else
-            success "OUTPUT_PATH_HOST is absolute: $OUTPUT_PATH_HOST"
+            success "OUTPUT_PATH is absolute: $output_path"
         fi
 
         info "Output directory will be created by jobs if it doesn't exist"
@@ -230,8 +273,9 @@ check_data_files() {
             return
         fi
 
-        # Build full path
-        local full_path="$DATA_PATH_HOST${file_path#/data}"
+        # Build full path (use DATA_PATH v3.0.0, fallback to DATA_PATH_HOST legacy)
+        local data_path="${DATA_PATH:-${DATA_PATH_HOST:-}}"
+        local full_path="$data_path${file_path#/data}"
 
         # Try to access file (handle Windows mount)
         local check_path="$full_path"
@@ -273,8 +317,9 @@ check_phenotype_structure() {
         return
     fi
 
-    # Build phenotype file path
-    local pheno_path="$DATA_PATH_HOST${PHENOTYPE_FILE#/data}"
+    # Build phenotype file path (use DATA_PATH v3.0.0, fallback to DATA_PATH_HOST legacy)
+    local data_path="${DATA_PATH:-${DATA_PATH_HOST:-}}"
+    local pheno_path="$data_path${PHENOTYPE_FILE#/data}"
 
     # Try Windows mount if direct access fails
     if [[ ! -f "$pheno_path" ]]; then
@@ -357,12 +402,13 @@ check_trait_indices() {
 check_gapit_parameters() {
     section "GAPIT Parameters"
 
-    # Check MODELS
-    if [[ -z "${MODELS:-}" ]]; then
-        error "MODELS not set"
+    # Check MODEL (v3.0.0) or MODELS (legacy)
+    local model_value="${MODEL:-${MODELS:-}}"
+    if [[ -z "$model_value" ]]; then
+        error "MODEL not set"
     else
         local valid_models="BLINK FarmCPU MLM MLMM SUPER CMLM"
-        IFS=',' read -ra model_array <<< "$MODELS"
+        IFS=',' read -ra model_array <<< "$model_value"
         for model in "${model_array[@]}"; do
             model=$(echo "$model" | xargs)  # trim whitespace
             if [[ ! " $valid_models " =~ " $model " ]]; then
@@ -373,37 +419,41 @@ check_gapit_parameters() {
         done
     fi
 
-    # Check PCA_COMPONENTS
-    if [[ -z "${PCA_COMPONENTS:-}" ]]; then
-        error "PCA_COMPONENTS not set"
-    elif [[ $PCA_COMPONENTS -lt 0 ]] || [[ $PCA_COMPONENTS -gt 20 ]]; then
-        error "PCA_COMPONENTS must be between 0 and 20, found: $PCA_COMPONENTS"
+    # Check PCA_TOTAL (v3.0.0) or PCA_COMPONENTS (legacy)
+    local pca_value="${PCA_TOTAL:-${PCA_COMPONENTS:-0}}"
+    if [[ $pca_value -lt 0 ]] || [[ $pca_value -gt 20 ]]; then
+        error "PCA_TOTAL must be between 0 and 20, found: $pca_value"
     else
-        success "PCA_COMPONENTS: $PCA_COMPONENTS"
+        success "PCA_TOTAL: $pca_value"
     fi
 
     # Check SNP_THRESHOLD
-    if [[ -z "${SNP_THRESHOLD:-}" ]]; then
-        error "SNP_THRESHOLD not set"
+    local threshold_value="${SNP_THRESHOLD:-0.05}"
+    # Check is valid p-value format (scientific notation or decimal)
+    if [[ "$threshold_value" =~ ^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]]; then
+        success "SNP_THRESHOLD: $threshold_value"
     else
-        # Check is valid p-value format (scientific notation or decimal)
-        if [[ "$SNP_THRESHOLD" =~ ^[0-9]*\.?[0-9]+([eE][-+]?[0-9]+)?$ ]]; then
-            success "SNP_THRESHOLD: $SNP_THRESHOLD"
-        else
-            error "SNP_THRESHOLD has invalid format: $SNP_THRESHOLD"
-        fi
+        error "SNP_THRESHOLD has invalid format: $threshold_value"
     fi
 
-    # Check MAF_FILTER
-    if [[ -z "${MAF_FILTER:-}" ]]; then
-        warning "MAF_FILTER not set (will use default)"
+    # Check SNP_MAF (v3.0.0) or MAF_FILTER (legacy)
+    local maf_value="${SNP_MAF:-${MAF_FILTER:-0}}"
+    # Check is between 0 and 0.5 (use awk instead of bc)
+    if awk -v maf="$maf_value" 'BEGIN { exit !(maf >= 0 && maf <= 0.5) }'; then
+        success "SNP_MAF: $maf_value"
     else
-        # Check is between 0 and 0.5 (use awk instead of bc)
-        if awk -v maf="$MAF_FILTER" 'BEGIN { exit !(maf >= 0 && maf <= 0.5) }'; then
-            success "MAF_FILTER: $MAF_FILTER"
+        error "SNP_MAF must be between 0 and 0.5, found: $maf_value"
+    fi
+
+    # Check SNP_FDR (optional)
+    if [[ -n "${SNP_FDR:-}" ]]; then
+        if awk -v fdr="$SNP_FDR" 'BEGIN { exit !(fdr >= 0 && fdr <= 1) }'; then
+            success "SNP_FDR: $SNP_FDR"
         else
-            error "MAF_FILTER must be between 0 and 0.5, found: $MAF_FILTER"
+            error "SNP_FDR must be between 0 and 1, found: $SNP_FDR"
         fi
+    else
+        info "SNP_FDR: disabled"
     fi
 }
 

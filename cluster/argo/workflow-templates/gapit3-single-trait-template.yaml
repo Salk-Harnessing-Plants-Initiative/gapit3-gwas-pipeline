@@ -23,7 +23,14 @@ spec:
     - name: trait-name
       value: "unknown"
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test"
+    # Data file paths (relative to /data mount point)
+    - name: genotype-file
+      value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+    - name: phenotype-file
+      value: "/data/phenotype/iron_traits_edited.txt"
+    - name: accession-ids-file
+      value: "/data/metadata/ids_gwas.txt"
     # Core GAPIT parameters (v3.0.0 naming) - defaults match GAPIT's native defaults
     - name: model
       value: "MLM"                    # GAPIT default
@@ -56,6 +63,10 @@ spec:
       - name: trait-index
       - name: trait-name
       - name: image
+      # Data file paths
+      - name: genotype-file
+      - name: phenotype-file
+      - name: accession-ids-file
       # Core GAPIT parameters (v3.0.0 naming)
       - name: model
       - name: pca-total
@@ -96,13 +107,13 @@ spec:
 
       # Environment variables
       env:
-      # Data paths
+      # Data paths (parameterized from workflow)
       - name: GENOTYPE_FILE
-        value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+        value: "{{inputs.parameters.genotype-file}}"
       - name: PHENOTYPE_FILE
-        value: "/data/phenotype/iron_traits_edited.txt"
+        value: "{{inputs.parameters.phenotype-file}}"
       - name: ACCESSION_IDS_FILE
-        value: "/data/metadata/ids_gwas.txt"
+        value: "{{inputs.parameters.accession-ids-file}}"
       # Core GAPIT parameters (v3.0.0 naming)
       - name: MODEL
         value: "{{inputs.parameters.model}}"

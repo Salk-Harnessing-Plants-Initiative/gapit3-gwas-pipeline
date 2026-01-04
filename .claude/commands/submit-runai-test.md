@@ -28,9 +28,10 @@ This pipeline uses **workspace** because jobs need manual cleanup after completi
 
 ```bash
 # IMPORTANT: Use MSYS_NO_PATHCONV=1 in Git Bash to prevent path mangling
+# Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
 MSYS_NO_PATHCONV=1 runai workspace submit <job-name> \
     --project talmo-lab \
-    --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
+    --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test \
     --cpu-core-request 12 \
     --cpu-memory-request 32G \
     --host-path path=/hpi/hpi_dev/users/<user>/<dataset>/data,mount=/data,mount-propagation=HostToContainer \
@@ -41,11 +42,14 @@ MSYS_NO_PATHCONV=1 runai workspace submit <job-name> \
     --environment GENOTYPE_FILE=/data/genotype/<file>.hmp.txt \
     --environment PHENOTYPE_FILE=/data/phenotype/<file>.txt \
     --environment ACCESSION_IDS_FILE=/data/metadata/ids_gwas.txt \
-    --environment MODELS=BLINK,FarmCPU \
-    --environment PCA_COMPONENTS=3 \
-    --environment SNP_THRESHOLD=0.00000001 \
+    --environment MODEL=BLINK,FarmCPU \
+    --environment PCA_TOTAL=3 \
+    --environment SNP_MAF=0.05 \
+    --environment SNP_THRESHOLD=0.05 \
     --environment SNP_FDR=0.05 \
-    --environment MAF_FILTER=0.05 \
+    --environment KINSHIP_ALGORITHM=Zhang \
+    --environment SNP_EFFECT=Add \
+    --environment SNP_IMPUTE=Middle \
     --environment OPENBLAS_NUM_THREADS=12 \
     --environment OMP_NUM_THREADS=12 \
     --command -- /scripts/entrypoint.sh run-single-trait
@@ -69,9 +73,10 @@ MSYS_NO_PATHCONV=1 runai workspace submit <job-name> \
 ## Example: Iron Traits Dataset with FDR
 
 ```bash
+# v3.0.0 parameter naming (MODEL, PCA_TOTAL, SNP_MAF)
 MSYS_NO_PATHCONV=1 runai workspace submit gapit3-fdr-test-trait2 \
     --project talmo-lab \
-    --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test \
+    --image ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test \
     --cpu-core-request 12 \
     --cpu-memory-request 32G \
     --host-path path=/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data,mount=/data,mount-propagation=HostToContainer \
@@ -82,11 +87,11 @@ MSYS_NO_PATHCONV=1 runai workspace submit gapit3-fdr-test-trait2 \
     --environment GENOTYPE_FILE=/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt \
     --environment PHENOTYPE_FILE=/data/phenotype/iron_traits_edited.txt \
     --environment ACCESSION_IDS_FILE=/data/metadata/ids_gwas.txt \
-    --environment MODELS=BLINK,FarmCPU \
-    --environment PCA_COMPONENTS=3 \
-    --environment SNP_THRESHOLD=0.00000001 \
+    --environment MODEL=BLINK,FarmCPU,MLM \
+    --environment PCA_TOTAL=3 \
+    --environment SNP_MAF=0.05 \
+    --environment SNP_THRESHOLD=0.05 \
     --environment SNP_FDR=0.05 \
-    --environment MAF_FILTER=0.05 \
     --environment OPENBLAS_NUM_THREADS=12 \
     --environment OMP_NUM_THREADS=12 \
     --command -- /scripts/entrypoint.sh run-single-trait
