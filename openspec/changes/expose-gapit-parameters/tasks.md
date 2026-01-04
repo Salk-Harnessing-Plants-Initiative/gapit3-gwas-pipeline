@@ -115,7 +115,7 @@
 - [x] Change tests checking for PCA_COMPONENTS → PCA_TOTAL
 - [x] Change tests checking for MAF_FILTER → SNP_MAF
 - [x] Update default value expectations (MLM, 0, 0 instead of BLINK,FarmCPU, 3, 0.05)
-- [ ] Run CI to verify all tests pass
+- [x] Run CI to verify all tests pass (4/4 workflows passing)
 
 ## Phase 7: Update Argo/RunAI Templates
 
@@ -151,9 +151,9 @@
 ## Phase 9: Final Validation
 
 ### 9.1 Run Full Test Suite
-- [x] All integration tests pass (12/12)
-- [ ] All R unit tests pass (BLOCKED - see Phase 1.2)
-- [ ] CI pipeline passes
+- [x] All integration tests pass (14/14 after SNP_THRESHOLD addition)
+- [ ] All R unit tests pass (BLOCKED - see Phase 1.2, tracked in GitHub Issue #11)
+- [x] CI pipeline passes (4/4 workflows: R Script Tests, Bash Validation, Docker Build, Devcontainer)
 
 ### 9.2 Manual Validation
 - [ ] Test with real GWAS data
