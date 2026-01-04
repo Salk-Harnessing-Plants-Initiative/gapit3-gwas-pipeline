@@ -105,8 +105,10 @@ The `generate_configuration_section()` in `collect_results.R` needs to display a
 | `MODEL` | `BLINK,FarmCPU` | `MLM` | More conservative default |
 | `PCA_TOTAL` | `3` | `0` | No PCA by default |
 | `SNP_MAF` | `0.05` | `0` | No MAF filtering by default |
+| `KINSHIP_ALGORITHM` | `VanRaden` | `Zhang` | GAPIT default algorithm |
+| `SNP_THRESHOLD` | `5e-8` | `0.05` | GAPIT cutOff default |
 
-**Recommendation**: Keep our current defaults but document clearly that they differ from GAPIT. Users can set `SNP_MAF=0` to get GAPIT behavior.
+**Decision**: Use GAPIT's exact default values. This ensures users get identical behavior to native GAPIT unless they explicitly configure otherwise. Users familiar with GAPIT won't be surprised, and scientific reproducibility is maintained.
 
 ## Scope
 

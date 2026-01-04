@@ -248,6 +248,45 @@ test_snp_impute_valid() {
 }
 
 # =============================================================================
+# Test: SNP_THRESHOLD (cutOff) parameter
+# =============================================================================
+
+test_snp_threshold_accepted() {
+    log_test "SNP_THRESHOLD env var is accepted"
+    ((TESTS_RUN++))
+
+    output=$(docker run --rm \
+        -e SNP_THRESHOLD=0.05 \
+        -e TRAIT_INDEX=2 \
+        "$TEST_IMAGE" help 2>&1) || true
+
+    if echo "$output" | grep -qi "invalid.*snp_threshold\|error.*snp_threshold"; then
+        log_fail "SNP_THRESHOLD was rejected"
+        echo "$output"
+        return 1
+    fi
+    log_pass "SNP_THRESHOLD env var accepted"
+}
+
+test_snp_threshold_displayed() {
+    log_test "SNP_THRESHOLD is displayed in config"
+    ((TESTS_RUN++))
+
+    output=$(docker run --rm \
+        -e SNP_THRESHOLD=0.01 \
+        -e TRAIT_INDEX=2 \
+        "$TEST_IMAGE" help 2>&1) || true
+
+    # Should show SNP_THRESHOLD in config display
+    if ! echo "$output" | grep -qi "snp_threshold.*0.01\|threshold.*0.01"; then
+        log_fail "Config display missing SNP_THRESHOLD value"
+        echo "$output"
+        return 1
+    fi
+    log_pass "SNP_THRESHOLD displayed in config"
+}
+
+# =============================================================================
 # Test: Runtime configuration display
 # =============================================================================
 
@@ -298,6 +337,10 @@ main() {
     test_kinship_algorithm_invalid || true
     test_snp_effect_valid || true
     test_snp_impute_valid || true
+
+    # Run SNP_THRESHOLD tests
+    test_snp_threshold_accepted || true
+    test_snp_threshold_displayed || true
 
     # Run config display test
     test_log_config_shows_gapit_params || true

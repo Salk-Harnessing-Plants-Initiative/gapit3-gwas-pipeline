@@ -33,20 +33,20 @@ ACCESSION_IDS_FILE="${ACCESSION_IDS_FILE:-${DATA_PATH}/phenotype/accession_ids.t
 # Parameter names match GAPIT's native naming (dots replaced with underscores)
 # Legacy names (MODELS, PCA_COMPONENTS, MAF_FILTER) are supported with warnings
 
-# Core GAPIT Parameters (Tier 1)
-MODEL="${MODEL:-BLINK,FarmCPU}"           # GAPIT: model (comma-separated for multiple)
-PCA_TOTAL="${PCA_TOTAL:-3}"               # GAPIT: PCA.total
-MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"  # GAPIT: Multiple_analysis
+# Core GAPIT Parameters (Tier 1) - Using GAPIT's exact defaults
+MODEL="${MODEL:-MLM}"                     # GAPIT default: MLM
+PCA_TOTAL="${PCA_TOTAL:-0}"               # GAPIT default: 0 (no PCA)
+MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"  # GAPIT default: TRUE
 
-# SNP Filtering Parameters
-SNP_MAF="${SNP_MAF:-0.05}"                # GAPIT: SNP.MAF (0 = no filtering)
-SNP_FDR="${SNP_FDR:-}"                    # GAPIT: SNP.FDR (empty = disabled)
-SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"    # Legacy significance threshold
+# SNP Filtering Parameters - Using GAPIT's exact defaults
+SNP_MAF="${SNP_MAF:-0}"                   # GAPIT default: 0 (no MAF filtering)
+SNP_FDR="${SNP_FDR:-}"                    # GAPIT default: 1 (effectively disabled, empty = disabled here)
+SNP_THRESHOLD="${SNP_THRESHOLD:-0.05}"    # GAPIT default cutOff: 0.05
 
-# Advanced GAPIT Parameters (Tier 2)
-KINSHIP_ALGORITHM="${KINSHIP_ALGORITHM:-VanRaden}"  # GAPIT: kinship.algorithm
-SNP_EFFECT="${SNP_EFFECT:-Add}"           # GAPIT: SNP.effect (Add, Dom)
-SNP_IMPUTE="${SNP_IMPUTE:-Middle}"        # GAPIT: SNP.impute (Middle, Major, Minor)
+# Advanced GAPIT Parameters (Tier 2) - Using GAPIT's exact defaults
+KINSHIP_ALGORITHM="${KINSHIP_ALGORITHM:-Zhang}"  # GAPIT default: Zhang
+SNP_EFFECT="${SNP_EFFECT:-Add}"           # GAPIT default: Add
+SNP_IMPUTE="${SNP_IMPUTE:-Middle}"        # GAPIT default: Middle
 
 # Legacy parameter names (deprecated, for backward compatibility)
 MODELS="${MODELS:-}"
@@ -90,7 +90,7 @@ handle_deprecated_params() {
 
     # MODELS -> MODEL
     if [ -n "${MODELS:-}" ]; then
-        if [ "$MODEL" = "BLINK,FarmCPU" ]; then
+        if [ "$MODEL" = "MLM" ]; then
             # MODEL has default value, use MODELS
             log_warn "MODELS is deprecated, use MODEL instead"
             MODEL="$MODELS"
@@ -100,7 +100,7 @@ handle_deprecated_params() {
 
     # PCA_COMPONENTS -> PCA_TOTAL
     if [ -n "${PCA_COMPONENTS:-}" ]; then
-        if [ "$PCA_TOTAL" = "3" ]; then
+        if [ "$PCA_TOTAL" = "0" ]; then
             # PCA_TOTAL has default value, use PCA_COMPONENTS
             log_warn "PCA_COMPONENTS is deprecated, use PCA_TOTAL instead"
             PCA_TOTAL="$PCA_COMPONENTS"
@@ -109,7 +109,7 @@ handle_deprecated_params() {
 
     # MAF_FILTER -> SNP_MAF
     if [ -n "${MAF_FILTER:-}" ]; then
-        if [ "$SNP_MAF" = "0.05" ]; then
+        if [ "$SNP_MAF" = "0" ]; then
             # SNP_MAF has default value, use MAF_FILTER
             log_warn "MAF_FILTER is deprecated, use SNP_MAF instead"
             SNP_MAF="$MAF_FILTER"
@@ -118,7 +118,7 @@ handle_deprecated_params() {
 
     # KINSHIP_METHOD -> KINSHIP_ALGORITHM
     if [ -n "${KINSHIP_METHOD:-}" ]; then
-        if [ "$KINSHIP_ALGORITHM" = "VanRaden" ]; then
+        if [ "$KINSHIP_ALGORITHM" = "Zhang" ]; then
             # KINSHIP_ALGORITHM has default value, use KINSHIP_METHOD
             log_warn "KINSHIP_METHOD is deprecated, use KINSHIP_ALGORITHM instead"
             KINSHIP_ALGORITHM="$KINSHIP_METHOD"
@@ -585,19 +585,20 @@ ${BLUE}Available commands:${NC}
 
 ${BLUE}Environment Variables (v3.0.0):${NC}
   See .env.example for complete documentation
+  All defaults match GAPIT's native defaults for consistency.
 
   Core GAPIT Parameters:
     TRAIT_INDEX         Trait column index (default: 2)
-    MODEL               GWAS models (default: BLINK,FarmCPU)
-    PCA_TOTAL           PCA components (default: 3)
+    MODEL               GWAS models (default: MLM)
+    PCA_TOTAL           PCA components (default: 0, no PCA)
 
   SNP Filtering:
-    SNP_MAF             MAF threshold (default: 0.05, 0=disabled)
+    SNP_MAF             MAF threshold (default: 0, no filtering)
     SNP_FDR             FDR threshold (e.g., 0.05; default: disabled)
-    SNP_THRESHOLD       P-value threshold (default: 5e-8)
+    SNP_THRESHOLD       P-value threshold (default: 0.05)
 
   Advanced GAPIT Parameters:
-    KINSHIP_ALGORITHM   Kinship algorithm (default: VanRaden)
+    KINSHIP_ALGORITHM   Kinship algorithm (default: Zhang)
     SNP_EFFECT          SNP effect model (default: Add)
     SNP_IMPUTE          Imputation method (default: Middle)
 
@@ -683,6 +684,8 @@ case "$COMMAND" in
         run_aggregation
         ;;
     help|--help|-h)
+        # Handle deprecation warnings first so users see them
+        handle_deprecated_params
         show_help
         show_current_config
         exit 0

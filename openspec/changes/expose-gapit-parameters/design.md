@@ -244,7 +244,7 @@ GAPIT Configuration:
 
 ## Trade-offs
 
-### Option A: Keep Current Defaults (Recommended)
+### Option A: Keep Current Defaults
 **Pros**:
 - No breaking change for existing users
 - Sensible defaults for common use cases
@@ -253,22 +253,40 @@ GAPIT Configuration:
 **Cons**:
 - Differs from GAPIT defaults
 - May surprise GAPIT experts
+- Users expect pipeline to behave like native GAPIT
 
-### Option B: Use GAPIT Defaults Exactly
+### Option B: Use GAPIT Defaults Exactly (Selected)
 **Pros**:
 - Identical behavior to native GAPIT
 - No surprises for GAPIT users
+- Users can rely on GAPIT documentation for default behavior
+- Scientific consistency with published GAPIT behavior
 
 **Cons**:
-- Breaking change for all existing pipelines
-- MAF=0 may include unreliable rare variants
-- PCA=0 may not correct for population structure
+- Breaking change for existing pipelines using implicit defaults
+- MAF=0 may include unreliable rare variants (users should set explicitly)
+- PCA=0 may not correct for population structure (users should set explicitly)
 
-### Decision: Option A with Clear Documentation
-- Keep current sensible defaults
-- Document prominently that defaults differ from GAPIT
-- Show defaults in help output and configuration display
-- Users can set `SNP_MAF=0` etc. to get GAPIT behavior
+### Decision: Option B - Use GAPIT Defaults Exactly
+- Use GAPIT's exact default values for all parameters
+- Document clearly in .env.example, help text, and docs/GAPIT_PARAMETERS.md
+- Users who want different behavior must set parameters explicitly
+- This ensures scientific reproducibility and no surprises
+
+**GAPIT Native Defaults (verified from source code)**:
+| Parameter | GAPIT Default |
+|-----------|---------------|
+| model | MLM |
+| PCA.total | 0 |
+| SNP.MAF | 0 |
+| SNP.FDR | 1 (disabled) |
+| cutOff | 0.05 |
+| kinship.algorithm | Zhang |
+| SNP.effect | Add |
+| SNP.impute | Middle |
+| Multiple_analysis | TRUE |
+
+Reference: https://github.com/jiabowang/GAPIT (GAPIT.R function signature)
 
 ## File Changes Summary
 

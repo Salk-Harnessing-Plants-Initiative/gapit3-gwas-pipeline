@@ -15,6 +15,7 @@ spec:
   serviceAccountName: default  # Required for workflowtaskresults permission
 
   # Template-level arguments with defaults
+  # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
   arguments:
     parameters:
     - name: trait-index
@@ -23,10 +24,22 @@ spec:
       value: "unknown"
     - name: image
       value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-bc10fc8-test"
-    - name: models
-      value: "BLINK,FarmCPU,MLM"
+    # Core GAPIT parameters (v3.0.0 naming) - defaults match GAPIT's native defaults
+    - name: model
+      value: "MLM"                    # GAPIT default
+    - name: pca-total
+      value: "0"                      # GAPIT default (no PCA)
+    - name: snp-maf
+      value: "0"                      # GAPIT default (no MAF filtering)
     - name: snp-fdr
-      value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
+      value: ""                       # GAPIT default is 1 (disabled); empty = disabled
+    # Advanced GAPIT parameters - defaults match GAPIT's native defaults
+    - name: kinship-algorithm
+      value: "Zhang"                  # GAPIT default
+    - name: snp-effect
+      value: "Add"                    # GAPIT default
+    - name: snp-impute
+      value: "Middle"                 # GAPIT default
 
   templates:
   # ===========================================================================
@@ -43,8 +56,15 @@ spec:
       - name: trait-index
       - name: trait-name
       - name: image
-      - name: models
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: model
+      - name: pca-total
+      - name: snp-maf
       - name: snp-fdr
+      # Advanced GAPIT parameters
+      - name: kinship-algorithm
+      - name: snp-effect
+      - name: snp-impute
 
     metadata:
       labels:
@@ -76,18 +96,35 @@ spec:
 
       # Environment variables
       env:
+      # Data paths
       - name: GENOTYPE_FILE
         value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
       - name: PHENOTYPE_FILE
         value: "/data/phenotype/iron_traits_edited.txt"
       - name: ACCESSION_IDS_FILE
         value: "/data/metadata/ids_gwas.txt"
-      - name: MODELS
-        value: "{{inputs.parameters.models}}"
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: MODEL
+        value: "{{inputs.parameters.model}}"
+      - name: PCA_TOTAL
+        value: "{{inputs.parameters.pca-total}}"
+      - name: SNP_MAF
+        value: "{{inputs.parameters.snp-maf}}"
+      - name: SNP_FDR
+        value: "{{inputs.parameters.snp-fdr}}"
+      # Advanced GAPIT parameters
+      - name: KINSHIP_ALGORITHM
+        value: "{{inputs.parameters.kinship-algorithm}}"
+      - name: SNP_EFFECT
+        value: "{{inputs.parameters.snp-effect}}"
+      - name: SNP_IMPUTE
+        value: "{{inputs.parameters.snp-impute}}"
+      # Compute resources
       - name: OPENBLAS_NUM_THREADS
         value: "12"
       - name: OMP_NUM_THREADS
         value: "12"
+      # Trait configuration
       - name: TRAIT_INDEX
         value: "{{inputs.parameters.trait-index}}"
       - name: TRAIT_NAME
@@ -113,8 +150,6 @@ spec:
         value: "{{inputs.parameters.image}}"
       - name: RETRY_ATTEMPT
         value: "{{retries}}"
-      - name: SNP_FDR
-        value: "{{inputs.parameters.snp-fdr}}"
 
       # Resource allocation - increased for large datasets (1.4M+ SNPs, 2.2GB genotype file)
       # Note: Resources must be fixed values in WorkflowTemplates when using templateRef

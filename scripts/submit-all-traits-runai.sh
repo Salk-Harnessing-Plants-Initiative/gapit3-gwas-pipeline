@@ -82,12 +82,19 @@ CPU="${CPU:-12}"
 MEMORY="${MEMORY:-32G}"
 
 # Configuration (GAPIT Runtime Parameters - passed as environment variables to container)
-MODELS="${MODELS:-BLINK,FarmCPU}"
-PCA_COMPONENTS="${PCA_COMPONENTS:-3}"
-SNP_THRESHOLD="${SNP_THRESHOLD:-5e-8}"
-SNP_FDR="${SNP_FDR:-}"  # Empty default = disabled, set to 0.05 for FDR-controlled analysis
-MAF_FILTER="${MAF_FILTER:-0.05}"
-MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"
+# v3.0.0 parameter names preferred; legacy names still supported for backward compatibility
+# All defaults match GAPIT's native defaults for consistency
+# Reference: https://github.com/jiabowang/GAPIT (GAPIT source code)
+MODEL="${MODEL:-${MODELS:-MLM}}"                    # GAPIT default: MLM
+PCA_TOTAL="${PCA_TOTAL:-${PCA_COMPONENTS:-0}}"      # GAPIT default: 0 (no PCA)
+SNP_MAF="${SNP_MAF:-${MAF_FILTER:-0}}"              # GAPIT default: 0 (no MAF filtering)
+SNP_THRESHOLD="${SNP_THRESHOLD:-0.05}"              # GAPIT default cutOff: 0.05
+SNP_FDR="${SNP_FDR:-}"  # GAPIT default: 1 (disabled); empty = disabled here
+MULTIPLE_ANALYSIS="${MULTIPLE_ANALYSIS:-TRUE}"      # GAPIT default: TRUE
+# Advanced GAPIT parameters (v3.0.0) - using GAPIT defaults
+KINSHIP_ALGORITHM="${KINSHIP_ALGORITHM:-Zhang}"     # GAPIT default: Zhang
+SNP_EFFECT="${SNP_EFFECT:-Add}"                     # GAPIT default: Add
+SNP_IMPUTE="${SNP_IMPUTE:-Middle}"                  # GAPIT default: Middle
 
 # Colors for output
 RED='\033[0;31m'
@@ -107,13 +114,16 @@ echo "  Traits:            $START_TRAIT to $END_TRAIT ($(($END_TRAIT - $START_TR
 echo "  Max concurrent:    $MAX_CONCURRENT"
 echo "  Resources:         $CPU CPU, $MEMORY memory"
 echo ""
-echo "GAPIT Parameters (passed as ENV to container):"
-echo "  Models:            $MODELS"
-echo "  PCA Components:    $PCA_COMPONENTS"
-echo "  SNP Threshold:     $SNP_THRESHOLD"
-echo "  SNP FDR:           ${SNP_FDR:-<disabled>}"
-echo "  MAF Filter:        $MAF_FILTER"
-echo "  Multiple Analysis: $MULTIPLE_ANALYSIS"
+echo "GAPIT Parameters (v3.0.0 naming, passed as ENV to container):"
+echo "  MODEL:              $MODEL"
+echo "  PCA_TOTAL:          $PCA_TOTAL"
+echo "  SNP_MAF:            $SNP_MAF"
+echo "  SNP_THRESHOLD:      $SNP_THRESHOLD"
+echo "  SNP_FDR:            ${SNP_FDR:-<disabled>}"
+echo "  KINSHIP_ALGORITHM:  $KINSHIP_ALGORITHM"
+echo "  SNP_EFFECT:         $SNP_EFFECT"
+echo "  SNP_IMPUTE:         $SNP_IMPUTE"
+echo "  MULTIPLE_ANALYSIS:  $MULTIPLE_ANALYSIS"
 echo ""
 echo "Paths:"
 echo "  Data path:         $DATA_PATH"
@@ -260,11 +270,14 @@ for trait_idx in $(seq $START_TRAIT $END_TRAIT); do
         --environment GENOTYPE_FILE=${GENOTYPE_FILE} \
         --environment PHENOTYPE_FILE=${PHENOTYPE_FILE} \
         --environment ACCESSION_IDS_FILE=${ACCESSION_IDS_FILE:-} \
-        --environment MODELS=$MODELS \
-        --environment PCA_COMPONENTS=$PCA_COMPONENTS \
+        --environment MODEL=$MODEL \
+        --environment PCA_TOTAL=$PCA_TOTAL \
+        --environment SNP_MAF=$SNP_MAF \
         --environment SNP_THRESHOLD=$SNP_THRESHOLD \
         $SNP_FDR_FLAG \
-        --environment MAF_FILTER=$MAF_FILTER \
+        --environment KINSHIP_ALGORITHM=$KINSHIP_ALGORITHM \
+        --environment SNP_EFFECT=$SNP_EFFECT \
+        --environment SNP_IMPUTE=$SNP_IMPUTE \
         --environment MULTIPLE_ANALYSIS=$MULTIPLE_ANALYSIS \
         --environment OPENBLAS_NUM_THREADS=$CPU \
         --environment OMP_NUM_THREADS=$CPU \

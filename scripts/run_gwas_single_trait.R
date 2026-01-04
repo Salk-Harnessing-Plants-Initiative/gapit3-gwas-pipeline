@@ -76,24 +76,38 @@ option_list <- list(
   make_option(c("-o", "--output-dir"), type = "character",
               default = Sys.getenv("OUTPUT_PATH", "/outputs"),
               help = "Output directory [env: OUTPUT_PATH]", metavar = "DIR"),
+  # Core GAPIT parameters - defaults match GAPIT's native defaults
   make_option(c("-m", "--models"), type = "character",
-              default = Sys.getenv("MODELS", "BLINK,FarmCPU"),
-              help = "Comma-separated models [env: MODELS]", metavar = "STRING"),
+              default = Sys.getenv("MODEL", Sys.getenv("MODELS", "MLM")),
+              help = "Comma-separated models (GAPIT default: MLM) [env: MODEL]", metavar = "STRING"),
   make_option(c("--pca"), type = "integer",
-              default = as.integer(Sys.getenv("PCA_COMPONENTS", "3")),
-              help = "Number of PCA components [env: PCA_COMPONENTS]", metavar = "INTEGER"),
+              default = as.integer(Sys.getenv("PCA_TOTAL", Sys.getenv("PCA_COMPONENTS", "0"))),
+              help = "Number of PCA components (GAPIT default: 0) [env: PCA_TOTAL]", metavar = "INTEGER"),
   make_option(c("--threads"), type = "integer",
               default = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
               help = "Number of CPU threads [env: OPENBLAS_NUM_THREADS]", metavar = "INTEGER"),
   make_option(c("--maf"), type = "numeric",
-              default = as.numeric(Sys.getenv("MAF_FILTER", "0.05")),
-              help = "Minor allele frequency filter [env: MAF_FILTER]", metavar = "FLOAT"),
+              default = as.numeric(Sys.getenv("SNP_MAF", Sys.getenv("MAF_FILTER", "0"))),
+              help = "Minor allele frequency filter (GAPIT default: 0) [env: SNP_MAF]", metavar = "FLOAT"),
   make_option(c("--multiple-analysis"), type = "logical",
               default = as.logical(Sys.getenv("MULTIPLE_ANALYSIS", "TRUE")),
-              help = "Run multiple analysis [env: MULTIPLE_ANALYSIS]", metavar = "BOOL"),
+              help = "Run multiple analysis (GAPIT default: TRUE) [env: MULTIPLE_ANALYSIS]", metavar = "BOOL"),
   make_option(c("--snp-fdr"), type = "numeric",
               default = NULL,
-              help = "FDR threshold for SNP significance (e.g., 0.05) [env: SNP_FDR]", metavar = "FLOAT")
+              help = "FDR threshold for SNP significance (GAPIT default: 1/disabled) [env: SNP_FDR]", metavar = "FLOAT"),
+  # Advanced GAPIT parameters - defaults match GAPIT's native defaults
+  make_option(c("--kinship-algorithm"), type = "character",
+              default = Sys.getenv("KINSHIP_ALGORITHM", Sys.getenv("KINSHIP_METHOD", "Zhang")),
+              help = "Kinship algorithm (GAPIT default: Zhang) [env: KINSHIP_ALGORITHM]", metavar = "STRING"),
+  make_option(c("--snp-effect"), type = "character",
+              default = Sys.getenv("SNP_EFFECT", "Add"),
+              help = "SNP effect model (GAPIT default: Add) [env: SNP_EFFECT]", metavar = "STRING"),
+  make_option(c("--snp-impute"), type = "character",
+              default = Sys.getenv("SNP_IMPUTE", "Middle"),
+              help = "Imputation method (GAPIT default: Middle) [env: SNP_IMPUTE]", metavar = "STRING"),
+  make_option(c("--cutoff"), type = "numeric",
+              default = as.numeric(Sys.getenv("SNP_THRESHOLD", "0.05")),
+              help = "Significance cutoff (GAPIT default: 0.05) [env: SNP_THRESHOLD]", metavar = "FLOAT")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
@@ -114,7 +128,11 @@ cat("  Models:         ", opt$models, "\n")
 cat("  PCA Components: ", opt$pca, "\n")
 cat("  MAF Filter:     ", opt$maf, "\n")
 cat("  SNP FDR:        ", ifelse(is.null(opt$`snp-fdr`), "disabled", opt$`snp-fdr`), "\n")
+cat("  Cutoff:         ", opt$cutoff, "\n")
 cat("  Multiple Analysis:", opt$`multiple-analysis`, "\n")
+cat("  Kinship Algorithm:", opt$`kinship-algorithm`, "\n")
+cat("  SNP Effect:     ", opt$`snp-effect`, "\n")
+cat("  SNP Impute:     ", opt$`snp-impute`, "\n")
 cat("\n")
 
 # Parse inputs
@@ -214,7 +232,10 @@ metadata <- list(
       PCA.total = pca_components,
       Multiple_analysis = multiple_analysis,
       SNP.MAF = opt$maf,
-      SNP.FDR = opt$`snp-fdr`
+      SNP.FDR = opt$`snp-fdr`,
+      kinship.algorithm = opt$`kinship-algorithm`,
+      SNP.effect = opt$`snp-effect`,
+      SNP.impute = opt$`snp-impute`
     ),
     # Compute resources
     compute = list(
@@ -309,7 +330,11 @@ tryCatch({
     G = myG,
     PCA.total = pca_components,
     model = models,
-    Multiple_analysis = multiple_analysis
+    Multiple_analysis = multiple_analysis,
+    kinship.algorithm = opt$`kinship-algorithm`,
+    SNP.effect = opt$`snp-effect`,
+    SNP.impute = opt$`snp-impute`,
+    cutOff = opt$cutoff
   )
 
   # Add SNP.MAF if specified (GAPIT's native parameter name for MAF filtering)
