@@ -110,6 +110,7 @@
 
 ### 6.5 Update Legacy Integration Tests for v3.0.0
 - [x] Update `tests/integration/test-env-vars-e2e.sh` for v3.0.0 parameter names
+- [x] Update `tests/integration/test-snp-fdr-e2e.sh` for v3.0.0 parameter names
 - [x] Change tests checking for MODELS → MODEL
 - [x] Change tests checking for PCA_COMPONENTS → PCA_TOTAL
 - [x] Change tests checking for MAF_FILTER → SNP_MAF

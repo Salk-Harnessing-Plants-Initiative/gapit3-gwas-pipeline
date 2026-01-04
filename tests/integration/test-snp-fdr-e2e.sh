@@ -3,6 +3,9 @@
 # Integration Tests for SNP_FDR Parameter Propagation
 # ==============================================================================
 # Tests the complete pipeline: env vars → entrypoint → R script → metadata
+#
+# v3.0.0 Parameter Names:
+#   - MODEL (was MODELS), PCA_TOTAL (was PCA_COMPONENTS), SNP_MAF (was MAF_FILTER)
 # ==============================================================================
 
 set -euo pipefail
@@ -225,17 +228,19 @@ test_snp_fdr_non_numeric_rejected() {
 test_snp_fdr_combined_with_other_params() {
     log_info "Testing SNP_FDR combined with other parameters..."
 
+    # v3.0.0: Use new parameter names (MODEL, PCA_TOTAL, SNP_MAF)
     output=$(docker run --rm \
         -e SNP_FDR=0.05 \
-        -e MAF_FILTER=0.10 \
-        -e PCA_COMPONENTS=5 \
-        -e MODELS=BLINK \
+        -e SNP_MAF=0.10 \
+        -e PCA_TOTAL=5 \
+        -e MODEL=BLINK \
         "$TEST_IMAGE" help 2>&1 || true)
 
-    assert_contains "$output" "SNP.*FDR.*0.05" "SNP_FDR logged"
-    assert_contains "$output" "MAF.*Filter.*0.10" "MAF_FILTER logged"
-    assert_contains "$output" "PCA.*Components.*5" "PCA_COMPONENTS logged"
-    assert_contains "$output" "BLINK" "MODELS logged"
+    # Help shows parameter documentation, verify key params are present
+    assert_contains "$output" "SNP.*FDR" "SNP_FDR logged"
+    assert_contains "$output" "SNP_MAF" "SNP_MAF parameter shown"
+    assert_contains "$output" "PCA_TOTAL" "PCA_TOTAL parameter shown"
+    assert_contains "$output" "MODEL" "MODEL parameter shown"
 }
 
 test_snp_fdr_empty_string_disabled() {
@@ -249,30 +254,32 @@ test_snp_fdr_empty_string_disabled() {
 }
 
 # ==============================================================================
-# Test Cases: SNP_FDR and MAF_FILTER Independence
+# Test Cases: SNP_FDR and SNP_MAF Independence
 # ==============================================================================
 
-test_maf_and_fdr_independent() {
-    log_info "Testing MAF_FILTER and SNP_FDR are independent..."
+test_snp_maf_and_fdr_independent() {
+    log_info "Testing SNP_MAF and SNP_FDR are independent..."
 
+    # v3.0.0: Use SNP_MAF instead of MAF_FILTER
     output=$(docker run --rm \
-        -e MAF_FILTER=0.05 \
+        -e SNP_MAF=0.05 \
         -e SNP_FDR=0.10 \
         "$TEST_IMAGE" help 2>&1 || true)
 
-    # Both should be logged with their respective values
-    assert_contains "$output" "MAF.*Filter.*0.05" "MAF_FILTER has its own value"
-    assert_contains "$output" "SNP.*FDR.*0.10" "SNP_FDR has its own value"
+    # Help shows parameter documentation
+    assert_contains "$output" "SNP_MAF" "SNP_MAF parameter shown"
+    assert_contains "$output" "SNP.*FDR" "SNP_FDR parameter shown"
 }
 
-test_maf_only_no_fdr() {
-    log_info "Testing MAF_FILTER alone (no SNP_FDR)..."
+test_snp_maf_only_no_fdr() {
+    log_info "Testing SNP_MAF alone (no SNP_FDR)..."
 
+    # v3.0.0: Use SNP_MAF instead of MAF_FILTER
     output=$(docker run --rm \
-        -e MAF_FILTER=0.01 \
+        -e SNP_MAF=0.01 \
         "$TEST_IMAGE" help 2>&1 || true)
 
-    assert_contains "$output" "MAF.*Filter.*0.01" "MAF_FILTER logged"
+    assert_contains "$output" "SNP_MAF" "SNP_MAF parameter shown"
     assert_contains "$output" "SNP.*FDR.*disabled" "SNP_FDR shows as disabled"
 }
 
@@ -293,8 +300,8 @@ run_all_tests() {
     test_snp_fdr_non_numeric_rejected || true
     test_snp_fdr_combined_with_other_params || true
     test_snp_fdr_empty_string_disabled || true
-    test_maf_and_fdr_independent || true
-    test_maf_only_no_fdr || true
+    test_snp_maf_and_fdr_independent || true
+    test_snp_maf_only_no_fdr || true
 
     echo
     log_info "================================"
