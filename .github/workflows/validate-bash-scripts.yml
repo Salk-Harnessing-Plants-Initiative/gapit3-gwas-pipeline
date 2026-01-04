@@ -110,7 +110,7 @@ jobs:
         run: |
           echo "::group::Retry Script Unit Tests"
           if [ -f "tests/unit/test-retry-script.sh" ]; then
-            chmod +x tests/unit/test-retry-script.sh
+            chmod +x tests/unit/test-retry-script.sh scripts/*.sh
             if bash tests/unit/test-retry-script.sh; then
               echo "✓ All retry script unit tests passed"
             else
