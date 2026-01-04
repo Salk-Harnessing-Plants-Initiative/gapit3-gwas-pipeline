@@ -47,7 +47,7 @@ assert_equals() {
 
     if [[ "$actual" == "$expected" ]]; then
         log_info "PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
         return 0
     else
         log_error "FAIL: $test_name"
@@ -63,9 +63,9 @@ assert_contains() {
     local expected="$2"
     local test_name="$3"
 
-    if echo "$output" | grep -q "$expected"; then
+    if echo "$output" | grep -qF -- "$expected"; then
         log_info "PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
         return 0
     else
         log_error "FAIL: $test_name"
@@ -83,7 +83,7 @@ assert_exit_code() {
 
     if [[ "$actual" -eq "$expected" ]]; then
         log_info "PASS: $test_name"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
         return 0
     else
         log_error "FAIL: $test_name"
@@ -105,7 +105,7 @@ test_syntax_validation() {
     # Test retry script syntax
     if bash -n "$RETRY_SCRIPT" 2>/dev/null; then
         log_info "PASS: retry-failed-traits.sh has valid syntax"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: retry-failed-traits.sh has syntax errors"
         ((TESTS_FAILED++))
@@ -114,7 +114,7 @@ test_syntax_validation() {
     # Test bulk resubmit script syntax
     if bash -n "$BULK_SCRIPT" 2>/dev/null; then
         log_info "PASS: bulk-resubmit-traits.sh has valid syntax"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: bulk-resubmit-traits.sh has syntax errors"
         ((TESTS_FAILED++))
@@ -123,7 +123,7 @@ test_syntax_validation() {
     # Test submit script syntax
     if bash -n "$SUBMIT_SCRIPT" 2>/dev/null; then
         log_info "PASS: submit-all-traits-runai.sh has valid syntax"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: submit-all-traits-runai.sh has syntax errors"
         ((TESTS_FAILED++))
@@ -195,7 +195,7 @@ test_mount_failure_detection() {
     local logs="[2024-12-10 10:00:00] [ERROR] INFRASTRUCTURE MOUNT FAILURE: /data is not a mount point"
     if echo "$logs" | grep -qi "INFRASTRUCTURE MOUNT FAILURE"; then
         log_info "PASS: Detect INFRASTRUCTURE MOUNT FAILURE pattern"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: Did not detect INFRASTRUCTURE MOUNT FAILURE pattern"
         ((TESTS_FAILED++))
@@ -205,7 +205,7 @@ test_mount_failure_detection() {
     logs="[ERROR] /data mount is not a mount point, volumes may not be attached"
     if echo "$logs" | grep -qi "mount.*not.*mount point"; then
         log_info "PASS: Detect 'mount not mount point' pattern"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: Did not detect 'mount not mount point' pattern"
         ((TESTS_FAILED++))
@@ -218,7 +218,7 @@ test_mount_failure_detection() {
         ((TESTS_FAILED++))
     else
         log_info "PASS: Correctly ignored config error (not mount failure)"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     fi
 
     # Pattern 4: Should NOT match general errors
@@ -228,7 +228,7 @@ test_mount_failure_detection() {
         ((TESTS_FAILED++))
     else
         log_info "PASS: Correctly ignored R error (not mount failure)"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     fi
 }
 
@@ -257,7 +257,7 @@ test_job_prefix_filtering() {
     # Verify specific job is included
     if echo "$runai_output" | grep -q "^[[:space:]]*$job_prefix-100"; then
         log_info "PASS: Filter includes gapit3-trait-100"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     else
         log_error "FAIL: Filter should include gapit3-trait-100"
         ((TESTS_FAILED++))
@@ -269,7 +269,7 @@ test_job_prefix_filtering() {
         ((TESTS_FAILED++))
     else
         log_info "PASS: Filter excludes other-job-1"
-        ((TESTS_PASSED++))
+        ((TESTS_PASSED++)) || true
     fi
 }
 
@@ -385,7 +385,7 @@ test_required_tools() {
     for tool in "${tools[@]}"; do
         if command -v "$tool" >/dev/null 2>&1; then
             log_info "PASS: $tool is available"
-            ((TESTS_PASSED++))
+            ((TESTS_PASSED++)) || true
         else
             log_error "FAIL: $tool is not available"
             ((TESTS_FAILED++))
