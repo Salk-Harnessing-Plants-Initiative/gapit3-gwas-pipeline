@@ -231,7 +231,7 @@ Workflow Status?
 ├── All tasks succeeded
 │   └── Check aggregation (collect-results task)
 │       ├── Aggregation ran → "Complete! No action needed"
-│       └── Aggregation missing → "Offer standalone aggregation"
+│       └── Aggregation missing → "Run standalone aggregation" (see below)
 ├── Has failures
 │   ├── OOMKilled failures → Use --highmem template
 │   ├── Stuck pods (>10min) → Stop workflow first
@@ -239,6 +239,23 @@ Workflow Status?
 │   └── Other errors → Show logs, recommend investigation
 └── Still running
     └── "Workflow still in progress. Monitor with: argo watch <workflow>"
+```
+
+### Standalone Aggregation Command
+
+When aggregation is missing (workflow stopped before `collect-results` ran):
+
+```bash
+# Submit standalone aggregation workflow
+argo submit cluster/argo/workflows/gapit3-aggregation-standalone.yaml \
+  -p output-hostpath="/hpi/hpi_dev/users/YOUR_USERNAME/outputs" \
+  -p batch-id="gapit3-gwas-parallel-XXXXX" \
+  -n runai-talmo-lab
+```
+
+Or from Windows via WSL:
+```bash
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && argo submit /mnt/c/repos/gapit3-gwas-pipeline/cluster/argo/workflows/gapit3-aggregation-standalone.yaml -p output-hostpath='/hpi/hpi_dev/users/YOUR_USERNAME/outputs' -p batch-id='gapit3-gwas-parallel-XXXXX' -n runai-talmo-lab"
 ```
 
 ## Related Commands

@@ -2,7 +2,23 @@
 
 Aggregate results from all completed GWAS analyses into summary tables and reports.
 
-## Command
+## Command Options
+
+### Option 1: Argo Standalone Workflow (Recommended for Cluster)
+
+Run aggregation as an Argo workflow on the cluster:
+
+```bash
+# Submit standalone aggregation workflow
+argo submit cluster/argo/workflows/gapit3-aggregation-standalone.yaml \
+  -p output-hostpath="/hpi/hpi_dev/users/YOUR_USERNAME/outputs" \
+  -p batch-id="gapit3-gwas-parallel-XXXXX" \
+  -n runai-talmo-lab
+```
+
+**When to use**: After a workflow stopped before aggregation or when retrying without `--aggregate` flag.
+
+### Option 2: RunAI Aggregation Script
 
 ```bash
 # Aggregate all results from RunAI jobs
@@ -12,13 +28,15 @@ Aggregate results from all completed GWAS analyses into summary tables and repor
 ./scripts/aggregate-runai-results.sh /path/to/outputs
 ```
 
-## Using R Script Directly
+### Option 3: R Script Directly
 
 ```bash
 Rscript scripts/collect_results.R \
   --output-dir /hpi/hpi_dev/users/$USER/gapit3-gwas/outputs \
   --aggregated-dir /hpi/hpi_dev/users/$USER/gapit3-gwas/outputs/aggregated_results
 ```
+
+**When to use**: Local re-aggregation, custom thresholds, or debugging.
 
 ## Description
 

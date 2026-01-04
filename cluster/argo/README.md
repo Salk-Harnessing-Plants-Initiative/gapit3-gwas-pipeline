@@ -15,7 +15,8 @@ cluster/argo/
 │   └── results-collector-template.yaml
 ├── workflows/                     # Executable workflows
 │   ├── gapit3-test-pipeline.yaml
-│   └── gapit3-parallel-pipeline.yaml
+│   ├── gapit3-parallel-pipeline.yaml
+│   └── gapit3-aggregation-standalone.yaml
 └── scripts/                       # Helper scripts
     ├── submit_workflow.sh
     └── monitor_workflow.sh
@@ -156,6 +157,32 @@ collect-results
 
 > **Note**: Resource allocation (CPU, memory) and parallelism are configured directly in YAML files, not via CLI parameters. See [Resource Requirements](#resource-requirements) for details.
 
+#### gapit3-aggregation-standalone.yaml
+**Purpose**: Run results aggregation independently (e.g., after retry workflows complete without `--aggregate`)
+
+**Submit**:
+```bash
+argo submit workflows/gapit3-aggregation-standalone.yaml \
+  -p output-hostpath="/hpi/hpi_dev/users/YOUR_USERNAME/outputs" \
+  -p batch-id="gapit3-gwas-parallel-XXXXX" \
+  -n runai-talmo-lab
+```
+
+**Use Case**: Aggregate results when:
+- Main workflow stopped before aggregation could run
+- Retry workflow completed without `--aggregate` flag
+- Re-aggregation needed with same or different parameters
+
+**Parameters**:
+- `output-hostpath` - Path to outputs directory containing `trait_NNN_*` directories
+- `batch-id` - Identifier for the aggregation run (for tracking)
+- `image` - Docker image tag to use
+
+**Output**: Creates `aggregated_results/` directory with:
+- `summary_table.csv` - Summary of all traits
+- `significant_snps.csv` - SNPs below p-value threshold
+- `summary_stats.json` - Overall statistics
+
 ### 3. scripts/ - Helper Scripts
 
 #### submit_workflow.sh
@@ -208,6 +235,22 @@ collect-results
 - Job status summary (running/succeeded/failed/pending)
 - Resource usage monitoring
 - Log streaming
+
+---
+
+## When to Use Each Aggregation Method
+
+| Scenario | Method | Command/File |
+|----------|--------|--------------|
+| Main pipeline with traits | In-DAG (automatic) | `gapit3-parallel-pipeline.yaml` - aggregation runs after all traits |
+| Retry after OOM/failures | In-DAG with flag | `retry-argo-traits.sh --aggregate` |
+| After workflow stops early | Standalone workflow | `gapit3-aggregation-standalone.yaml` |
+| Local re-aggregation | R script directly | `Rscript scripts/collect_results.R --output-dir ...` |
+
+**Choose based on your situation:**
+- **In-DAG**: Best when running full pipeline or retries - aggregation happens automatically in cluster
+- **Standalone workflow**: Best when workflow stopped before aggregation or you forgot `--aggregate`
+- **R script directly**: Best for local re-aggregation, custom thresholds, or debugging
 
 ---
 
