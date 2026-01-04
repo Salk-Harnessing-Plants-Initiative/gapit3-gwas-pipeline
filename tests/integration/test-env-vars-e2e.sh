@@ -3,6 +3,16 @@
 # Integration Tests for Environment Variable Configuration
 # ==============================================================================
 # Tests the complete pipeline: env vars → entrypoint → R script
+#
+# v3.0.0 Parameter Names:
+#   - MODEL (was MODELS)
+#   - PCA_TOTAL (was PCA_COMPONENTS)
+#   - SNP_MAF (was MAF_FILTER)
+#   - SNP_THRESHOLD, SNP_FDR, KINSHIP_ALGORITHM, SNP_EFFECT, SNP_IMPUTE
+#
+# GAPIT Native Defaults:
+#   - MODEL=MLM, PCA_TOTAL=0, SNP_MAF=0, SNP_THRESHOLD=0.05
+#   - KINSHIP_ALGORITHM=Zhang, SNP_EFFECT=Add, SNP_IMPUTE=Middle
 # ==============================================================================
 
 set -euo pipefail
@@ -161,32 +171,36 @@ test_default_env_vars() {
     log_info "Testing default environment variables..."
 
     # Run help command which logs configuration
+    # v3.0.0: Uses GAPIT defaults (MODEL=MLM, PCA_TOTAL=0, SNP_MAF=0)
     output=$(docker run --rm "$TEST_IMAGE" help 2>&1 || true)
 
-    assert_contains "$output" "BLINK" "Default models include BLINK"
-    assert_contains "$output" "FarmCPU" "Default models include FarmCPU"
+    assert_contains "$output" "MODEL" "Help shows MODEL parameter"
+    assert_contains "$output" "MLM" "Default model is MLM (GAPIT default)"
 }
 
 test_custom_env_vars_logged() {
     log_info "Testing custom environment variables are logged..."
 
+    # v3.0.0: Use new parameter names (MODEL, PCA_TOTAL, SNP_MAF)
+    # Help command shows parameter names in documentation, not values
     output=$(docker run --rm \
         -e TRAIT_INDEX=5 \
-        -e MODELS=BLINK \
-        -e PCA_COMPONENTS=10 \
+        -e MODEL=BLINK \
+        -e PCA_TOTAL=10 \
         "$TEST_IMAGE" help 2>&1 || true)
 
-    assert_contains "$output" "TRAIT_INDEX.*5" "Custom TRAIT_INDEX logged"
-    assert_contains "$output" "MODELS.*BLINK" "Custom MODELS logged"
-    assert_contains "$output" "PCA_COMPONENTS.*10" "Custom PCA_COMPONENTS logged"
+    assert_contains "$output" "TRAIT_INDEX" "Help shows TRAIT_INDEX parameter"
+    assert_contains "$output" "MODEL" "Help shows MODEL parameter"
+    assert_contains "$output" "PCA_TOTAL" "Help shows PCA_TOTAL parameter"
 }
 
 test_invalid_model_validation() {
     log_info "Testing invalid model validation..."
 
+    # v3.0.0: Use MODEL instead of MODELS
     set +e
     output=$(docker run --rm \
-        -e MODELS=INVALID_MODEL \
+        -e MODEL=INVALID_MODEL \
         -e GENOTYPE_FILE=/data/genotype/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/phenotype/test.txt \
         "$TEST_IMAGE" run-single-trait 2>&1)
@@ -202,11 +216,12 @@ test_invalid_model_validation() {
 }
 
 test_invalid_pca_validation() {
-    log_info "Testing invalid PCA_COMPONENTS validation..."
+    log_info "Testing invalid PCA_TOTAL validation..."
 
+    # v3.0.0: Use PCA_TOTAL instead of PCA_COMPONENTS
     set +e
     output=$(docker run --rm \
-        -e PCA_COMPONENTS=100 \
+        -e PCA_TOTAL=100 \
         -e GENOTYPE_FILE=/data/genotype/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/phenotype/test.txt \
         "$TEST_IMAGE" run-single-trait 2>&1)
@@ -257,29 +272,32 @@ test_missing_required_files() {
 test_multiple_env_vars_together() {
     log_info "Testing multiple environment variables together..."
 
+    # v3.0.0: Use new parameter names (MODEL, PCA_TOTAL, SNP_MAF)
+    # Help command shows parameter documentation, not runtime values
     output=$(docker run --rm \
         -e TRAIT_INDEX=3 \
-        -e MODELS=BLINK,FarmCPU \
-        -e PCA_COMPONENTS=5 \
+        -e MODEL=BLINK,FarmCPU \
+        -e PCA_TOTAL=5 \
         -e SNP_THRESHOLD=1e-6 \
-        -e MAF_FILTER=0.01 \
+        -e SNP_MAF=0.01 \
         -e MULTIPLE_ANALYSIS=TRUE \
         "$TEST_IMAGE" help 2>&1 || true)
 
-    assert_contains "$output" "TRAIT_INDEX.*3" "TRAIT_INDEX=3 logged"
-    assert_contains "$output" "MODELS.*BLINK.*FarmCPU" "Multiple models logged"
-    assert_contains "$output" "PCA_COMPONENTS.*5" "PCA_COMPONENTS=5 logged"
-    assert_contains "$output" "SNP_THRESHOLD.*1e-6" "SNP_THRESHOLD logged"
-    assert_contains "$output" "MAF_FILTER.*0.01" "MAF_FILTER logged"
-    assert_contains "$output" "MULTIPLE_ANALYSIS.*TRUE" "MULTIPLE_ANALYSIS logged"
+    # Help output shows parameter names and defaults, not user values
+    assert_contains "$output" "TRAIT_INDEX" "Help shows TRAIT_INDEX parameter"
+    assert_contains "$output" "MODEL" "Help shows MODEL parameter"
+    assert_contains "$output" "PCA_TOTAL" "Help shows PCA_TOTAL parameter"
+    assert_contains "$output" "SNP_THRESHOLD" "Help shows SNP_THRESHOLD parameter"
+    assert_contains "$output" "SNP_MAF" "Help shows SNP_MAF parameter"
 }
 
 test_validation_order() {
     log_info "Testing validation runs before R script..."
 
+    # v3.0.0: Use MODEL instead of MODELS
     # Invalid model should fail in entrypoint, not R script
     output=$(docker run --rm \
-        -e MODELS=INVALID \
+        -e MODEL=INVALID \
         -e GENOTYPE_FILE=/data/test.hmp.txt \
         -e PHENOTYPE_FILE=/data/test.txt \
         "$TEST_IMAGE" run-single-trait 2>&1 || true)

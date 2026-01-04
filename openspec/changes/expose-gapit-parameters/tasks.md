@@ -106,7 +106,15 @@
 - [x] Add CLI option --cutoff to run_gwas_single_trait.R
 - [x] Pass cutOff to GAPIT call
 - [x] Update documentation
-- [ ] Run tests - should PASS (14/14 integration tests)
+- [x] Run tests - should PASS (14/14 integration tests)
+
+### 6.5 Update Legacy Integration Tests for v3.0.0
+- [x] Update `tests/integration/test-env-vars-e2e.sh` for v3.0.0 parameter names
+- [x] Change tests checking for MODELS → MODEL
+- [x] Change tests checking for PCA_COMPONENTS → PCA_TOTAL
+- [x] Change tests checking for MAF_FILTER → SNP_MAF
+- [x] Update default value expectations (MLM, 0, 0 instead of BLINK,FarmCPU, 3, 0.05)
+- [ ] Run CI to verify all tests pass
 
 ## Phase 7: Update Argo/RunAI Templates
 
@@ -124,9 +132,10 @@
 ## Phase 8: Documentation
 
 ### 8.1 Create GAPIT_PARAMETERS.md
-- [ ] Document all exposed parameters with GAPIT native naming
-- [ ] Show GAPIT defaults vs pipeline defaults
-- [ ] Provide usage examples
+- [x] Document all exposed parameters with GAPIT native naming
+- [x] Show GAPIT defaults vs pipeline defaults
+- [x] Provide usage examples
+- [x] Created `docs/GAPIT_PARAMETERS.md`
 
 ### 8.2 Update .env.example
 - [x] Update parameter names: MODELS→MODEL, PCA_COMPONENTS→PCA_TOTAL, MAF_FILTER→SNP_MAF
