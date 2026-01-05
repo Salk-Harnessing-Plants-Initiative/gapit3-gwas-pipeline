@@ -147,11 +147,12 @@ cleanup_tests() {
 test_aggregation_creates_output_files() {
     log_info "Testing aggregation creates output files..."
 
-    # Run collect_results.R
+    # Run collect_results.R (allow-incomplete for test fixtures with missing Filter files)
     Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
         --output-dir "$TEMP_OUTPUT" \
         --batch-id "test-integration" \
         --models "BLINK,FarmCPU,MLM" \
+        --allow-incomplete \
         2>&1 || {
             log_error "collect_results.R failed to run"
             ((TESTS_FAILED++))
@@ -180,6 +181,7 @@ test_output_csv_has_model_column() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -200,6 +202,7 @@ test_output_csv_has_multiple_models() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -218,6 +221,7 @@ test_output_csv_sorted_by_pvalue() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -253,6 +257,7 @@ test_summary_stats_has_snps_by_model() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -271,6 +276,7 @@ test_aggregation_handles_trait_with_periods() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -291,6 +297,7 @@ test_aggregation_handles_fallback() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
@@ -316,6 +323,7 @@ test_aggregation_performance() {
         --output-dir "$TEMP_OUTPUT" \
         --batch-id "test-performance" \
         --models "BLINK,FarmCPU,MLM" \
+        --allow-incomplete \
         2>&1 >/dev/null
 
     end_time=$(date +%s.%N)
@@ -346,6 +354,7 @@ test_summary_stats_has_configuration_section() {
             --output-dir "$TEMP_OUTPUT" \
             --batch-id "test-config" \
             --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
             2>&1 >/dev/null
     fi
 
