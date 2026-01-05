@@ -412,13 +412,18 @@ detect_models_from_first_trait <- function(output_dir) {
 #' models <- get_gapit_param(metadata, "model", "models", "BLINK,FarmCPU,MLM")
 #' pca <- get_gapit_param(metadata, "PCA.total", "pca_components", 3)
 get_gapit_param <- function(metadata, gapit_name, legacy_name, default = NULL) {
+  # Handle NULL parameters gracefully
+  if (is.null(metadata) || is.null(metadata$parameters)) {
+    return(default)
+  }
+
   # Try new schema first (parameters.gapit.*)
-  if (!is.null(metadata$parameters$gapit[[gapit_name]])) {
+  if (!is.null(metadata$parameters$gapit) && !is.null(metadata$parameters$gapit[[gapit_name]])) {
     return(metadata$parameters$gapit[[gapit_name]])
   }
 
   # Try flat v3.0.0 schema (parameters.*)
-  if (!is.null(metadata$parameters[[gapit_name]])) {
+  if (!is.null(gapit_name) && !is.null(metadata$parameters[[gapit_name]])) {
     return(metadata$parameters[[gapit_name]])
   }
 
