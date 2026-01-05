@@ -209,48 +209,9 @@ if (markdown_only) {
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
-# Formatting helpers for markdown generation
-# ------------------------------------------------------------------------------
-
-#' Format p-value for display
-#' @param pval Numeric p-value
-#' @return Character string in scientific notation
-format_pvalue <- function(pval) {
-  if (is.na(pval)) return("NA")
-  sprintf("%.2e", pval)
-}
-
-#' Format number with thousand separators
-#' @param n Numeric value
-#' @return Character string with commas
-format_number <- function(n) {
-  if (is.na(n)) return("NA")
-  format(n, big.mark = ",", scientific = FALSE)
-}
-
-#' Format duration for display
-#' @param minutes Numeric duration in minutes
-#' @param unit Output unit ("minutes" or "hours")
-#' @return Character string with unit
-format_duration <- function(minutes, unit = "minutes") {
-  if (unit == "hours") {
-    sprintf("%.1f hours", minutes)
-  } else {
-    sprintf("%.1f minutes", minutes)
-  }
-}
-
-#' Truncate string with ellipsis
-#' @param s Character string
-#' @param max_length Maximum length
-#' @return Truncated string
-truncate_string <- function(s, max_length = 40) {
-  if (nchar(s) <= max_length) return(s)
-  paste0(substr(s, 1, max_length - 3), "...")
-}
-
-# ------------------------------------------------------------------------------
 # Markdown section generators
+# Note: Formatting helpers (format_pvalue, format_number, format_duration,
+# truncate_string) are provided by aggregation_utils.R
 # ------------------------------------------------------------------------------
 
 #' Generate executive summary section
@@ -298,139 +259,8 @@ generate_executive_summary <- function(stats, top_snp, top_trait) {
   paste(lines, collapse = "\n")
 }
 
-#' Extract GAPIT parameter with fallback to legacy names
-#' Supports both schema v3.0.0 (parameters.gapit.*) and v2.0.0 (parameters.*)
-#' @param metadata Metadata list
-#' @param gapit_name GAPIT native parameter name (e.g., "model", "PCA.total")
-#' @param legacy_name Legacy parameter name (e.g., "models", "pca_components")
-#' @param default Default value if not found
-#' @return Parameter value
-get_gapit_param <- function(metadata, gapit_name, legacy_name, default = NULL) {
-  # Handle NULL parameters gracefully
-  if (is.null(metadata) || is.null(metadata$parameters)) {
-    return(default)
-  }
-
-  # Try new schema first (parameters.gapit.*)
-  if (!is.null(metadata$parameters$gapit) && !is.null(metadata$parameters$gapit[[gapit_name]])) {
-    return(metadata$parameters$gapit[[gapit_name]])
-  }
-
-  # Try flat v3.0.0 schema (parameters.*)
-  if (!is.null(gapit_name) && !is.null(metadata$parameters[[gapit_name]])) {
-    return(metadata$parameters[[gapit_name]])
-  }
-
-  # Fall back to legacy schema (parameters.*)
-  if (!is.null(legacy_name) && !is.null(metadata$parameters[[legacy_name]])) {
-    return(metadata$parameters[[legacy_name]])
-  }
-
-  return(default)
-}
-
-#' Generate configuration section
-#' @param metadata Metadata list from first trait
-#' @param summary_table Summary data frame
-#' @return Character string with markdown
-generate_configuration_section <- function(metadata, summary_table) {
-  # Extract GAPIT parameters (supports both v3.0.0 and v2.0.0 schemas)
-  models <- get_gapit_param(metadata, "model", "models", NULL)
-  if (!is.null(models)) {
-    models <- paste(models, collapse = ", ")
-  } else {
-    models <- "N/A"
-  }
-
-  pca_total <- get_gapit_param(metadata, "PCA.total", "pca_components", "N/A")
-  snp_maf <- get_gapit_param(metadata, "SNP.MAF", "maf_filter", "N/A")
-  snp_fdr <- get_gapit_param(metadata, "SNP.FDR", "snp_fdr", NULL)
-  snp_fdr <- if (!is.null(snp_fdr)) snp_fdr else "N/A (disabled)"
-
-  # New GAPIT parameters (v3.0.0 only)
-  kinship_algo <- get_gapit_param(metadata, "kinship.algorithm", NULL, NULL)
-  snp_effect <- get_gapit_param(metadata, "SNP.effect", NULL, NULL)
-  snp_impute <- get_gapit_param(metadata, "SNP.impute", NULL, NULL)
-
-  n_snps <- if (!is.null(metadata$genotype$n_snps)) {
-    format_number(metadata$genotype$n_snps)
-  } else if (nrow(summary_table) > 0 && "n_snps" %in% colnames(summary_table)) {
-    format_number(summary_table$n_snps[1])
-  } else {
-    "N/A"
-  }
-
-  n_accessions <- if (!is.null(metadata$genotype$n_accessions)) {
-    format_number(metadata$genotype$n_accessions)
-  } else if (nrow(summary_table) > 0 && "n_samples" %in% colnames(summary_table)) {
-    format_number(summary_table$n_samples[1])
-  } else {
-    "N/A"
-  }
-
-  # Build configuration section with GAPIT naming
-  lines <- c(
-    "## Configuration",
-    "",
-    "### GAPIT Parameters",
-    "",
-    "| Parameter | Value |",
-    "|-----------|-------|",
-    sprintf("| model | %s |", models),
-    sprintf("| PCA.total | %s |", pca_total)
-  )
-
-  # Add optional parameters if present
-
-  if (!is.null(kinship_algo)) {
-    lines <- c(lines, sprintf("| kinship.algorithm | %s |", kinship_algo))
-  }
-  if (!is.null(snp_effect)) {
-    lines <- c(lines, sprintf("| SNP.effect | %s |", snp_effect))
-  }
-  if (!is.null(snp_impute)) {
-    lines <- c(lines, sprintf("| SNP.impute | %s |", snp_impute))
-  }
-
-  lines <- c(lines, "")
-
-  # Filtering section
-  lines <- c(lines,
-    "### Filtering",
-    "",
-    "| Parameter | Value |",
-    "|-----------|-------|",
-    sprintf("| SNP.MAF | %s |", snp_maf),
-    sprintf("| SNP.FDR | %s |", snp_fdr),
-    ""
-  )
-
-  # Data section
-  lines <- c(lines,
-    "### Data",
-    "",
-    "| Parameter | Value |",
-    "|-----------|-------|",
-    sprintf("| SNPs Tested | %s |", n_snps),
-    sprintf("| Accessions | %s |", n_accessions),
-    ""
-  )
-
-  # Add input files if available
-  if (!is.null(metadata$inputs)) {
-    geno_file <- if (!is.null(metadata$inputs$genotype_file)) metadata$inputs$genotype_file else "N/A"
-    pheno_file <- if (!is.null(metadata$inputs$phenotype_file)) metadata$inputs$phenotype_file else "N/A"
-    lines <- c(lines,
-      "### Input Files",
-      "",
-      sprintf("- **Genotype:** `%s`", geno_file),
-      sprintf("- **Phenotype:** `%s`", pheno_file),
-      ""
-    )
-  }
-
-  paste(lines, collapse = "\n")
-}
+# Note: get_gapit_param and generate_configuration_section are provided by
+# aggregation_utils.R - no need to duplicate here
 
 #' Generate top SNPs table
 #' @param snps_df Data frame of significant SNPs
@@ -788,83 +618,8 @@ generate_markdown_summary <- function(output_dir, stats, summary_table, snps_df,
 
 # ------------------------------------------------------------------------------
 # Deduplication and trait completeness
+# Note: select_best_trait_dirs is provided by aggregation_utils.R
 # ------------------------------------------------------------------------------
-
-#' Select best directory for each trait index (deduplication)
-#'
-#' When multiple directories exist for the same trait (from retries),
-#' select the one with the most complete model outputs.
-#' If tied, select the newest (by timestamp in directory name).
-#'
-#' @param trait_dirs Vector of trait directory paths
-#' @param expected_models Vector of expected model names (e.g., c("BLINK", "FarmCPU", "MLM"))
-#' @return Vector of selected trait directory paths (one per trait index)
-select_best_trait_dirs <- function(trait_dirs, expected_models) {
-  if (length(trait_dirs) == 0) return(character(0))
-
-  # Build info table for all directories
-  trait_info <- data.frame(
-    path = trait_dirs,
-    basename = basename(trait_dirs),
-    stringsAsFactors = FALSE
-  )
-
-  # Extract trait index from directory name
-  # Pattern: trait_<index>_<name>_<timestamp> or trait_<index>_<timestamp>
-  trait_info$trait_index <- as.integer(
-    sub("trait_(\\d+)_.*", "\\1", trait_info$basename)
-  )
-
-  # Count complete models for each directory
-  trait_info$n_models <- sapply(trait_info$path, function(dir) {
-    sum(sapply(expected_models, function(model) {
-      pattern <- paste0("GAPIT\\.Association\\.GWAS_Results\\.", model, "\\.")
-      length(list.files(dir, pattern = pattern)) > 0
-    }))
-  })
-
-  # Extract timestamp for tie-breaking
-  # Try to find YYYYMMDD_HHMMSS pattern at end of directory name
-  trait_info$timestamp <- sub(".*_(\\d{8}_\\d{6})$", "\\1", trait_info$basename)
-  # If no timestamp found, use basename for sorting
-  trait_info$timestamp[trait_info$timestamp == trait_info$basename] <- "00000000_000000"
-
-  # Find traits with duplicates (for logging)
-  dup_counts <- table(trait_info$trait_index)
-  dup_traits <- names(dup_counts[dup_counts > 1])
-
-  if (length(dup_traits) > 0) {
-    cat("  Note: Found multiple directories for", length(dup_traits), "trait(s)\n")
-    cat("  Selecting most complete directory for each:\n")
-
-    for (idx in as.integer(dup_traits)) {
-      dirs_for_trait <- trait_info[trait_info$trait_index == idx, ]
-      # Sort by n_models descending, then timestamp descending (string comparison works for YYYYMMDD_HHMMSS)
-      dirs_for_trait <- dirs_for_trait[order(-dirs_for_trait$n_models, -xtfrm(dirs_for_trait$timestamp)), ]
-      selected <- dirs_for_trait[1, ]
-      others <- dirs_for_trait[-1, ]
-
-      cat("    - Trait", idx, ":", nrow(dirs_for_trait), "directories\n")
-      cat("      Selected:", selected$basename,
-          "(", selected$n_models, "/", length(expected_models), "models)\n")
-      for (j in seq_len(nrow(others))) {
-        cat("      Skipped:", others$basename[j],
-            "(", others$n_models[j], "/", length(expected_models), "models)\n")
-      }
-    }
-    cat("\n")
-  }
-
-  # For each trait index, select best directory
-  # Priority: most models complete, then newest timestamp
-  selected <- trait_info %>%
-    group_by(trait_index) %>%
-    arrange(desc(n_models), desc(timestamp)) %>%
-    slice(1) %>%
-    ungroup()
-
-  return(selected$path)
-}
 
 #' Check trait directories for completeness (Filter file present)
 #'

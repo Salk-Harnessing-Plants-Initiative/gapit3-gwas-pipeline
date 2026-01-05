@@ -62,7 +62,7 @@
 
 ### 3.1 Modify collect_results.R to use modules
 - [x] Add module sourcing at top of script
-- [ ] Remove duplicate function definitions (use module functions)
+- [x] Remove duplicate function definitions (use module functions)
 - [x] Use KNOWN_GAPIT_MODELS from constants in validation
 - [x] Use DEFAULT_MODELS_STRING for CLI default
 - [ ] Verify script still runs correctly after removing duplicates
