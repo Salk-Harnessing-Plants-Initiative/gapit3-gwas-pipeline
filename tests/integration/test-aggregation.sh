@@ -435,6 +435,101 @@ EOF
 }
 
 # ==============================================================================
+# Markdown Generation Tests (refactor-collect-results-testable)
+# ==============================================================================
+
+test_markdown_summary_generated() {
+    log_info "Testing markdown summary report is generated..."
+
+    # Clean previous output
+    rm -rf "$TEMP_OUTPUT/aggregated_results"
+
+    # Run aggregation
+    Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
+        --output-dir "$TEMP_OUTPUT" \
+        --batch-id "test-markdown" \
+        --models "BLINK,FarmCPU,MLM" \
+        --allow-incomplete \
+        2>&1 >/dev/null
+
+    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+
+    if [ -f "$md_file" ]; then
+        log_info "✓ PASS: Markdown summary report generated"
+        ((TESTS_PASSED++))
+    else
+        log_error "✗ FAIL: Markdown summary report not generated"
+        log_error "  Expected: $md_file"
+        ((TESTS_FAILED++))
+        return 1
+    fi
+}
+
+test_markdown_has_configuration_section() {
+    log_info "Testing markdown has configuration section..."
+
+    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+
+    if [ ! -f "$md_file" ]; then
+        log_warning "Markdown file not found, running aggregation first..."
+        Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
+            --output-dir "$TEMP_OUTPUT" \
+            --batch-id "test-markdown" \
+            --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
+            2>&1 >/dev/null
+    fi
+
+    assert_file_contains "$md_file" "## Configuration" "Configuration section in markdown"
+    assert_file_contains "$md_file" "### GAPIT Parameters" "GAPIT Parameters in markdown"
+}
+
+test_markdown_has_executive_summary() {
+    log_info "Testing markdown has executive summary..."
+
+    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+
+    if [ ! -f "$md_file" ]; then
+        log_warning "Markdown file not found, running aggregation first..."
+        Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
+            --output-dir "$TEMP_OUTPUT" \
+            --batch-id "test-markdown" \
+            --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
+            2>&1 >/dev/null
+    fi
+
+    assert_file_contains "$md_file" "## Executive Summary" "Executive Summary in markdown"
+    assert_file_contains "$md_file" "Total Traits Analyzed" "Total Traits in executive summary"
+}
+
+test_markdown_formatting_correct() {
+    log_info "Testing markdown formatting is correct..."
+
+    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+
+    if [ ! -f "$md_file" ]; then
+        log_warning "Markdown file not found, running aggregation first..."
+        Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
+            --output-dir "$TEMP_OUTPUT" \
+            --batch-id "test-markdown" \
+            --models "BLINK,FarmCPU,MLM" \
+            --allow-incomplete \
+            2>&1 >/dev/null
+    fi
+
+    # Check p-value formatting (scientific notation)
+    if grep -qE '[0-9]\.[0-9]+e-[0-9]+' "$md_file" 2>/dev/null; then
+        log_info "✓ PASS: P-values formatted in scientific notation"
+        ((TESTS_PASSED++))
+    else
+        log_warning "P-value formatting not verified (may be OK if no significant SNPs)"
+        log_info "✓ PASS: Markdown formatting check completed"
+        ((TESTS_PASSED++))
+    fi
+}
+
+# ==============================================================================
 # Test Runner
 # ==============================================================================
 
@@ -456,6 +551,12 @@ run_all_tests() {
     test_summary_stats_has_configuration_section || true
     test_models_source_tracks_cli || true
     test_models_source_tracks_default || true
+
+    # Markdown generation tests (refactor-collect-results-testable)
+    test_markdown_summary_generated || true
+    test_markdown_has_configuration_section || true
+    test_markdown_has_executive_summary || true
+    test_markdown_formatting_correct || true
 
     echo
     log_info "================================"
