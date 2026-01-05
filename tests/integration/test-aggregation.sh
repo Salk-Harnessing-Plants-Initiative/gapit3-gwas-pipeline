@@ -452,10 +452,10 @@ test_markdown_summary_generated() {
         --allow-incomplete \
         2>&1 >/dev/null
 
-    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+    local md_file="$TEMP_OUTPUT/aggregated_results/pipeline_summary.md"
 
     if [ -f "$md_file" ]; then
-        log_info "✓ PASS: Markdown summary report generated"
+        log_info "✓ PASS: Markdown pipeline summary generated"
         ((TESTS_PASSED++))
     else
         log_error "✗ FAIL: Markdown summary report not generated"
@@ -468,7 +468,7 @@ test_markdown_summary_generated() {
 test_markdown_has_configuration_section() {
     log_info "Testing markdown has configuration section..."
 
-    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+    local md_file="$TEMP_OUTPUT/aggregated_results/pipeline_summary.md"
 
     if [ ! -f "$md_file" ]; then
         log_warning "Markdown file not found, running aggregation first..."
@@ -487,7 +487,7 @@ test_markdown_has_configuration_section() {
 test_markdown_has_executive_summary() {
     log_info "Testing markdown has executive summary..."
 
-    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+    local md_file="$TEMP_OUTPUT/aggregated_results/pipeline_summary.md"
 
     if [ ! -f "$md_file" ]; then
         log_warning "Markdown file not found, running aggregation first..."
@@ -506,7 +506,7 @@ test_markdown_has_executive_summary() {
 test_markdown_formatting_correct() {
     log_info "Testing markdown formatting is correct..."
 
-    local md_file="$TEMP_OUTPUT/aggregated_results/summary_report.md"
+    local md_file="$TEMP_OUTPUT/aggregated_results/pipeline_summary.md"
 
     if [ ! -f "$md_file" ]; then
         log_warning "Markdown file not found, running aggregation first..."
