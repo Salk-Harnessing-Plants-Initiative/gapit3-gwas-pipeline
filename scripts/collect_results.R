@@ -18,6 +18,49 @@ suppressPackageStartupMessages({
 })
 
 # ==============================================================================
+# Source modules (provides reusable, testable functions)
+# ==============================================================================
+# Robust path resolution that works regardless of working directory
+.get_script_dir <- function() {
+  # Try to get the path of this script from command line arguments
+
+cmd_args <- commandArgs(trailingOnly = FALSE)
+  file_arg <- grep("^--file=", cmd_args, value = TRUE)
+  if (length(file_arg) > 0) {
+    return(dirname(normalizePath(sub("^--file=", "", file_arg))))
+  }
+
+  # Fallback: check common locations
+  candidates <- c(
+    "scripts",
+    ".",
+    file.path(getwd(), "scripts")
+  )
+
+  for (path in candidates) {
+    if (file.exists(file.path(path, "lib", "constants.R"))) {
+      return(normalizePath(path))
+    }
+  }
+
+  # Last resort: search upward from current directory
+  current <- getwd()
+  while (current != dirname(current)) {
+    test_path <- file.path(current, "scripts")
+    if (file.exists(file.path(test_path, "lib", "constants.R"))) {
+      return(normalizePath(test_path))
+    }
+    current <- dirname(current)
+  }
+
+  stop("Could not locate scripts/lib/constants.R - ensure you're running from the project directory")
+}
+
+.script_dir <- .get_script_dir()
+source(file.path(.script_dir, "lib", "constants.R"))
+source(file.path(.script_dir, "lib", "aggregation_utils.R"))
+
+# ==============================================================================
 # Helper function for environment variables
 # ==============================================================================
 
@@ -43,7 +86,7 @@ option_list <- list(
               help = "Batch/workflow ID for tracking", metavar = "STRING"),
   make_option(c("-t", "--threshold"), type = "numeric", default = 5e-8,
               help = "Genome-wide significance threshold [default: %default]", metavar = "FLOAT"),
-  make_option(c("-m", "--models"), type = "character", default = "BLINK,FarmCPU,MLM",
+  make_option(c("-m", "--models"), type = "character", default = DEFAULT_MODELS_STRING,
               help = "Expected models for completeness check [default: %default]", metavar = "STRING"),
   make_option(c("--allow-incomplete"), action = "store_true", default = FALSE,
               help = "Allow aggregation with incomplete traits (skip them with warning)"),
@@ -63,10 +106,41 @@ opt <- parse_args(opt_parser)
 output_dir <- opt$`output-dir`
 batch_id <- opt$`batch-id`
 threshold <- opt$threshold
-expected_models <- strsplit(opt$models, ",")[[1]]
 allow_incomplete <- opt$`allow-incomplete`
 no_markdown <- opt$`no-markdown`
 markdown_only <- opt$`markdown-only`
+
+# Determine expected models and their source
+# Priority: CLI flag > auto-detected from metadata > default
+models_source <- "default"  # Track where models came from
+cli_models_specified <- opt$models != DEFAULT_MODELS_STRING
+
+if (cli_models_specified) {
+  # User explicitly specified models via CLI
+  expected_models <- strsplit(opt$models, ",")[[1]]
+  models_source <- "cli"
+} else {
+  # Try to auto-detect from first trait's metadata
+  detected_models <- detect_models_from_first_trait(output_dir)
+
+  if (!is.null(detected_models) && length(detected_models) > 0) {
+    # Validate detected models
+    validation <- validate_model_names(detected_models)
+    if (validation$valid) {
+      expected_models <- validation$canonical_models
+      models_source <- "auto-detected"
+    } else {
+      warning(sprintf("Invalid models detected in metadata: %s. Using defaults.",
+                      paste(validation$invalid_models, collapse = ", ")))
+      expected_models <- DEFAULT_MODELS
+      models_source <- "default"
+    }
+  } else {
+    # Fall back to defaults
+    expected_models <- DEFAULT_MODELS
+    models_source <- "default"
+  }
+}
 
 cat(strrep("=", 78), "\n")
 cat("GAPIT3 Results Collector\n")
@@ -75,6 +149,7 @@ cat("Output directory:", output_dir, "\n")
 cat("Batch ID:", batch_id, "\n")
 cat("Significance threshold:", threshold, "\n")
 cat("Expected models:", paste(expected_models, collapse = ", "), "\n")
+cat("Models source:", models_source, "\n")
 cat("Allow incomplete:", allow_incomplete, "\n")
 cat("No markdown:", no_markdown, "\n")
 cat("Markdown only:", markdown_only, "\n")
@@ -890,10 +965,8 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
       }
     }
 
-    # Validate model names (warn if unexpected, but continue)
-    expected_models <- c("BLINK", "FarmCPU", "GLM", "MLM", "MLMM",
-                         "FarmCPU.LM", "Blink.LM")
-    unexpected <- unique(filter_data$model[!(filter_data$model %in% expected_models)])
+    # Validate model names using KNOWN_GAPIT_MODELS from constants (warn if unexpected, but continue)
+    unexpected <- unique(filter_data$model[!(filter_data$model %in% KNOWN_GAPIT_MODELS)])
     if (length(unexpected) > 0) {
       cat("  Warning: Unexpected model names in", basename(trait_dir), ":",
           paste(unexpected, collapse=", "), "\n")
@@ -1133,6 +1206,13 @@ stats <- list(
   average_duration_minutes = mean(summary_df$duration_minutes, na.rm = TRUE),
   total_duration_hours = sum(summary_df$duration_minutes, na.rm = TRUE) / 60,
   expected_models = expected_models,
+  # Configuration section for reproducibility (per spec)
+  configuration = list(
+    expected_models = expected_models,
+    models_source = models_source,
+    significance_threshold = threshold,
+    allow_incomplete = allow_incomplete
+  ),
   # Provenance section for traceability
   provenance = list(
     workflow_name = get_env_or_null("WORKFLOW_NAME"),

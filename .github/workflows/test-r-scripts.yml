@@ -73,6 +73,11 @@ jobs:
           }
           "
 
+      - name: Run integration tests
+        run: |
+          chmod +x tests/integration/test-aggregation.sh
+          bash tests/integration/test-aggregation.sh
+
       - name: Test summary
         if: always()
         run: |
@@ -87,3 +92,6 @@ jobs:
           echo "- Configuration precedence (CLI > env > defaults)" >> $GITHUB_STEP_SUMMARY
           echo "- Input validation logic" >> $GITHUB_STEP_SUMMARY
           echo "- Trait extraction logic" >> $GITHUB_STEP_SUMMARY
+          echo "- Aggregation module functions" >> $GITHUB_STEP_SUMMARY
+          echo "- Configuration section in summary output" >> $GITHUB_STEP_SUMMARY
+          echo "- Integration tests for collect_results.R" >> $GITHUB_STEP_SUMMARY

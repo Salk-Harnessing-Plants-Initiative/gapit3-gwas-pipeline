@@ -10,20 +10,39 @@ library(jsonlite)
 # Note: helper.R is automatically sourced by testthat
 
 # ==============================================================================
-# Source the markdown generation functions from collect_results.R
+# Source modules directly (per OpenSpec design - no script execution)
 # ==============================================================================
+.get_project_root <- function() {
+  candidates <- c(
+    "../..",           # Running from tests/testthat
+    "..",              # Running from tests
+    "."                # Running from project root
+  )
+
+  for (candidate in candidates) {
+    if (file.exists(file.path(candidate, "scripts", "lib", "constants.R"))) {
+      return(normalizePath(candidate))
+    }
+  }
+  stop("Could not find project root")
+}
+
+.project_root <- .get_project_root()
+
+# Source the modules (pure functions, no side effects)
+source(file.path(.project_root, "scripts", "lib", "constants.R"))
+source(file.path(.project_root, "scripts", "lib", "aggregation_utils.R"))
+
+# Source additional markdown functions not yet in modules
 source_summary_functions <- function() {
-  script_path <- file.path("..", "..", "scripts", "collect_results.R")
+  script_path <- file.path(.project_root, "scripts", "collect_results.R")
   script_lines <- readLines(script_path)
 
-  # List of functions to source
+  # List of functions NOT in modules that need to be sourced from script
+  # Functions now in modules: format_pvalue, format_number, format_duration,
+  #   truncate_string, generate_configuration_section, get_gapit_param
   functions_to_source <- c(
-    "format_pvalue",
-    "format_number",
-    "format_duration",
-    "truncate_string",
     "generate_executive_summary",
-    "generate_configuration_section",
     "generate_top_snps_table",
     "generate_traits_table",
     "generate_model_statistics",
@@ -475,8 +494,8 @@ test_that("generate_configuration_section includes SNP FDR when set", {
 
   result <- generate_configuration_section(metadata, summary_table)
 
-  # Check that SNP FDR is included
-  expect_true(grepl("SNP FDR", result) || grepl("snp_fdr", result, ignore.case = TRUE),
+  # Check that SNP.FDR is included (GAPIT native naming per v3.0.0 schema)
+  expect_true(grepl("SNP.FDR", result) || grepl("SNP FDR", result) || grepl("snp_fdr", result, ignore.case = TRUE),
               info = "Configuration section should include SNP FDR parameter")
   expect_true(grepl("0.05", result))
 })

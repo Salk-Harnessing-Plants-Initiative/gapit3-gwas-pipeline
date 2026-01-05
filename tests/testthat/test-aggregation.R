@@ -2,6 +2,7 @@
 # Tests for GAPIT Results Aggregation Script
 # ==============================================================================
 # Tests for collect_results.R aggregation functionality
+# These tests use the modular functions from scripts/lib/
 # ==============================================================================
 
 library(testthat)
@@ -12,32 +13,48 @@ library(jsonlite)
 # Note: helper.R is automatically sourced by testthat
 
 # ==============================================================================
-# Helper function to source only the functions from collect_results.R
+# Source modules directly (preferred approach)
 # ==============================================================================
-source_aggregation_functions <- function() {
-  # Read the script (path relative to project root)
-  script_path <- file.path("..", "..", "scripts", "collect_results.R")
-  script_lines <- readLines(script_path)
 
-  # Find select_best_trait_dirs function
-  select_start <- grep("^select_best_trait_dirs <- function", script_lines)[1]
-  select_end <- grep("^}", script_lines)
-  select_end <- select_end[select_end > select_start][1]
+# Get project root (handle different test execution contexts)
+.get_project_root <- function() {
+  candidates <- c(
+    "../..",           # Running from tests/testthat
+    "..",              # Running from tests
+    "."                # Running from project root
+  )
+
+  for (candidate in candidates) {
+    if (file.exists(file.path(candidate, "scripts", "lib", "constants.R"))) {
+      return(normalizePath(candidate))
+    }
+  }
+  stop("Could not find project root")
+}
+
+.project_root <- .get_project_root()
+
+# Source the constants and utility modules
+source(file.path(.project_root, "scripts", "lib", "constants.R"))
+source(file.path(.project_root, "scripts", "lib", "aggregation_utils.R"))
+
+# Source read_filter_file and check_trait_completeness from collect_results.R
+# These functions are still defined in the main script
+.source_script_functions <- function() {
+  script_path <- file.path(.project_root, "scripts", "collect_results.R")
+  script_lines <- readLines(script_path)
 
   # Find check_trait_completeness function
   check_start <- grep("^check_trait_completeness <- function", script_lines)[1]
   check_end <- grep("^}", script_lines)
   check_end <- check_end[check_end > check_start][1]
 
-  # Find read_filter_file function (no longer has fallback)
+  # Find read_filter_file function
   read_filter_start <- grep("^read_filter_file <- function", script_lines)[1]
   read_filter_end <- grep("^}", script_lines)
   read_filter_end <- read_filter_end[read_filter_end > read_filter_start][1]
 
   # Extract and evaluate function definitions
-  select_code <- paste(script_lines[select_start:select_end], collapse = "\n")
-  eval(parse(text = select_code), envir = .GlobalEnv)
-
   if (!is.na(check_start)) {
     check_code <- paste(script_lines[check_start:check_end], collapse = "\n")
     eval(parse(text = check_code), envir = .GlobalEnv)
@@ -47,8 +64,8 @@ source_aggregation_functions <- function() {
   eval(parse(text = filter_code), envir = .GlobalEnv)
 }
 
-# Source the functions for testing
-source_aggregation_functions()
+# Source the script-specific functions
+.source_script_functions()
 
 # ==============================================================================
 # Test: read_filter_file() with single model

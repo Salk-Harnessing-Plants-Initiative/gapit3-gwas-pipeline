@@ -9,9 +9,33 @@
 
 library(testthat)
 
+# ==============================================================================
+# Source modules directly (per OpenSpec design - no script execution)
+# ==============================================================================
+.get_project_root <- function() {
+  candidates <- c(
+    "../..",           # Running from tests/testthat
+    "..",              # Running from tests
+    "."                # Running from project root
+  )
+
+  for (candidate in candidates) {
+    if (file.exists(file.path(candidate, "scripts", "lib", "constants.R"))) {
+      return(normalizePath(candidate))
+    }
+  }
+  stop("Could not find project root")
+}
+
+.project_root <- .get_project_root()
+
+# Source the modules (pure functions, no side effects)
+# All functions are now in the modules - no script sourcing needed
+source(file.path(.project_root, "scripts", "lib", "constants.R"))
+source(file.path(.project_root, "scripts", "lib", "aggregation_utils.R"))
+
 # Get fixture path helper
 get_fixture_path <- function(fixture_name) {
-
   # Try multiple possible locations
   paths <- c(
     file.path("fixtures", "gapit_params", fixture_name, "metadata.json"),
@@ -31,19 +55,10 @@ get_fixture_path <- function(fixture_name) {
 # =============================================================================
 
 test_that("get_gapit_param reads v3.0.0 schema correctly", {
-
-  # Source the collect_results.R to get the function
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # get_gapit_param is now available from aggregation_utils.R module
 
   # Load v3 fixture
-  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = TRUE)
 
   # Test reading GAPIT parameters from v3.0.0 schema
   expect_equal(
@@ -70,17 +85,10 @@ test_that("get_gapit_param reads v3.0.0 schema correctly", {
 })
 
 test_that("get_gapit_param falls back to v2.0.0 legacy schema", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # get_gapit_param is now available from aggregation_utils.R module
 
   # Load v2 legacy fixture
-  metadata <- jsonlite::fromJSON(get_fixture_path("v2_legacy"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v2_legacy"), simplifyVector = TRUE)
 
   # Test reading from legacy schema (no parameters.gapit section)
   expect_equal(
@@ -98,17 +106,10 @@ test_that("get_gapit_param falls back to v2.0.0 legacy schema", {
 })
 
 test_that("get_gapit_param returns default when parameter missing", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # get_gapit_param is now available from aggregation_utils.R module
 
   # Load v3 minimal fixture (missing optional params)
-  metadata <- jsonlite::fromJSON(get_fixture_path("v3_minimal"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v3_minimal"), simplifyVector = TRUE)
 
   # Test that missing parameters return default
   expect_null(
@@ -125,16 +126,9 @@ test_that("get_gapit_param returns default when parameter missing", {
 # =============================================================================
 
 test_that("generate_configuration_section uses GAPIT native names", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # generate_configuration_section is sourced at top of file
 
-  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = TRUE)
   summary_table <- data.frame(n_snps = 287000, n_samples = 1135)
 
   output <- generate_configuration_section(metadata, summary_table)
@@ -152,16 +146,9 @@ test_that("generate_configuration_section uses GAPIT native names", {
 })
 
 test_that("generate_configuration_section groups parameters correctly", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # generate_configuration_section is sourced at top of file
 
-  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = TRUE)
   summary_table <- data.frame(n_snps = 287000, n_samples = 1135)
 
   output <- generate_configuration_section(metadata, summary_table)
@@ -173,16 +160,9 @@ test_that("generate_configuration_section groups parameters correctly", {
 })
 
 test_that("generate_configuration_section shows optional parameters when present", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # generate_configuration_section is sourced at top of file
 
-  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v3_full"), simplifyVector = TRUE)
   summary_table <- data.frame(n_snps = 287000, n_samples = 1135)
 
   output <- generate_configuration_section(metadata, summary_table)
@@ -195,16 +175,9 @@ test_that("generate_configuration_section shows optional parameters when present
 })
 
 test_that("generate_configuration_section works with v2 legacy metadata", {
-  source_path <- if (file.exists("../../scripts/collect_results.R")) {
-    "../../scripts/collect_results.R"
-  } else if (file.exists("scripts/collect_results.R")) {
-    "scripts/collect_results.R"
-  } else {
-    stop("Cannot find collect_results.R")
-  }
-  source(source_path)
+  # generate_configuration_section is sourced at top of file
 
-  metadata <- jsonlite::fromJSON(get_fixture_path("v2_legacy"), simplifyVector = FALSE)
+  metadata <- jsonlite::fromJSON(get_fixture_path("v2_legacy"), simplifyVector = TRUE)
   summary_table <- data.frame(n_snps = 287000, n_samples = 1135)
 
   # Should not error on v2 legacy metadata
