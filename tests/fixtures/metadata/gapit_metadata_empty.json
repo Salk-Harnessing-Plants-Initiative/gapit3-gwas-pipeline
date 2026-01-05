@@ -1,0 +1,19 @@
+{
+  "schema_version": "3.0.0",
+  "trait": {
+    "index": 2,
+    "name": "test_trait"
+  },
+  "parameters": {
+    "PCA.total": 3,
+    "SNP.MAF": 0.05
+  },
+  "genotype": {
+    "n_snps": 500000,
+    "n_accessions": 300
+  },
+  "execution": {
+    "status": "success",
+    "duration_seconds": 1800
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "schema_version": "3.0.0",
+  "trait": {
+    "index": 2,
+    "name": "test_trait"
+  },
+  "parameters": {
+    "model": "BLINK,FarmCPU",
+    "PCA.total": 3,
+    "SNP.MAF": 0.05,
+    "kinship.algorithm": "Zhang",
+    "SNP.effect": "Add",
+    "SNP.impute": "Middle"
+  },
+  "genotype": {
+    "n_snps": 1000000,
+    "n_accessions": 500
+  },
+  "execution": {
+    "status": "success",
+    "duration_seconds": 3600
+  },
+  "argo": {
+    "workflow_name": "gapit3-gwas-parallel-test",
+    "workflow_uid": "abc123-def456"
+  }
+}
