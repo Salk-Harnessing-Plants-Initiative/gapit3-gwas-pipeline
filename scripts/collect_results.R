@@ -306,15 +306,26 @@ generate_executive_summary <- function(stats, top_snp, top_trait) {
 #' @param default Default value if not found
 #' @return Parameter value
 get_gapit_param <- function(metadata, gapit_name, legacy_name, default = NULL) {
+  # Handle NULL parameters gracefully
+  if (is.null(metadata) || is.null(metadata$parameters)) {
+    return(default)
+  }
 
   # Try new schema first (parameters.gapit.*)
-  if (!is.null(metadata$parameters$gapit[[gapit_name]])) {
+  if (!is.null(metadata$parameters$gapit) && !is.null(metadata$parameters$gapit[[gapit_name]])) {
     return(metadata$parameters$gapit[[gapit_name]])
   }
+
+  # Try flat v3.0.0 schema (parameters.*)
+  if (!is.null(gapit_name) && !is.null(metadata$parameters[[gapit_name]])) {
+    return(metadata$parameters[[gapit_name]])
+  }
+
   # Fall back to legacy schema (parameters.*)
-  if (!is.null(metadata$parameters[[legacy_name]])) {
+  if (!is.null(legacy_name) && !is.null(metadata$parameters[[legacy_name]])) {
     return(metadata$parameters[[legacy_name]])
   }
+
   return(default)
 }
 
