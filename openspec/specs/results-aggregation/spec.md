@@ -172,58 +172,35 @@ Collecting significant SNPs...
 
 The aggregation script MUST produce a CSV file containing all significant SNPs from all traits with complete statistical information and model tracking.
 
-The output CSV has columns: `SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,trait,model` (includes model column for filtering by GWAS model).
+**Modification**: The script now uses modular functions from `scripts/lib/aggregation_utils.R` for model validation and trait directory selection. The output format and content remain unchanged.
 
-#### Scenario: Complete aggregated output format
+#### Scenario: Aggregation uses modular functions
 
-**Given** aggregation of 186 traits with 2 models
-
-**When** aggregation completes
-
-**Then** the output file MUST:
-- Be named: `all_traits_significant_snps.csv`
-- Include `model` column as the last column
-- Contain all significant SNPs from all traits
-- Be sorted by P.value ascending
-- Have one row per (SNP, model) combination
+- **GIVEN** the refactored `collect_results.R` that sources modules
+- **WHEN** aggregation runs on a valid output directory
+- **THEN** the behavior MUST be identical to the pre-refactor version:
+  - Same output file names and formats
+  - Same significant SNP detection logic
+  - Same model tracking
+  - Same deduplication behavior
 
 ### Requirement: Fail-fast on incomplete traits
 
 When `GAPIT.Association.Filter_GWAS_results.csv` does not exist for a trait, the aggregation script MUST fail with a clear error message by default. The Filter file is the definitive completion signal - GAPIT only creates it after ALL models finish successfully.
 
-#### Scenario: Aggregation fails when any trait is incomplete
+**Modification**: Completeness checking now uses auto-detected models (when available) instead of only CLI-specified or default models. This ensures traits are correctly identified as complete when the workflow used a subset of models.
 
-- **GIVEN** 185 trait directories where 181 have Filter files and 4 are missing Filter files
-- **AND** the `--allow-incomplete` flag is NOT set
-- **WHEN** the aggregation script runs
+#### Scenario: Completeness uses auto-detected model subset
+
+- **GIVEN** trait directories with metadata indicating `model: "BLINK"` (single model)
+- **AND** Filter files exist for all traits
+- **AND** GWAS_Results files exist only for BLINK (not FarmCPU or MLM)
+- **WHEN** the aggregation script runs without `--models` flag
 - **THEN** the script MUST:
-  - NOT create any output files
-  - Exit with code 1 (error)
-  - Print error: `"ERROR: 4 traits are incomplete (missing Filter file)"`
-  - List each incomplete trait directory
-  - Suggest: `"Run retry-argo-traits.sh --output-dir <path> first, or use --allow-incomplete to skip."`
-
-#### Scenario: Aggregation succeeds with all complete traits
-
-- **GIVEN** 185 trait directories where ALL have Filter files
-- **WHEN** the aggregation script runs
-- **THEN** the script MUST:
-  - Process all 185 traits
-  - Create `all_traits_significant_snps.csv`
-  - Create `summary_table.csv`
-  - Exit with code 0 (success)
-
-#### Scenario: Allow-incomplete flag skips incomplete traits with warning
-
-- **GIVEN** 185 trait directories where 181 have Filter files and 4 are missing Filter files
-- **AND** the `--allow-incomplete` flag IS set
-- **WHEN** the aggregation script runs
-- **THEN** the script MUST:
-  - Emit warning for each incomplete trait: `"WARNING: Skipping trait_XXX (missing Filter file)"`
-  - Process only the 181 complete traits
-  - Create output files with partial results
-  - Print summary: `"Aggregated 181 of 185 traits (4 skipped due to missing Filter file)"`
-  - Exit with code 0 (success)
+  - Auto-detect expected model as `["BLINK"]`
+  - Consider traits complete (they have BLINK results)
+  - NOT fail due to "missing" FarmCPU or MLM results
+  - Successfully aggregate all traits
 
 ### Requirement: Aggregation must generate human-readable markdown summary report
 
@@ -438,6 +415,243 @@ The aggregation script MUST support a `--no-markdown` flag to skip markdown repo
   - Print message: "Skipping markdown report generation (--no-markdown)"
 
 ---
+
+### Requirement: Aggregation functions must be extractable as testable modules
+
+The aggregation script MUST organize reusable functions into separate module files that can be sourced independently without triggering script execution, enabling unit testing.
+
+#### Scenario: Sourcing aggregation_utils.R does not execute aggregation
+
+- **GIVEN** the file `scripts/lib/aggregation_utils.R` exists
+- **WHEN** an R session sources the file with `source("scripts/lib/aggregation_utils.R")`
+- **THEN** the session MUST:
+  - Have `extract_models_from_metadata` function available
+  - Have `validate_model_names` function available
+  - Have `detect_models_from_first_trait` function available
+  - Have `get_gapit_param` function available
+  - Have `select_best_trait_dirs` function available
+  - NOT execute any aggregation logic
+  - NOT require CLI arguments
+  - NOT print any output
+
+#### Scenario: Sourcing constants.R provides configuration values
+
+- **GIVEN** the file `scripts/lib/constants.R` exists
+- **WHEN** an R session sources the file
+- **THEN** the session MUST have:
+  - `KNOWN_GAPIT_MODELS` character vector with all supported models
+  - `DEFAULT_MODELS` character vector with default model list
+  - No side effects or console output
+
+---
+
+### Requirement: All extracted functions must be pure with explicit parameters
+
+All functions in the aggregation modules MUST be pure functions with no reliance on global state - all inputs must be passed as explicit parameters.
+
+#### Scenario: validate_model_names accepts custom known_models parameter
+
+- **GIVEN** a custom list of known models `c("MODEL_A", "MODEL_B")`
+- **WHEN** calling `validate_model_names(c("MODEL_A"), known_models = c("MODEL_A", "MODEL_B"))`
+- **THEN** the function MUST:
+  - Return `list(valid = TRUE, invalid_models = character(0))`
+  - NOT reference global KNOWN_GAPIT_MODELS
+  - Be deterministic (same input always gives same output)
+
+#### Scenario: Functions work without global environment setup
+
+- **GIVEN** a fresh R session with no global variables set
+- **AND** modules are sourced
+- **WHEN** calling any extracted function with valid parameters
+- **THEN** the function MUST:
+  - Execute successfully
+  - NOT throw errors about missing global variables
+  - Return expected results based only on provided parameters
+
+---
+
+### Requirement: Aggregation output must include configuration metadata
+
+The `summary_stats.json` output MUST include a `configuration` section documenting all settings used during aggregation for reproducibility.
+
+#### Scenario: Configuration section in summary_stats.json
+
+- **GIVEN** aggregation runs with:
+  - Auto-detected models: `["BLINK", "FarmCPU"]`
+  - Significance threshold: `5e-8`
+  - allow_incomplete: `false`
+- **WHEN** aggregation completes successfully
+- **THEN** `summary_stats.json` MUST include:
+  ```json
+  {
+    "configuration": {
+      "expected_models": ["BLINK", "FarmCPU"],
+      "models_source": "auto-detected",
+      "significance_threshold": 5e-8,
+      "allow_incomplete": false
+    }
+  }
+  ```
+
+#### Scenario: CLI-specified models recorded in configuration
+
+- **GIVEN** aggregation runs with `--models "MLM"`
+- **WHEN** aggregation completes
+- **THEN** `summary_stats.json` configuration MUST show:
+  - `expected_models`: `["MLM"]`
+  - `models_source`: `"cli"`
+
+#### Scenario: Default models recorded when auto-detection fails
+
+- **GIVEN** aggregation runs without `--models` flag
+- **AND** no metadata files exist for auto-detection
+- **WHEN** aggregation completes
+- **THEN** `summary_stats.json` configuration MUST show:
+  - `expected_models`: `["BLINK", "FarmCPU", "MLM"]`
+  - `models_source`: `"default"`
+
+---
+
+### Requirement: Module sourcing must use robust path resolution
+
+The main script MUST source modules using path resolution that works regardless of the current working directory.
+
+#### Scenario: Script runs from project root
+
+- **GIVEN** current directory is project root
+- **WHEN** running `Rscript scripts/collect_results.R --output-dir /path`
+- **THEN** modules MUST be sourced successfully
+
+#### Scenario: Script runs from scripts directory
+
+- **GIVEN** current directory is `scripts/`
+- **WHEN** running `Rscript collect_results.R --output-dir /path`
+- **THEN** modules MUST be sourced successfully
+
+#### Scenario: Script runs via absolute path
+
+- **GIVEN** any current directory
+- **WHEN** running `Rscript /full/path/to/scripts/collect_results.R --output-dir /path`
+- **THEN** modules MUST be sourced successfully
+
+### Requirement: Aggregation must auto-detect expected models from workflow metadata
+
+When the `--models` CLI flag is not specified (using default value), the aggregation script MUST attempt to auto-detect the expected models from the first trait directory's `gapit_metadata.json` file.
+
+#### Scenario: Auto-detect models from v3.0.0 metadata
+
+- **GIVEN** trait directories exist with `gapit_metadata.json` files
+- **AND** the first trait's metadata contains: `{"model": "BLINK,FarmCPU"}`
+- **AND** the `--models` flag is NOT specified
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Read the first trait's `gapit_metadata.json`
+  - Extract models: `["BLINK", "FarmCPU"]`
+  - Log: `"Auto-detected models from metadata: BLINK, FarmCPU"`
+  - Use detected models for completeness checking
+
+#### Scenario: Auto-detect models from legacy metadata format
+
+- **GIVEN** trait directories exist with `gapit_metadata.json` files
+- **AND** the first trait's metadata contains: `{"models": "MLM"}` (legacy parameter name)
+- **AND** the `--models` flag is NOT specified
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Check for v3.0.0 `model` parameter first
+  - Fall back to legacy `models` parameter
+  - Extract models: `["MLM"]`
+  - Use detected model for completeness checking
+
+#### Scenario: CLI models flag overrides auto-detection
+
+- **GIVEN** trait directories exist with metadata indicating `model: "BLINK,FarmCPU"`
+- **AND** the CLI specifies `--models "MLM"`
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - NOT read metadata for model detection
+  - Log: `"Using CLI-specified models: MLM"`
+  - Use only `["MLM"]` for completeness checking
+
+#### Scenario: Fallback to default when metadata unavailable
+
+- **GIVEN** trait directories exist WITHOUT `gapit_metadata.json` files
+- **AND** the `--models` flag is NOT specified
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Emit warning: `"Could not auto-detect models from metadata; using default: BLINK,FarmCPU,MLM"`
+  - Use default models `["BLINK", "FarmCPU", "MLM"]` for completeness checking
+  - NOT fail the aggregation
+
+#### Scenario: Fallback when metadata is malformed
+
+- **GIVEN** trait directories exist with malformed `gapit_metadata.json` (invalid JSON)
+- **AND** the `--models` flag is NOT specified
+- **WHEN** the aggregation script runs
+- **THEN** the script MUST:
+  - Emit warning about malformed metadata
+  - Fall back to default models
+  - NOT fail the aggregation
+
+---
+
+### Requirement: Model names must be validated against known GAPIT models
+
+The aggregation script MUST validate detected or specified model names against a canonical list of known GAPIT models and emit warnings for unrecognized models.
+
+#### Scenario: All models are recognized
+
+- **GIVEN** models to validate: `["BLINK", "FarmCPU", "MLM"]`
+- **WHEN** model validation runs
+- **THEN** validation MUST:
+  - Return valid = TRUE
+  - Return empty invalid_models list
+  - NOT emit any warnings
+
+#### Scenario: Unknown model name detected
+
+- **GIVEN** models to validate: `["BLINK", "TYPO_MODEL"]`
+- **WHEN** model validation runs
+- **THEN** validation MUST:
+  - Return valid = FALSE
+  - Return invalid_models = `["TYPO_MODEL"]`
+  - Emit warning: `"Unrecognized model name: TYPO_MODEL. Known models: BLINK, FarmCPU, MLM, ..."`
+
+#### Scenario: Case-insensitive model matching
+
+- **GIVEN** models to validate: `["blink", "farmcpu"]` (lowercase)
+- **WHEN** model validation runs
+- **THEN** validation MUST:
+  - Match case-insensitively against known models
+  - Return valid = TRUE
+  - Use canonical form (BLINK, FarmCPU) for internal processing
+
+---
+
+### Requirement: Single authoritative list of known GAPIT models
+
+The aggregation script MUST define a single constant containing all known GAPIT model names, eliminating duplicate hardcoded lists.
+
+#### Scenario: Known models constant includes all GAPIT models
+
+- **GIVEN** the KNOWN_GAPIT_MODELS constant in collect_results.R
+- **WHEN** inspecting the constant
+- **THEN** it MUST include at minimum:
+  - `BLINK`
+  - `FarmCPU`
+  - `MLM`
+  - `MLMM`
+  - `GLM`
+  - `SUPER`
+  - `CMLM`
+  - `FarmCPU.LM`
+  - `Blink.LM`
+
+#### Scenario: No duplicate model lists in codebase
+
+- **GIVEN** the collect_results.R script
+- **WHEN** searching for hardcoded model lists
+- **THEN** there MUST be exactly one authoritative list (KNOWN_GAPIT_MODELS)
+- **AND** all model validation MUST reference this single constant
 
 ## Reference: GAPIT Output Quirks
 

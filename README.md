@@ -131,14 +131,14 @@ docker run --rm \
   -v /data:/data \
   -v /outputs:/outputs \
   -e TRAIT_INDEX=2 \
-  -e MODELS=BLINK \
+  -e MODEL=BLINK \
   gapit3:latest
 
-# Validation run (multiple models)
+# Validation run (multiple models with population structure)
 docker run --rm \
   -e TRAIT_INDEX=2 \
-  -e MODELS=BLINK,FarmCPU,MLM \
-  -e PCA_COMPONENTS=5 \
+  -e MODEL=BLINK,FarmCPU,MLM \
+  -e PCA_TOTAL=5 \
   gapit3:latest
 ```
 
@@ -148,8 +148,8 @@ runai workspace submit gapit3-trait-2 \
   --project talmo-lab \
   --image ghcr.io/.../gapit3:latest \
   --environment TRAIT_INDEX=2 \
-  --environment MODELS=BLINK \
-  --environment PCA_COMPONENTS=5 \
+  --environment MODEL=BLINK \
+  --environment PCA_TOTAL=5 \
   --environment SNP_THRESHOLD=5e-8
 ```
 
@@ -163,13 +163,27 @@ nano .env
 docker run --rm --env-file .env gapit3:latest
 ```
 
-### Available Configuration Options
+### GAPIT Parameters
 
-**Core Analysis Parameters:**
-- `MODELS` - GWAS models (default: `BLINK,FarmCPU`)
-- `PCA_COMPONENTS` - Population structure correction (default: `3`, range: `0-20`)
-- `SNP_THRESHOLD` - Significance threshold (default: `5e-8`)
-- `MAF_FILTER` - Minor allele frequency filter (default: `0.05`)
+Parameter names follow GAPIT v3.0.0 conventions. **See [docs/GAPIT_PARAMETERS.md](docs/GAPIT_PARAMETERS.md) for complete parameter reference.**
+
+**Core Parameters (GAPIT native names):**
+
+| Parameter | Description | GAPIT Default |
+|-----------|-------------|---------------|
+| `MODEL` | GWAS models (BLINK, FarmCPU, MLM, etc.) | `MLM` |
+| `PCA_TOTAL` | Principal components (0-20) | `0` |
+| `SNP_MAF` | Minor allele frequency filter | `0` |
+| `SNP_THRESHOLD` | Significance p-value cutoff | `0.05` |
+| `SNP_FDR` | FDR correction threshold | disabled |
+
+**Additional GAPIT Parameters:**
+
+| Parameter | Description | GAPIT Default |
+|-----------|-------------|---------------|
+| `KINSHIP_ALGORITHM` | Kinship matrix method (VanRaden, Zhang, Loiselle, EMMA) | `VanRaden` |
+| `SNP_EFFECT` | Genetic effect model (Add, Dom) | `Add` |
+| `SNP_IMPUTE` | Missing data imputation (Middle, Major, Minor) | `Middle` |
 
 **Paths:**
 - `TRAIT_INDEX` - Which trait column to analyze (required)
@@ -181,6 +195,8 @@ docker run --rm --env-file .env gapit3:latest
 **Computational Resources:**
 - `OPENBLAS_NUM_THREADS` - Linear algebra threads (default: `12`)
 - `OMP_NUM_THREADS` - OpenMP threads (default: `12`)
+
+> **Note**: Legacy parameter names (`MODELS`, `PCA_COMPONENTS`, `MAF_FILTER`) are still supported but deprecated. They will show warnings and be automatically mapped to the new names.
 
 **See [.env.example](.env.example) for complete documentation of all options.**
 
@@ -360,14 +376,14 @@ cd cluster/argo
 
 ### Runtime Configuration via Environment Variables ([.env.example](.env.example))
 
-All GAPIT parameters are configured through environment variables. See [.env.example](.env.example) for complete documentation.
+All GAPIT parameters are configured through environment variables. See [.env.example](.env.example) and [docs/GAPIT_PARAMETERS.md](docs/GAPIT_PARAMETERS.md) for complete documentation.
 
 ```bash
-# Key parameters
-MODELS=BLINK,FarmCPU    # GWAS models to run
-PCA_COMPONENTS=3        # Population structure correction
+# Key parameters (GAPIT v3.0.0 native names)
+MODEL=BLINK,FarmCPU     # GWAS models to run
+PCA_TOTAL=3             # Population structure correction
 SNP_THRESHOLD=5e-8      # Significance threshold
-MAF_FILTER=0.05         # Minor allele frequency filter
+SNP_MAF=0.05            # Minor allele frequency filter
 ```
 
 ### Argo Parallelization
@@ -584,4 +600,4 @@ This project is licensed under the GNU General Public License v3.0 - see the [LI
 
 **Status**: Production-ready ✅
 
-Last updated: 2025-12-09
+Last updated: 2026-01-05

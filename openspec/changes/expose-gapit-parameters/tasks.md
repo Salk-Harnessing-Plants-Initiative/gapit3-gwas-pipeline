@@ -18,7 +18,7 @@
 - [x] Add tests for `get_gapit_param()` helper function
 - [x] Add tests for schema v3.0.0 reading
 - [x] Add tests for backward compatibility with v2.0.0
-- [ ] **BLOCKED**: Tests cannot run because `collect_results.R` executes on source (needs main guard refactor)
+- [x] Tests now run successfully (blocker resolved by `refactor-collect-results-testable`)
 
 ### 1.3 Create Integration Test File
 - [x] Create `tests/integration/test-gapit-params-e2e.sh`
@@ -58,12 +58,12 @@
 - [x] Add test: summary falls back to legacy `parameters.*`
 - [x] Add test: summary displays grouped sections (GAPIT Parameters, Filtering, Data)
 - [x] Add test: summary shows GAPIT native param names
-- [ ] **BLOCKED**: R unit tests cannot run (see Phase 1.2)
+- [x] R unit tests now pass (blocker resolved)
 
 ### 4.2 Implement Summary Updates
 - [x] Add `get_gapit_param()` helper to collect_results.R
 - [x] Update `generate_configuration_section()` with grouped format
-- [ ] **BLOCKED**: R unit tests cannot run (see Phase 1.2)
+- [x] R unit tests now pass (blocker resolved)
 
 ## Phase 5: Add Deprecation Warnings (TDD)
 
@@ -145,14 +145,16 @@
 - [x] Show default values and document deprecation
 
 ### 8.3 Update README.md
-- [ ] Add section on GAPIT parameter configuration
-- [ ] Document deprecation warnings and migration
+- [x] Add section on GAPIT parameter configuration
+- [x] Document deprecation warnings and migration
+- [x] Update examples to use v3.0.0 parameter names (MODEL, PCA_TOTAL, SNP_MAF)
+- [x] Add link to docs/GAPIT_PARAMETERS.md
 
 ## Phase 9: Final Validation
 
 ### 9.1 Run Full Test Suite
 - [x] All integration tests pass (14/14 after SNP_THRESHOLD addition)
-- [ ] All R unit tests pass (BLOCKED - see Phase 1.2, tracked in GitHub Issue #11)
+- [x] All R unit tests pass (441 tests, blocker resolved by `refactor-collect-results-testable`)
 - [x] CI pipeline passes (4/4 workflows: R Script Tests, Bash Validation, Docker Build, Devcontainer)
 
 ### 9.2 Manual Validation
@@ -160,15 +162,12 @@
 - [ ] Verify metadata completeness
 - [ ] Check pipeline summary output
 
-## Known Blockers
+## Resolved Blockers
 
-### R Unit Test Infrastructure (Phase 1.2)
-The R unit tests for `get_gapit_param()` and `generate_configuration_section()` cannot run because:
-- `collect_results.R` executes on source (no main guard)
-- Functions are defined AFTER script execution starts
-- Script exits with "No trait results found" before functions are defined
+### R Unit Test Infrastructure (Phase 1.2) - RESOLVED
+~~The R unit tests for `get_gapit_param()` and `generate_configuration_section()` could not run because `collect_results.R` executed on source.~~
 
-**Required fix**: Refactor `collect_results.R` to add main execution guard so functions can be sourced for testing without triggering script execution. This should be done as a separate change proposal to avoid breaking existing functionality.
+**Resolution**: The `refactor-collect-results-testable` change (archived 2026-01-06) extracted functions into `scripts/lib/aggregation_utils.R` which can be sourced independently. All 441 R unit tests now pass including the 26 GAPIT parameter tests.
 
 ## File Change Summary
 

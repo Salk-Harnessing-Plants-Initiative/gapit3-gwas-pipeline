@@ -141,10 +141,20 @@ Rscript scripts/run_gwas_single_trait.R \
 | Output Dir | `--output-dir` | Path | `/outputs` | Directory containing trait results |
 | Batch ID | `--batch-id` | String | `unknown` | Workflow ID for tracking |
 | Threshold | `--threshold` | Float | 5e-8 | Genome-wide significance threshold |
-| Models | `--models` | String | `BLINK,FarmCPU,MLM` | Expected models for completeness check |
+| Models | `--models` | String | (auto-detect) | Expected models for completeness check (see below) |
 | Allow Incomplete | `--allow-incomplete` | Flag | FALSE | Continue if some traits failed |
 | No Markdown | `--no-markdown` | Flag | FALSE | Skip markdown summary generation |
 | Markdown Only | `--markdown-only` | Flag | FALSE | Regenerate markdown from existing data |
+
+#### Model Auto-Detection
+
+The `--models` parameter supports automatic detection from workflow metadata:
+
+1. **CLI Override**: If `--models` is specified, those models are used (source: `cli`)
+2. **Auto-Detection**: If not specified, reads first trait's `gapit_metadata.json` to detect models (source: `auto-detected`)
+3. **Default Fallback**: If metadata unavailable, falls back to `BLINK,FarmCPU,MLM` (source: `default`)
+
+The `models_source` field in `summary_stats.json` indicates which method was used. This ensures completeness checking uses the actual models from the workflow rather than hardcoded defaults.
 
 #### Output Files
 
