@@ -16,10 +16,13 @@ Comprehensive documentation for all R scripts and the container entrypoint in th
    - [validate_inputs.R](#validate_inputsr)
    - [extract_trait_names.R](#extract_trait_namesr)
    - [entrypoint.sh](#entrypointsh)
-4. [Duplicate Handling](#duplicate-handling)
-5. [Parameter Interactions](#parameter-interactions)
-6. [Troubleshooting](#troubleshooting)
-7. [GAPIT3 Documentation](#gapit3-documentation)
+4. [Script Modules](#script-modules)
+   - [scripts/lib/constants.R](#scriptslib-constantsr)
+   - [scripts/lib/aggregation_utils.R](#scriptslib-aggregation_utilsr)
+5. [Duplicate Handling](#duplicate-handling)
+6. [Parameter Interactions](#parameter-interactions)
+7. [Troubleshooting](#troubleshooting)
+8. [GAPIT3 Documentation](#gapit3-documentation)
 
 ---
 
@@ -283,6 +286,88 @@ Key variables:
 
 ---
 
+## Script Modules
+
+The pipeline uses a modular architecture with reusable functions extracted into `scripts/lib/`. These modules can be sourced independently for testing or reuse.
+
+### scripts/lib/constants.R
+
+**Purpose**: Authoritative constants for GAPIT model names and defaults.
+
+**Contents**:
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `KNOWN_GAPIT_MODELS` | Vector | All valid GAPIT model names: BLINK, FarmCPU, MLM, MLMM, SUPER, CMLM, GLM, EMMA, ECMLM |
+| `DEFAULT_MODELS` | Vector | Default models when none specified: `c("BLINK", "FarmCPU", "MLM")` |
+| `DEFAULT_MODELS_STRING` | String | Comma-separated default models: `"BLINK,FarmCPU,MLM"` |
+
+**Usage**:
+
+```r
+# Source constants in your script
+source("scripts/lib/constants.R")
+
+# Validate a model name
+if (model %in% KNOWN_GAPIT_MODELS) {
+  # Valid model
+}
+```
+
+### scripts/lib/aggregation_utils.R
+
+**Purpose**: Reusable pure functions for GWAS results aggregation and metadata handling.
+
+**Key Functions**:
+
+| Function | Description |
+|----------|-------------|
+| `extract_models_from_metadata()` | Parse model config from gapit_metadata.json |
+| `validate_model_names()` | Validate models against KNOWN_GAPIT_MODELS (case-insensitive) |
+| `detect_models_from_first_trait()` | Auto-detect expected models from first trait's metadata |
+| `get_gapit_param()` | Extract GAPIT parameters with fallback to legacy schema |
+| `select_best_trait_dirs()` | Choose best directory when duplicates exist (from retries) |
+| `generate_configuration_section()` | Generate markdown configuration section |
+| `format_pvalue()` | Format p-value in scientific notation |
+| `format_number()` | Format number with thousand separators |
+| `format_duration()` | Format duration in minutes/hours |
+| `truncate_string()` | Truncate string with ellipsis |
+
+**Design Principles**:
+
+- All functions are **pure** (no global state, deterministic outputs)
+- All inputs are explicit parameters
+- Functions can be tested in isolation
+- Supports both v3.0.0 and legacy v2.0.0 metadata schemas
+
+**Usage**:
+
+```r
+# Source the module
+source("scripts/lib/aggregation_utils.R")
+
+# Validate models (case-insensitive)
+result <- validate_model_names(c("blink", "farmcpu"))
+# result$valid == TRUE
+# result$canonical_models == c("BLINK", "FarmCPU")
+
+# Extract parameter with fallback
+pca <- get_gapit_param(metadata, "PCA.total", "pca_components", 3)
+
+# Select best directories for deduplication
+best_dirs <- select_best_trait_dirs(trait_dirs, expected_models)
+```
+
+**Testing**:
+
+The modules have comprehensive unit tests in `tests/testthat/test-aggregation-utils.R`. Run with:
+
+```bash
+Rscript -e "library(testthat); test_file('tests/testthat/test-aggregation-utils.R')"
+```
+
+---
+
 ## Duplicate Handling
 
 The pipeline automatically handles duplicate entries at two levels:
@@ -440,4 +525,4 @@ This pipeline exposes commonly-used GAPIT parameters. For advanced options (e.g.
 
 ---
 
-*Last updated: 2025-01-03*
+*Last updated: 2026-01-05*
