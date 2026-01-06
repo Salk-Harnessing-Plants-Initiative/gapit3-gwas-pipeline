@@ -65,7 +65,7 @@
 - [x] Remove duplicate function definitions (use module functions)
 - [x] Use KNOWN_GAPIT_MODELS from constants in validation
 - [x] Use DEFAULT_MODELS_STRING for CLI default
-- [ ] Verify script still runs correctly after removing duplicates
+- [x] Verify script still runs correctly after removing duplicates
 
 ### 3.2 Add configuration to metadata output
 - [x] Add `configuration` section to summary_stats.json
