@@ -664,6 +664,13 @@ read_filter_file <- function(trait_dir, threshold = 5e-8) {
     # Read Filter file (contains only significant SNPs)
     filter_data <- fread(filter_file, data.table = FALSE)
 
+    # Drop V1 column (row index) if present - not needed for analysis
+    # Critical fix: V1 has mixed types across files (numeric: 1216644 vs X-prefixed: X2625218)
+    # which causes bind_rows() type mismatch errors when combining results
+    if ("V1" %in% colnames(filter_data)) {
+      filter_data <- filter_data[, colnames(filter_data) != "V1", drop = FALSE]
+    }
+
     # Check if traits column exists
     # No traits column means no significant SNPs found (empty Filter file)
     if (!"traits" %in% colnames(filter_data)) {

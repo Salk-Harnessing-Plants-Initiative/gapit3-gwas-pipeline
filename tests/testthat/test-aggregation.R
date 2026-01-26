@@ -409,6 +409,40 @@ test_that("read_filter_file returns empty for Filter with traits but no data", {
 })
 
 # ==============================================================================
+# Test: read_filter_file handles mixed row index types (V1 column)
+# ==============================================================================
+# Some GAPIT outputs have numeric row indices (1216644) while others have
+# X-prefixed character indices (X2625218). When combining with bind_rows(),
+# this causes type mismatch errors if V1 is kept. The fix drops V1.
+# ==============================================================================
+test_that("read_filter_file drops V1 column (row index) to avoid type mismatch", {
+  # Test with numeric row index
+  fixture_numeric <- get_fixture_path(file.path("aggregation", "trait_numeric_rowindex"))
+  result_numeric <- read_filter_file(fixture_numeric, threshold = 5e-8)
+
+  expect_s3_class(result_numeric, "data.frame")
+  expect_gt(nrow(result_numeric), 0)
+  # V1 column should NOT be present (dropped to avoid type mismatch)
+  expect_false("V1" %in% colnames(result_numeric))
+  # Essential columns should be present
+  expect_true(all(c("SNP", "Chr", "Pos", "P.value", "model", "trait") %in% colnames(result_numeric)))
+
+  # Test with X-prefixed row index
+  fixture_xprefix <- get_fixture_path(file.path("aggregation", "trait_xprefix_rowindex"))
+  result_xprefix <- read_filter_file(fixture_xprefix, threshold = 5e-8)
+
+  expect_s3_class(result_xprefix, "data.frame")
+  expect_gt(nrow(result_xprefix), 0)
+  # V1 column should NOT be present
+  expect_false("V1" %in% colnames(result_xprefix))
+  expect_true(all(c("SNP", "Chr", "Pos", "P.value", "model", "trait") %in% colnames(result_xprefix)))
+
+  # Critical: bind_rows should work without type mismatch error
+  combined <- dplyr::bind_rows(result_numeric, result_xprefix)
+  expect_equal(nrow(combined), nrow(result_numeric) + nrow(result_xprefix))
+})
+
+# ==============================================================================
 # Tests for select_best_trait_dirs() - Deduplication
 # ==============================================================================
 
