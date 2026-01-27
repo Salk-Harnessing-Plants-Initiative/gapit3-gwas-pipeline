@@ -84,11 +84,11 @@ spec:
         dependencies: [validate-inputs]
         template: extract-traits-inline
 
-      # Step 3: Run 3 test traits in parallel
+      # Step 3: Run 3 test traits in parallel (using highmem template for large datasets)
       - name: run-trait-2
         dependencies: [extract-traits]
         templateRef:
-          name: gapit3-gwas-single-trait
+          name: gapit3-gwas-single-trait-highmem
           template: run-gwas
         arguments:
           parameters:
@@ -122,7 +122,7 @@ spec:
       - name: run-trait-3
         dependencies: [extract-traits]
         templateRef:
-          name: gapit3-gwas-single-trait
+          name: gapit3-gwas-single-trait-highmem
           template: run-gwas
         arguments:
           parameters:
@@ -156,7 +156,7 @@ spec:
       - name: run-trait-4
         dependencies: [extract-traits]
         templateRef:
-          name: gapit3-gwas-single-trait
+          name: gapit3-gwas-single-trait-highmem
           template: run-gwas
         arguments:
           parameters:

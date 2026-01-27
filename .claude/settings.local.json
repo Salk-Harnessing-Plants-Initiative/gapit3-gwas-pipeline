@@ -6,7 +6,10 @@
       "Bash(for f in cluster/argo/**/*.yaml)",
       "Bash(do python -c \"import yaml; yaml.safe_load(open(''''$f''''))\")",
       "Bash(echo:*)",
-      "Bash(gh run list:*)"
+      "Bash(gh run list:*)",
+      "Bash(wsl -e bash -c:*)",
+      "Bash(unset GITHUB_TOKEN)",
+      "Bash(MSYS_NO_PATHCONV=1 gh run watch:*)"
     ],
     "deny": [],
     "ask": []

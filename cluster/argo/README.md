@@ -11,6 +11,8 @@ cluster/argo/
 ├── README.md                      # This file
 ├── workflow-templates/            # Reusable workflow templates
 │   ├── gapit3-single-trait-template.yaml
+│   ├── gapit3-single-trait-template-highmem.yaml
+│   ├── gapit3-single-trait-template-ultrahighmem.yaml
 │   ├── trait-extractor-template.yaml
 │   └── results-collector-template.yaml
 ├── workflows/                     # Executable workflows
@@ -435,7 +437,7 @@ find . -name "*.yaml" -exec sed -i \
 
 ### Memory Sizing
 
-The WorkflowTemplate allocates **64GB RAM** per trait job. This is required for large genotype datasets due to GAPIT's memory usage during data loading:
+The WorkflowTemplate allocates memory based on dataset size. Memory requirements scale with SNP count due to GAPIT's matrix operations:
 
 | Stage | Memory Usage | Notes |
 |-------|-------------|-------|
@@ -447,26 +449,71 @@ The WorkflowTemplate allocates **64GB RAM** per trait job. This is required for 
 
 **Important**: The memory peak occurs during **numericalization** (before any GWAS model runs), not during model execution. All models (BLINK, FarmCPU, MLM, etc.) run sequentially and share the already-loaded data.
 
+### Template Tier Selection
+
+Choose the appropriate template based on your dataset's SNP count:
+
+| Template | SNP Count | Memory | CPU | Use Case |
+|----------|-----------|--------|-----|----------|
+| `gapit3-gwas-single-trait` | <500K | 64Gi/72Gi | 12/16 | Standard datasets |
+| `gapit3-gwas-single-trait-highmem` | 500K-1.5M | 96Gi/104Gi | 16/20 | Medium datasets |
+| `gapit3-gwas-single-trait-ultrahighmem` | >1.5M | 160Gi/180Gi | 16/24 | Large MAC-filtered datasets |
+
+**Memory Estimation Formula:**
+```
+Peak (GB) ≈ (samples × SNPs × 8 × 5) / 1024³ × 1.5
+```
+
+Example: 546 samples × 2.64M SNPs = ~129 GB peak → use `ultrahighmem` template
+
+### Cluster Resource Impact
+
+| Template | Jobs/Node | 10 Parallel Jobs | GPU Blocking |
+|----------|-----------|------------------|--------------|
+| Standard | 5 | 2 nodes | 8 GPUs (12%) |
+| Highmem | 3 | 4 nodes | 16 GPUs (25%) |
+| Ultrahighmem | 2 | 5 nodes | 20 GPUs (31%) |
+
+> **Note**: RunAI nodes have 320GB RAM and 4 GPUs each. CPU is typically the limiting factor for job packing.
+
 ### Scaling Guidelines
 
-| Genotype File Size | SNP Count | Recommended Memory |
-|-------------------|-----------|-------------------|
-| < 500 MB | < 500K SNPs | 32 GB |
-| 500 MB - 1 GB | 500K - 1M SNPs | 48 GB |
-| 1 - 2.5 GB | 1M - 1.5M SNPs | 64 GB |
-| > 2.5 GB | > 1.5M SNPs | 96+ GB |
+| Genotype File Size | SNP Count | Recommended Template |
+|-------------------|-----------|---------------------|
+| < 500 MB | < 500K SNPs | Standard (64Gi) |
+| 500 MB - 1.5 GB | 500K - 1M SNPs | Standard (64Gi) |
+| 1.5 - 2.5 GB | 1M - 1.5M SNPs | Highmem (96Gi) |
+| > 2.5 GB | > 1.5M SNPs | Ultrahighmem (160Gi) |
 
 ### Current Configuration
 
 ```yaml
-# In gapit3-single-trait-template.yaml
+# In gapit3-single-trait-template.yaml (Standard)
 resources:
   requests:
     memory: "64Gi"
     cpu: "12"
   limits:
-    memory: "72Gi"  # Headroom for peak usage
+    memory: "72Gi"
     cpu: "16"
+
+# In gapit3-single-trait-template-highmem.yaml
+resources:
+  requests:
+    memory: "96Gi"
+    cpu: "16"
+  limits:
+    memory: "104Gi"
+    cpu: "20"
+
+# In gapit3-single-trait-template-ultrahighmem.yaml
+resources:
+  requests:
+    memory: "160Gi"
+    cpu: "16"
+  limits:
+    memory: "180Gi"
+    cpu: "24"
 ```
 
 ### Parallelism vs Resources
@@ -500,8 +547,9 @@ This will show:
 
 ### Retry with High Memory
 
-For OOM failures (exit code 137), use the high-memory template:
+For OOM failures (exit code 137), choose the appropriate memory template based on SNP count:
 
+**For datasets with 500K-1.5M SNPs (highmem - 96Gi):**
 ```bash
 ./scripts/retry-argo-traits.sh \
   --workflow gapit3-gwas-parallel-8nj24 \
@@ -510,14 +558,24 @@ For OOM failures (exit code 137), use the high-memory template:
   --submit
 ```
 
-**High-memory template resources:**
-| Resource | Normal | High-Memory |
-|----------|--------|-------------|
-| Memory request | 64Gi | 96Gi |
-| Memory limit | 72Gi | 104Gi |
-| CPU request | 12 | 16 |
-| CPU limit | 16 | 20 |
-| Thread env vars | 12 | 16 |
+**For datasets with >1.5M SNPs (ultrahighmem - 160Gi):**
+```bash
+./scripts/retry-argo-traits.sh \
+  --workflow gapit3-gwas-parallel-8nj24 \
+  --output-dir "Z:/users/eberrigan/.../outputs" \
+  --ultrahighmem \
+  --submit
+```
+
+**Template resources comparison:**
+| Resource | Standard | Highmem | Ultrahighmem |
+|----------|----------|---------|--------------|
+| Memory request | 64Gi | 96Gi | 160Gi |
+| Memory limit | 72Gi | 104Gi | 180Gi |
+| CPU request | 12 | 16 | 16 |
+| CPU limit | 16 | 20 | 24 |
+| Thread env vars | 12 | 16 | 16 |
+| Jobs per node | 5 | 3 | 2 |
 
 ### Manual Trait Specification
 
@@ -567,12 +625,19 @@ Selecting most complete directory for each:
     Skipped: trait_005_Zn_ICP_20231112_200000 (2/3 models)
 ```
 
-### Install High-Memory Template
+### Install Memory Templates
 
-Before using `--highmem`, install the template:
+Before using `--highmem` or `--ultrahighmem`, install the templates:
 
 ```bash
+# Install high-memory template (96Gi)
 kubectl apply -f workflow-templates/gapit3-single-trait-template-highmem.yaml -n runai-talmo-lab
+
+# Install ultra-high-memory template (160Gi)
+kubectl apply -f workflow-templates/gapit3-single-trait-template-ultrahighmem.yaml -n runai-talmo-lab
+
+# Or install all templates at once
+kubectl apply -f workflow-templates/ -n runai-talmo-lab
 ```
 
 ---
@@ -651,4 +716,4 @@ For detailed technical documentation about the workflow architecture, see:
 
 ---
 
-**Last Updated**: 2025-12-08
+**Last Updated**: 2026-01-05

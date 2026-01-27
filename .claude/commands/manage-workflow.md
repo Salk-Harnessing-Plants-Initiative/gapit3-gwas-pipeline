@@ -30,10 +30,23 @@ wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && arg
 **Failure Categories:**
 | Category | Detection | Remediation |
 |----------|-----------|-------------|
-| OOMKilled | Exit code 137, "OOMKilled" in message | Use high-memory template (96Gi/16 CPU) |
+| OOMKilled | Exit code 137, "OOMKilled" in message | Use `--highmem` (96Gi) or `--ultrahighmem` (160Gi) for >1.5M SNPs |
 | Stuck | PodInitializing > 10 minutes | Stop workflow, retry |
 | Timeout | DeadlineExceeded | Increase deadline or investigate |
 | Error | Other failures | Check pod logs for details |
+
+**Memory Template Selection (for OOMKilled failures):**
+| Dataset Size | Template Flag | Memory | Use Case |
+|--------------|---------------|--------|----------|
+| <500K SNPs | (default) | 64Gi | Standard datasets |
+| 500K-1.5M SNPs | `--highmem` | 96Gi | Medium datasets |
+| >1.5M SNPs | `--ultrahighmem` | 160Gi | Large MAC-filtered datasets |
+
+**Memory Estimation Formula:**
+```
+Peak (GB) ≈ (samples × SNPs × 8 × 5) / 1024³ × 1.5
+Example: 546 samples × 2.64M SNPs = ~129 GB → use --ultrahighmem
+```
 
 **Trait Index Extraction:**
 - From parallel tasks: `run-all-traits(3:5)` → trait index 5
@@ -66,12 +79,22 @@ wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && cd 
   --highmem \
   --aggregate \
   --submit"
+
+# For very large datasets (>1.5M SNPs), use ultra-high-memory:
+wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && cd /mnt/c/repos/gapit3-gwas-pipeline && ./scripts/retry-argo-traits.sh \
+  --workflow <original-workflow> \
+  --traits <comma-separated-list> \
+  --ultrahighmem \
+  --aggregate \
+  --submit"
 ```
 
 **Parameters Propagated:**
-- SNP FDR threshold (e.g., `snp-fdr=0.05`)
-- Models, paths, image from original workflow
-- Uses high-memory template for OOM failures
+- All GAPIT v3.0.0 parameters: model, pca-total, snp-maf, snp-fdr
+- Advanced parameters: kinship-algorithm, snp-effect, snp-impute
+- File paths: genotype-file, phenotype-file, accession-ids-file
+- Paths, image from original workflow
+- Uses appropriate memory template based on flags
 
 ### Phase 4: Monitoring
 Track retry workflow until completion:
@@ -143,10 +166,11 @@ wsl -e bash -c "export KUBECONFIG=~/.kube/kubeconfig-runai-talmo-lab.yaml && kub
 - Node selector issues: Check RunAI quota and node affinity
 
 **Resource requirements:**
-| Template | Memory Request | Memory Limit | CPU Request | CPU Limit |
-|----------|----------------|--------------|-------------|-----------|
-| Normal   | 64Gi           | 72Gi         | 12          | 16        |
-| High-mem | 96Gi           | 104Gi        | 16          | 20        |
+| Template | Memory Request | Memory Limit | CPU Request | CPU Limit | Use Case |
+|----------|----------------|--------------|-------------|-----------|----------|
+| Normal   | 64Gi           | 72Gi         | 12          | 16        | <500K SNPs |
+| High-mem | 96Gi           | 104Gi        | 16          | 20        | 500K-1.5M SNPs |
+| Ultra-highmem | 160Gi     | 180Gi        | 16          | 24        | >1.5M SNPs |
 
 ### Data Access (NFS/hostPath)
 
@@ -233,7 +257,7 @@ Workflow Status?
 │       ├── Aggregation ran → "Complete! No action needed"
 │       └── Aggregation missing → "Run standalone aggregation" (see below)
 ├── Has failures
-│   ├── OOMKilled failures → Use --highmem template
+│   ├── OOMKilled failures → Use --highmem (96Gi) or --ultrahighmem (160Gi) for >1.5M SNPs
 │   ├── Stuck pods (>10min) → Stop workflow first
 │   ├── Timeout failures → Recommend investigation
 │   └── Other errors → Show logs, recommend investigation

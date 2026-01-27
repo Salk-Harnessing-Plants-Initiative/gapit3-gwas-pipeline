@@ -25,16 +25,16 @@ spec:
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/data"
+      value: "/hpi/hpi_dev/users/eberrigan/20260104_Elohim_Bello_iron_deficiency_GAPIT_GWAS_normalized/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/eberrigan/20251208_Elohim_Bello_iron_deficiency_GAPIT_GWAS/outputs"
+      value: "/hpi/hpi_dev/users/eberrigan/20260104_Elohim_Bello_iron_deficiency_GAPIT_GWAS_normalized/outputs"
     # Data file paths (relative to /data mount point)
     - name: genotype-file
-      value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+      value: "/data/genotype/acc_snps_filtered_mac.recode_edited_diploid.hmp.txt"
     - name: phenotype-file
-      value: "/data/phenotype/iron_traits_edited.txt"
+      value: "/data/phenotype/iron_traits_edited_normal.txt"
     - name: accession-ids-file
       value: "/data/metadata/ids_gwas.txt"
     # Trait range
@@ -48,9 +48,16 @@ spec:
     - name: pca-total
       value: "3"
     - name: snp-maf
-      value: "0"
+      value: "0.0073"  # MAF threshold (MAC >= 8 with 546 samples: 8/(2*546) = 0.00733)
     - name: snp-fdr
       value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
+    # Advanced GAPIT parameters
+    - name: kinship-algorithm
+      value: "Zhang"
+    - name: snp-effect
+      value: "Add"
+    - name: snp-impute
+      value: "Middle"
 
   # Global timeout (7 days - effectively no limit, can terminate manually if needed)
   activeDeadlineSeconds: 604800
@@ -82,11 +89,11 @@ spec:
         dependencies: [validate-inputs]
         template: extract-traits-inline
 
-      # Step 3: Run all traits in parallel (withSequence)
+      # Step 3: Run all traits in parallel (withSequence) - using highmem template for large datasets
       - name: run-all-traits
         dependencies: [extract-traits]
         templateRef:
-          name: gapit3-gwas-single-trait
+          name: gapit3-gwas-single-trait-highmem
           template: run-gwas
         arguments:
           parameters:
@@ -110,6 +117,12 @@ spec:
             value: "{{workflow.parameters.snp-maf}}"
           - name: snp-fdr
             value: "{{workflow.parameters.snp-fdr}}"
+          - name: kinship-algorithm
+            value: "{{workflow.parameters.kinship-algorithm}}"
+          - name: snp-effect
+            value: "{{workflow.parameters.snp-effect}}"
+          - name: snp-impute
+            value: "{{workflow.parameters.snp-impute}}"
         withSequence:
           start: "{{workflow.parameters.start-trait-index}}"
           end: "{{workflow.parameters.end-trait-index}}"
@@ -192,5 +205,6 @@ spec:
   # Parallelism control
   # ===========================================================================
   # Limit concurrent pod execution to avoid overwhelming cluster
-  # At peak: 30 jobs × 64GB = 1.9TB RAM, 30 jobs × 12 CPU = 360 CPUs
-  parallelism: 30
+  # At peak: 10 jobs × 96GB = 960GB RAM, 10 jobs × 16 CPU = 160 CPUs
+  # Reduced for highmem template (96GB per job)
+  parallelism: 10

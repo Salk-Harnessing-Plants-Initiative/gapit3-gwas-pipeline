@@ -23,11 +23,13 @@ WORKFLOW=""
 TRAITS=""
 OUTPUT_DIR=""
 HIGHMEM=false
+ULTRAHIGHMEM=false
 DRY_RUN=false
 SUBMIT=false
 WATCH=false
 AGGREGATE=false
 OUTPUT_FILE=""
+PARALLELISM=""  # Empty = use template-specific default
 
 # Colors
 RED='\033[0;31m'
@@ -58,13 +60,24 @@ ${BLUE}Options:${NC}
   --traits LIST      Comma-separated trait indices (e.g., 5,28,29,30,31)
                      If not specified, auto-detects from output directory
   --namespace NS     Kubernetes namespace (default: runai-talmo-lab)
-  --highmem          Use high-memory template (96Gi/16 CPU vs 64Gi/12 CPU)
+  --highmem          Use high-memory template (96Gi/16 CPU)
+  --ultrahighmem     Use ultra-high-memory template (160Gi/16 CPU) for >1.5M SNPs
   --dry-run          Generate YAML and print to stdout, don't submit
   --submit           Submit the generated workflow to cluster
   --watch            Watch workflow after submission (implies --submit)
   --aggregate        Include aggregation step in workflow (runs in-cluster after retries)
+  --parallelism N    Max concurrent jobs (default: 10 for standard/highmem, 5 for ultrahighmem)
   --output FILE      Write generated YAML to file
   --help             Show this help message
+
+${BLUE}Template Selection Guide:${NC}
+  standard (default)  64Gi memory   For <500K SNPs, <300 samples
+  --highmem           96Gi memory   For 500K-1.5M SNPs, <600 samples
+  --ultrahighmem     160Gi memory   For >1.5M SNPs or >600 samples
+
+${BLUE}Memory Estimation:${NC}
+  Peak (GB) ≈ (samples × SNPs × 8 × 5) / 1024³ × 1.5
+  Example: 546 samples × 2.64M SNPs = ~129 GB → use --ultrahighmem
 
 ${BLUE}Examples:${NC}
   # Auto-detect incomplete traits and preview retry workflow
@@ -87,6 +100,7 @@ ${BLUE}Notes:${NC}
   - Models list comes from the original workflow parameters (not hardcoded)
   - SNP FDR threshold is automatically propagated from the original workflow
   - Use --highmem for traits that failed with OOMKilled (exit code 137)
+  - Use --ultrahighmem for very large datasets (>1.5M SNPs) that fail even with --highmem
 
 EOF
 }
@@ -129,6 +143,10 @@ while [[ $# -gt 0 ]]; do
             HIGHMEM=true
             shift
             ;;
+        --ultrahighmem)
+            ULTRAHIGHMEM=true
+            shift
+            ;;
         --dry-run)
             DRY_RUN=true
             shift
@@ -148,6 +166,15 @@ while [[ $# -gt 0 ]]; do
             ;;
         --output)
             OUTPUT_FILE="$2"
+            shift 2
+            ;;
+        --parallelism)
+            PARALLELISM="$2"
+            # Validate it's a positive integer
+            if ! [[ "$PARALLELISM" =~ ^[1-9][0-9]*$ ]]; then
+                log_error "--parallelism must be a positive integer, got: $PARALLELISM"
+                exit 1
+            fi
             shift 2
             ;;
         --help|-h)
@@ -211,27 +238,59 @@ WORKFLOW_JSON=$(argo get "$WORKFLOW" -n "$NAMESPACE" -o json 2>/dev/null) || {
 DATA_HOSTPATH=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "data-hostpath") | .value')
 OUTPUT_HOSTPATH=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "output-hostpath") | .value')
 IMAGE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "image") | .value')
-MODELS=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "models") | .value')
+
+# Handle both v3.0.0 naming ("model") and legacy naming ("models")
+MODEL=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "model") | .value // ""')
+if [[ -z "$MODEL" ]]; then
+    MODEL=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "models") | .value // "MLM"')
+fi
+
 START_TRAIT=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "start-trait-index") | .value // "2"')
 END_TRAIT=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "end-trait-index") | .value // "187"')
+
+# Core GAPIT parameters (v3.0.0 naming)
 SNP_FDR=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "snp-fdr") | .value // ""')
+PCA_TOTAL=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "pca-total") | .value // "0"')
+SNP_MAF=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "snp-maf") | .value // "0"')
+
+# Advanced GAPIT parameters
+KINSHIP_ALGORITHM=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "kinship-algorithm") | .value // "Zhang"')
+SNP_EFFECT=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "snp-effect") | .value // "Add"')
+SNP_IMPUTE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "snp-impute") | .value // "Middle"')
+
+# File path parameters
+GENOTYPE_FILE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "genotype-file") | .value // "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"')
+PHENOTYPE_FILE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "phenotype-file") | .value // "/data/phenotype/iron_traits_edited.txt"')
+ACCESSION_IDS_FILE=$(echo "$WORKFLOW_JSON" | jq -r '.spec.arguments.parameters[] | select(.name == "accession-ids-file") | .value // "/data/metadata/ids_gwas.txt"')
 
 echo ""
 log_info "Workflow parameters:"
 echo "  Data path (cluster): $DATA_HOSTPATH"
 echo "  Output path (cluster): $OUTPUT_HOSTPATH"
 echo "  Image: $IMAGE"
-echo "  Models: $MODELS"
+echo "  Model: $MODEL"
 echo "  Trait range: $START_TRAIT - $END_TRAIT"
+echo ""
+echo "  GAPIT Parameters:"
+echo "    PCA Total: $PCA_TOTAL"
+echo "    SNP MAF: $SNP_MAF"
 if [[ -n "$SNP_FDR" ]]; then
-    echo "  SNP FDR threshold: $SNP_FDR"
+    echo "    SNP FDR: $SNP_FDR"
 else
-    echo "  SNP FDR threshold: (not set)"
+    echo "    SNP FDR: (not set)"
 fi
+echo "    Kinship Algorithm: $KINSHIP_ALGORITHM"
+echo "    SNP Effect: $SNP_EFFECT"
+echo "    SNP Impute: $SNP_IMPUTE"
+echo ""
+echo "  File Paths:"
+echo "    Genotype: $GENOTYPE_FILE"
+echo "    Phenotype: $PHENOTYPE_FILE"
+echo "    Accession IDs: $ACCESSION_IDS_FILE"
 echo ""
 
-# Parse models into array
-IFS=',' read -ra MODEL_ARRAY <<< "$MODELS"
+# Parse models into array (for output completeness checking)
+IFS=',' read -ra MODEL_ARRAY <<< "$MODEL"
 log_info "Expected models: ${MODEL_ARRAY[*]}"
 
 # ==============================================================================
@@ -346,14 +405,31 @@ echo ""
 # Generate Retry Workflow YAML
 # ==============================================================================
 
-# Determine template to use
-if [[ "$HIGHMEM" == "true" ]]; then
+# Determine template to use (ultrahighmem takes precedence over highmem)
+# Also set template-specific parallelism defaults
+if [[ "$ULTRAHIGHMEM" == "true" ]]; then
+    TEMPLATE_NAME="gapit3-gwas-single-trait-ultrahighmem"
+    DEFAULT_PARALLELISM=5  # Ultrahighmem uses 160Gi+16CPU, limit concurrent jobs
+    log_info "Using ultra-high-memory template (160Gi/16 CPU)"
+elif [[ "$HIGHMEM" == "true" ]]; then
     TEMPLATE_NAME="gapit3-gwas-single-trait-highmem"
+    DEFAULT_PARALLELISM=10
     log_info "Using high-memory template (96Gi/16 CPU)"
 else
     TEMPLATE_NAME="gapit3-gwas-single-trait"
+    DEFAULT_PARALLELISM=10
     log_info "Using standard template (64Gi/12 CPU)"
 fi
+
+# Use user-specified parallelism or template default
+if [[ -n "$PARALLELISM" ]]; then
+    EFFECTIVE_PARALLELISM=$PARALLELISM
+    PARALLELISM_SOURCE="user-specified"
+else
+    EFFECTIVE_PARALLELISM=$DEFAULT_PARALLELISM
+    PARALLELISM_SOURCE="template default"
+fi
+log_info "Parallelism: $EFFECTIVE_PARALLELISM ($PARALLELISM_SOURCE)"
 
 # Generate workflow suffix from original workflow
 WORKFLOW_SUFFIX=$(echo "$WORKFLOW" | sed 's/gapit3-gwas-parallel-//' | sed 's/gapit3-gwas-//')
@@ -375,10 +451,29 @@ for trait in "${TRAIT_ARRAY[@]}"; do
             value: \"retry-trait-${trait}\"
           - name: image
             value: \"{{workflow.parameters.image}}\"
-          - name: models
-            value: \"{{workflow.parameters.models}}\"
+          # File paths
+          - name: genotype-file
+            value: \"{{workflow.parameters.genotype-file}}\"
+          - name: phenotype-file
+            value: \"{{workflow.parameters.phenotype-file}}\"
+          - name: accession-ids-file
+            value: \"{{workflow.parameters.accession-ids-file}}\"
+          # Core GAPIT parameters (v3.0.0 naming)
+          - name: model
+            value: \"{{workflow.parameters.model}}\"
+          - name: pca-total
+            value: \"{{workflow.parameters.pca-total}}\"
+          - name: snp-maf
+            value: \"{{workflow.parameters.snp-maf}}\"
           - name: snp-fdr
             value: \"{{workflow.parameters.snp-fdr}}\"
+          # Advanced GAPIT parameters
+          - name: kinship-algorithm
+            value: \"{{workflow.parameters.kinship-algorithm}}\"
+          - name: snp-effect
+            value: \"{{workflow.parameters.snp-effect}}\"
+          - name: snp-impute
+            value: \"{{workflow.parameters.snp-impute}}\"
 "
 done
 
@@ -418,7 +513,7 @@ spec:
   # ===========================================================================
   # Retry workflow for incomplete traits from: ${WORKFLOW}
   # Template: ${TEMPLATE_NAME}
-  # Models: ${MODELS}
+  # Model: ${MODEL}
   # ===========================================================================
 
   entrypoint: retry-traits
@@ -433,10 +528,29 @@ spec:
       value: \"${DATA_HOSTPATH}\"
     - name: output-hostpath
       value: \"${OUTPUT_HOSTPATH}\"
-    - name: models
-      value: \"${MODELS}\"
+    # File paths
+    - name: genotype-file
+      value: \"${GENOTYPE_FILE}\"
+    - name: phenotype-file
+      value: \"${PHENOTYPE_FILE}\"
+    - name: accession-ids-file
+      value: \"${ACCESSION_IDS_FILE}\"
+    # Core GAPIT parameters (v3.0.0 naming)
+    - name: model
+      value: \"${MODEL}\"
+    - name: pca-total
+      value: \"${PCA_TOTAL}\"
+    - name: snp-maf
+      value: \"${SNP_MAF}\"
     - name: snp-fdr
       value: \"${SNP_FDR}\"
+    # Advanced GAPIT parameters
+    - name: kinship-algorithm
+      value: \"${KINSHIP_ALGORITHM}\"
+    - name: snp-effect
+      value: \"${SNP_EFFECT}\"
+    - name: snp-impute
+      value: \"${SNP_IMPUTE}\"
 
   # Global timeout (7 days - effectively no limit for retries)
   activeDeadlineSeconds: 604800
@@ -457,8 +571,8 @@ spec:
     dag:
       tasks:
 ${TASKS_YAML}${COLLECT_RESULTS_YAML}
-  # Parallelism - run all retry traits in parallel (small count)
-  parallelism: ${#TRAIT_ARRAY[@]}
+  # Parallelism - limit concurrent jobs (template default or user-specified)
+  parallelism: ${EFFECTIVE_PARALLELISM}
 "
 
 # ==============================================================================
@@ -470,6 +584,11 @@ if [[ "$DRY_RUN" == "true" ]]; then
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
     echo -e "${BLUE}Generated Retry Workflow YAML (DRY RUN)${NC}"
     echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+    echo ""
+    echo -e "${BLUE}Configuration Summary:${NC}"
+    echo "  Template: $TEMPLATE_NAME"
+    echo "  Parallelism: $EFFECTIVE_PARALLELISM ($PARALLELISM_SOURCE)"
+    echo "  Traits to retry: ${#TRAIT_ARRAY[@]}"
     echo ""
     echo "$RETRY_YAML"
     echo ""
