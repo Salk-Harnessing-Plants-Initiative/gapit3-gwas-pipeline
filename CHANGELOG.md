@@ -9,7 +9,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **CI Testing Workflows** - Comprehensive GitHub Actions CI with testthat unit tests
+  - 466 unit tests covering aggregation, metadata, pipeline summary, and GAPIT parameters
+  - Bash script validation with shellcheck
+  - Docker build and integration tests
+  - R code coverage analysis support
+- **Multi-Workflow Provenance Tracking** - Track when aggregated results come from multiple Argo workflows
+  - `collect_workflow_stats()` function to gather per-workflow statistics
+  - `is_multi_workflow()` detection for composite result sets
+  - Source Workflows table in pipeline summary markdown report
+  - `workflow_stats` object in summary_stats.json with per-workflow breakdown
+  - Console notification when multi-workflow results detected
+- **Ultra-Highmem Workflow Template** - New 160Gi memory template for large datasets
+  - `gapit3-single-trait-template-ultrahighmem.yaml` for MLM with >2M SNPs
+  - Documented memory requirements in RESOURCE_SIZING.md
+- **Autonomous Pipeline Monitor** - Script for automated workflow monitoring
+  - `scripts/autonomous-pipeline-monitor.sh` for unattended monitoring
+  - Configurable check intervals and notification thresholds
+- **GAPIT v3.0.0 Parameter Naming** - Updated parameter names to match GAPIT native conventions
+  - `SNP.FDR` for FDR-controlled significance thresholds
+  - All GAPIT parameters now use native GAPIT names
+  - Backward-compatible with environment variable configuration
+- **Metadata Provenance Tracking** - Pipeline summary reports with execution metadata
+  - Executive summary with trait counts, SNP counts, and compute time
+  - Reproducibility section with workflow UIDs and parameters
+  - JSON output with full statistics for programmatic access
+- **Aggregation Refactoring for Testability** - Modular design following OpenSpec TDD
+  - `scripts/lib/aggregation_utils.R` with reusable utility functions
+  - `scripts/lib/markdown_generator.R` for report generation
+  - Clear separation of concerns for easier testing
+- **GitHub Issue Templates** - Structured templates for workflow improvements
+- **OpenSpec Proposals** - Documented change proposals for future work
+  - `add-autonomous-pipeline-monitor/` - Automated monitoring proposal
+  - `add-ultra-highmem-template/` - High memory template proposal
+  - `update-argo-workflows-v3/` - Argo v3 migration proposal
+  - `improve-multi-workflow-provenance/` - Multi-workflow tracking (implemented)
+
 ### Fixed
+- **V1 Column Type Mismatch** - Fixed `bind_rows()` error when combining Filter files
+  - Root cause: Mixed row index types (numeric vs X-prefixed) across different GAPIT runs
+  - Fix: Drop V1 column after `fread()` since it's just a row index not needed for analysis
+  - Affected aggregation of results from multiple workflow runs
+- **NULL Metadata Handling** - Fixed crashes when metadata.json lacks parameters section
+  - `get_gapit_param()` now safely handles NULL metadata.parameters
+  - Prevents aggregation failures on older result directories
+- **Integration Test Stability** - Multiple fixes for reliable CI testing
+  - Correct markdown filename detection in test assertions
+  - Add `--allow-incomplete` flag for partial result aggregation
+  - Proper execute permissions on test scripts
 - **BLINK MAF Column Order Issue** - Fixed incorrect MAF values in aggregated results for BLINK model
   - GAPIT's BLINK model outputs columns in wrong order (MAF contains sample count instead of frequency)
   - Aggregation script now detects MAF > 1 and sets to NA with warning
@@ -113,6 +161,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Updated QUICKSTART.md with RBAC warning and RunAI instructions
 - Updated docs/ARGO_SETUP.md with workflow validation fix section
 - Updated docs/DEPLOYMENT_TESTING.md with latest test results (2025-11-07)
+
+### Documented
+- **Session Documentation** - Operational notes from January 2026 iron GWAS run
+  - `docs/20260104_iron_gwas_normalized_status.md` - Pipeline status report
+  - `docs/session_review_20260104.md` - Lessons learned and improvement recommendations
+  - `docs/github_issue_pipeline_improvements.md` - Proposed improvements from real-world usage
 
 ### Deprecated
 - `config/config.yaml` - Configuration now via environment variables (file kept for backward compatibility but not used by new entrypoint)
