@@ -1,0 +1,3 @@
+,SNP,Chr,Pos,P.value,MAF,traits
+X201,PERL3.34567890,3,34567890,3.20e-11,0.18,FarmCPU.test_trait_workflow_b
+X202,PERL4.45678901,4,45678901,4.10e-09,0.25,FarmCPU.test_trait_workflow_b

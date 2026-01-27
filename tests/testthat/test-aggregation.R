@@ -689,3 +689,83 @@ test_that("aggregated output includes analysis_type and trait_dir columns", {
   expect_true("NYC" %in% all_snps$analysis_type)
   expect_true("standard" %in% all_snps$analysis_type)
 })
+
+# ==============================================================================
+# Tests for multi-workflow provenance tracking (improve-multi-workflow-provenance)
+# ==============================================================================
+
+test_that("collect_workflow_stats returns per-workflow statistics", {
+  fixture_base <- get_fixture_path(file.path("aggregation", "multi_workflow"))
+  trait_dirs <- list.files(fixture_base, pattern = "trait_", full.names = TRUE)
+
+  # This function should be added to aggregation_utils.R
+  workflow_stats <- collect_workflow_stats(trait_dirs)
+
+  expect_type(workflow_stats, "list")
+  expect_true(length(workflow_stats) == 2)  # Two different workflows
+
+  # Check workflow A stats
+  workflow_a_uid <- "uid-workflow-a-0000-0000-000000000001"
+  expect_true(workflow_a_uid %in% names(workflow_stats))
+  expect_equal(workflow_stats[[workflow_a_uid]]$workflow_name, "gapit3-gwas-parallel-abc123")
+  expect_equal(workflow_stats[[workflow_a_uid]]$trait_count, 1)
+  expect_equal(workflow_stats[[workflow_a_uid]]$total_duration_minutes, 90.0)
+
+
+  # Check workflow B stats
+  workflow_b_uid <- "uid-workflow-b-0000-0000-000000000002"
+  expect_true(workflow_b_uid %in% names(workflow_stats))
+  expect_equal(workflow_stats[[workflow_b_uid]]$workflow_name, "gapit3-gwas-retry-xyz789")
+  expect_equal(workflow_stats[[workflow_b_uid]]$trait_count, 1)
+  expect_equal(workflow_stats[[workflow_b_uid]]$total_duration_minutes, 120.0)
+})
+
+test_that("is_multi_workflow returns TRUE when multiple workflow UIDs present", {
+  fixture_base <- get_fixture_path(file.path("aggregation", "multi_workflow"))
+  trait_dirs <- list.files(fixture_base, pattern = "trait_", full.names = TRUE)
+
+  workflow_stats <- collect_workflow_stats(trait_dirs)
+
+  # This should be a simple helper that checks if >1 workflow
+  expect_true(is_multi_workflow(workflow_stats))
+})
+
+test_that("is_multi_workflow returns FALSE for single workflow", {
+  # Use existing single-workflow fixture
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_001_single_model"))
+
+  workflow_stats <- collect_workflow_stats(fixture_dir)
+
+  expect_false(is_multi_workflow(workflow_stats))
+})
+
+test_that("collect_workflow_stats handles traits without metadata", {
+  # trait_004_no_filter has no metadata.json
+  fixture_dir <- get_fixture_path(file.path("aggregation", "trait_004_no_filter"))
+
+  workflow_stats <- collect_workflow_stats(fixture_dir)
+
+  # Should return empty list or list with "unknown" key
+  expect_type(workflow_stats, "list")
+})
+
+test_that("multi-workflow traits can be combined with bind_rows", {
+  fixture_base <- get_fixture_path(file.path("aggregation", "multi_workflow"))
+  trait_dirs <- list.files(fixture_base, pattern = "trait_", full.names = TRUE)
+
+  # Read all traits
+  snps_list <- list()
+  for (dir in trait_dirs) {
+    trait_snps <- read_filter_file(dir, threshold = 5e-8)
+    if (!is.null(trait_snps) && nrow(trait_snps) > 0) {
+      snps_list[[length(snps_list) + 1]] <- trait_snps
+    }
+  }
+
+  # This should work without type mismatch (V1 column dropped)
+  combined <- dplyr::bind_rows(snps_list)
+
+  expect_equal(nrow(combined), 4)  # 2 SNPs from each workflow
+  expect_true("BLINK" %in% combined$model)
+  expect_true("FarmCPU" %in% combined$model)
+})

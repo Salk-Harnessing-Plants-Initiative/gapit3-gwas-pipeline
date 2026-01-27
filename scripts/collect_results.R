@@ -238,12 +238,19 @@ generate_executive_summary <- function(stats, top_snp, top_trait) {
     "N/A"
   }
 
+  # Show source workflows info if multi-workflow aggregation
+  workflow_info <- if (!is.null(stats$is_multi_workflow) && stats$is_multi_workflow) {
+    sprintf("| Source Workflows | %d |", length(stats$workflow_stats))
+  } else {
+    sprintf("| Workflow ID | `%s` |", stats$batch_id)
+  }
+
   lines <- c(
     "## Executive Summary",
     "",
     "| Metric | Value |",
     "|--------|-------|",
-    sprintf("| Workflow ID | `%s` |", stats$batch_id),
+    workflow_info,
     sprintf("| Analysis Date | %s |", format(as.Date(stats$collection_time), "%Y-%m-%d")),
     sprintf("| Total Traits Analyzed | %s |", format_number(stats$total_traits_attempted)),
     sprintf("| Successful | %s (%s) |", format_number(stats$successful_traits), success_rate),
@@ -503,13 +510,20 @@ generate_reproducibility_section <- function(stats, metadata = NULL) {
     "## Reproducibility",
     "",
     "| Field | Value |",
-    "|-------|-------|",
-    sprintf("| Workflow ID | `%s` |", stats$batch_id)
+    "|-------|-------|"
   )
 
-  # Add workflow UID if available
-  if (!is.null(stats$provenance$workflow_uid)) {
-    lines <- c(lines, sprintf("| Workflow UID | `%s` |", stats$provenance$workflow_uid))
+  # Show workflow information based on multi-workflow status
+ if (!is.null(stats$is_multi_workflow) && stats$is_multi_workflow) {
+    n_workflows <- length(stats$workflow_stats)
+    lines <- c(lines, sprintf("| Aggregation Workflow | `%s` |", stats$batch_id))
+    lines <- c(lines, sprintf("| Source Workflows | %d (see below) |", n_workflows))
+  } else {
+    lines <- c(lines, sprintf("| Workflow ID | `%s` |", stats$batch_id))
+    # Add workflow UID if available (single workflow case)
+    if (!is.null(stats$provenance$workflow_uid)) {
+      lines <- c(lines, sprintf("| Workflow UID | `%s` |", stats$provenance$workflow_uid))
+    }
   }
 
   lines <- c(lines, sprintf("| Collection Time | %s |", stats$collection_time))
@@ -525,6 +539,14 @@ generate_reproducibility_section <- function(stats, metadata = NULL) {
     lines <- c(lines, sprintf("| GAPIT Version | %s |", metadata$execution$gapit_version))
   } else {
     lines <- c(lines, "| GAPIT Version | N/A |")
+  }
+
+  # Add source workflows table if multi-workflow
+  if (!is.null(stats$is_multi_workflow) && stats$is_multi_workflow && !is.null(stats$workflow_stats)) {
+    lines <- c(lines, "",
+               "### Source Workflows",
+               "",
+               format_workflow_stats_table(stats$workflow_stats))
   }
 
   # Add output files reference
@@ -790,6 +812,10 @@ traits_with_provenance <- 0
 # Track unique workflow UIDs for lineage
 workflow_uids <- character(0)
 
+# Collect per-workflow statistics using the utility function
+workflow_stats <- collect_workflow_stats(trait_dirs)
+multi_workflow <- is_multi_workflow(workflow_stats)
+
 for (dir in trait_dirs) {
   metadata_file <- file.path(dir, "metadata.json")
 
@@ -822,6 +848,9 @@ cat("  - With metadata:", traits_with_metadata, "\n")
 cat("  - With provenance:", traits_with_provenance, "\n")
 if (length(workflow_uids) > 0) {
   cat("  - Unique workflow UIDs:", length(workflow_uids), "\n")
+}
+if (multi_workflow) {
+  cat("\n  Note: Aggregating results from", length(workflow_uids), "source workflows\n")
 }
 cat("\n")
 
@@ -997,6 +1026,9 @@ stats <- list(
     container_image = get_env_or_null("CONTAINER_IMAGE"),
     source_workflow_uids = if (length(workflow_uids) > 0) workflow_uids else NULL
   ),
+  # Multi-workflow tracking
+  is_multi_workflow = multi_workflow,
+  workflow_stats = if (length(workflow_stats) > 0) workflow_stats else NULL,
   # Metadata coverage tracking
   metadata_coverage = list(
     traits_with_metadata = traits_with_metadata,

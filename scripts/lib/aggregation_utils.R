@@ -518,3 +518,124 @@ select_best_trait_dirs <- function(trait_dirs, expected_models) {
 
   return(selected$path)
 }
+
+# ==============================================================================
+# Multi-Workflow Provenance Functions
+# ==============================================================================
+
+#' Collect per-workflow statistics from trait directories
+#'
+#' Scans metadata.json files in trait directories and aggregates statistics
+#' by source workflow UID.
+#'
+#' @param trait_dirs Character vector of trait directory paths
+#' @return Named list of workflow statistics, keyed by workflow UID
+#'         Each entry contains: workflow_name, trait_count, total_duration_minutes
+collect_workflow_stats <- function(trait_dirs) {
+  workflow_stats <- list()
+
+  for (dir in trait_dirs) {
+    metadata_file <- file.path(dir, "metadata.json")
+
+    if (!file.exists(metadata_file)) {
+      # Track traits without metadata under "unknown"
+      if (is.null(workflow_stats[["unknown"]])) {
+        workflow_stats[["unknown"]] <- list(
+          workflow_name = "unknown",
+          trait_count = 0,
+          total_duration_minutes = 0
+        )
+      }
+      workflow_stats[["unknown"]]$trait_count <- workflow_stats[["unknown"]]$trait_count + 1
+      next
+    }
+
+    tryCatch({
+      meta <- jsonlite::fromJSON(metadata_file)
+
+      # Extract workflow UID (required for tracking)
+      workflow_uid <- NULL
+      workflow_name <- "unknown"
+      duration <- 0
+
+      if (!is.null(meta$argo) && !is.null(meta$argo$workflow_uid)) {
+        workflow_uid <- meta$argo$workflow_uid
+        workflow_name <- meta$argo$workflow_name %||% "unknown"
+      }
+
+      if (!is.null(meta$execution) && !is.null(meta$execution$duration_minutes)) {
+        duration <- as.numeric(meta$execution$duration_minutes)
+      }
+
+      # Use "unknown" if no workflow UID
+
+      if (is.null(workflow_uid)) {
+        workflow_uid <- "unknown"
+        workflow_name <- "unknown"
+      }
+
+      # Initialize or update workflow stats
+      if (is.null(workflow_stats[[workflow_uid]])) {
+        workflow_stats[[workflow_uid]] <- list(
+          workflow_name = workflow_name,
+          trait_count = 0,
+          total_duration_minutes = 0
+        )
+      }
+
+      workflow_stats[[workflow_uid]]$trait_count <- workflow_stats[[workflow_uid]]$trait_count + 1
+      workflow_stats[[workflow_uid]]$total_duration_minutes <-
+        workflow_stats[[workflow_uid]]$total_duration_minutes + duration
+
+    }, error = function(e) {
+      # On error reading metadata, count as unknown
+      if (is.null(workflow_stats[["unknown"]])) {
+        workflow_stats[["unknown"]] <- list(
+          workflow_name = "unknown",
+          trait_count = 0,
+          total_duration_minutes = 0
+        )
+      }
+      workflow_stats[["unknown"]]$trait_count <- workflow_stats[["unknown"]]$trait_count + 1
+    })
+  }
+
+  return(workflow_stats)
+}
+
+#' Check if results come from multiple workflows
+#'
+#' @param workflow_stats Named list from collect_workflow_stats()
+#' @return TRUE if more than one workflow contributed results
+is_multi_workflow <- function(workflow_stats) {
+  # Filter out "unknown" when checking for multi-workflow
+  known_workflows <- names(workflow_stats)[names(workflow_stats) != "unknown"]
+  return(length(known_workflows) > 1)
+}
+
+#' Format workflow stats for markdown report
+#'
+#' @param workflow_stats Named list from collect_workflow_stats()
+#' @return Character string with markdown table
+format_workflow_stats_table <- function(workflow_stats) {
+  if (length(workflow_stats) == 0) {
+    return("No workflow statistics available.\n")
+  }
+
+  lines <- c(
+    "| Workflow Name | UID | Traits | Compute Hours |",
+    "|---------------|-----|--------|---------------|"
+  )
+
+  for (uid in names(workflow_stats)) {
+    stats <- workflow_stats[[uid]]
+    hours <- round(stats$total_duration_minutes / 60, 1)
+    # Truncate UID for display
+    uid_display <- if (nchar(uid) > 20) paste0(substr(uid, 1, 17), "...") else uid
+    lines <- c(lines, sprintf("| %s | %s | %d | %.1f |",
+                               stats$workflow_name, uid_display,
+                               stats$trait_count, hours))
+  }
+
+  return(paste(lines, collapse = "\n"))
+}

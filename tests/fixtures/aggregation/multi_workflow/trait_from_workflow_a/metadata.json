@@ -1,0 +1,24 @@
+{
+  "schema_version": "3.0.0",
+  "execution": {
+    "trait_index": 1,
+    "start_time": "2026-01-04 10:00:00",
+    "end_time": "2026-01-04 11:30:00",
+    "duration_minutes": 90.0,
+    "status": "success",
+    "r_version": "R version 4.4.1 (2024-06-14)",
+    "gapit_version": "3.5.0"
+  },
+  "argo": {
+    "workflow_name": "gapit3-gwas-parallel-abc123",
+    "workflow_uid": "uid-workflow-a-0000-0000-000000000001",
+    "namespace": "runai-talmo-lab",
+    "pod_name": "gapit3-gwas-parallel-abc123-run-gwas-001",
+    "node_name": "gpu-node1",
+    "retry_attempt": 0,
+    "max_retries": 5
+  },
+  "parameters": {
+    "models": ["BLINK", "FarmCPU", "MLM"]
+  }
+}
