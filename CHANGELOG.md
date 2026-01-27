@@ -167,15 +167,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `docs/20260104_iron_gwas_normalized_status.md` - Pipeline status report
   - `docs/session_review_20260104.md` - Lessons learned and improvement recommendations
   - `docs/github_issue_pipeline_improvements.md` - Proposed improvements from real-world usage
-
-### Deprecated
-- `config/config.yaml` - Configuration now via environment variables (file kept for backward compatibility but not used by new entrypoint)
-
-### Documented
 - Workflow validation fix root cause and solution
 - RBAC permissions issue blocking Argo execution
 - Successful single-trait test with RunAI CLI
 - RunAI CLI syntax migration (old vs. new commands)
+
+### Deprecated
+- `config/config.yaml` - Configuration now via environment variables (file kept for backward compatibility but not used by new entrypoint)
 
 ---
 
