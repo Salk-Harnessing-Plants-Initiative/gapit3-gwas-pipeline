@@ -31,6 +31,20 @@ The `Z:` drive in Windows maps to `/mnt/hpi_dev` in WSL, which corresponds to `/
 
 **Current working dataset**: User-specified (check conversation context)
 
+## GitHub CLI Workaround
+
+The Salk organization restricts fine-grained personal access tokens with lifetimes >366 days. When `gh` commands fail with this error:
+
+```
+GraphQL: The 'Salk-Harnessing-Plants-Initiative' organization forbids access via a fine-grained personal access tokens...
+```
+
+**Fix**: Run `unset GITHUB_TOKEN` before the `gh` command to use browser-based auth instead:
+
+```bash
+unset GITHUB_TOKEN && gh pr create --title "..." --body "..."
+```
+
 ## Documentation Guidelines
 
 When writing or updating documentation:
