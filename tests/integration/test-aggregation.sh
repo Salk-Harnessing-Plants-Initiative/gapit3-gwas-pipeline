@@ -225,11 +225,13 @@ test_output_csv_sorted_by_pvalue() {
             2>&1 >/dev/null
     fi
 
-    # Extract P.value column (column 5 in output), check if sorted
-    # Skip header, get P.values, check first < last
+    # Find P.value column dynamically from header
+    local pval_col
+    pval_col=$(awk -F',' 'NR==1 {for(i=1;i<=NF;i++) if($i=="P.value") print i; exit}' "$snps_file")
+
     local first_pval last_pval
-    first_pval=$(awk -F',' 'NR==2 {print $5}' "$snps_file")
-    last_pval=$(awk -F',' 'END {print $5}' "$snps_file")
+    first_pval=$(awk -F',' -v col="$pval_col" 'NR==2 {print $col}' "$snps_file")
+    last_pval=$(awk -F',' -v col="$pval_col" 'END {print $col}' "$snps_file")
 
     # Use R to compare scientific notation
     local sorted
