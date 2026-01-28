@@ -225,25 +225,19 @@ test_output_csv_sorted_by_pvalue() {
             2>&1 >/dev/null
     fi
 
-    # Find P.value column dynamically from header
-    local pval_col
-    pval_col=$(awk -F',' 'NR==1 {for(i=1;i<=NF;i++) if($i=="P.value") print i; exit}' "$snps_file")
-
-    local first_pval last_pval
-    first_pval=$(awk -F',' -v col="$pval_col" 'NR==2 {print $col}' "$snps_file")
-    last_pval=$(awk -F',' -v col="$pval_col" 'END {print $col}' "$snps_file")
-
-    # Use R to compare scientific notation
+    # Use R for robust P.value column extraction and comparison
+    # R handles quoted CSV headers and scientific notation natively
     local sorted
-    sorted=$(Rscript -e "cat(as.numeric('$first_pval') <= as.numeric('$last_pval'))" 2>/dev/null)
+    sorted=$(Rscript -e "
+      d <- read.csv('$snps_file')
+      cat(d\$P.value[1] <= d\$P.value[nrow(d)])
+    " 2>/dev/null)
 
     if [ "$sorted" = "TRUE" ]; then
-        log_info "✓ PASS: Output CSV sorted by P.value (first: $first_pval, last: $last_pval)"
+        log_info "✓ PASS: Output CSV sorted by P.value"
         ((TESTS_PASSED++))
     else
         log_error "✗ FAIL: Output CSV not sorted by P.value"
-        log_error "  First P.value: $first_pval"
-        log_error "  Last P.value: $last_pval"
         ((TESTS_FAILED++))
     fi
 }
