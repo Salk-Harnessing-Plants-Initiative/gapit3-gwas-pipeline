@@ -35,37 +35,42 @@ library(jsonlite)
 .project_root <- .get_project_root()
 
 # Source the constants and utility modules
+# check_trait_completeness and read_filter_file are now in aggregation_utils.R
 source(file.path(.project_root, "scripts", "lib", "constants.R"))
 source(file.path(.project_root, "scripts", "lib", "aggregation_utils.R"))
 
-# Source read_filter_file and check_trait_completeness from collect_results.R
-# These functions are still defined in the main script
-.source_script_functions <- function() {
-  script_path <- file.path(.project_root, "scripts", "collect_results.R")
-  script_lines <- readLines(script_path)
+# ==============================================================================
+# Test: with_env_vars correctly sets and restores environment variables
+# ==============================================================================
+test_that("with_env_vars sets named environment variable correctly", {
+  # Ensure variable is unset before test
+  Sys.unsetenv("GAPIT_TEST_WITH_ENV_VAR")
 
-  # Find check_trait_completeness function
-  check_start <- grep("^check_trait_completeness <- function", script_lines)[1]
-  check_end <- grep("^}", script_lines)
-  check_end <- check_end[check_end > check_start][1]
+  result <- with_env_vars(
+    list(GAPIT_TEST_WITH_ENV_VAR = "test_value_123"),
+    Sys.getenv("GAPIT_TEST_WITH_ENV_VAR")
+  )
 
-  # Find read_filter_file function
-  read_filter_start <- grep("^read_filter_file <- function", script_lines)[1]
-  read_filter_end <- grep("^}", script_lines)
-  read_filter_end <- read_filter_end[read_filter_end > read_filter_start][1]
+  expect_equal(result, "test_value_123")
 
-  # Extract and evaluate function definitions
-  if (!is.na(check_start)) {
-    check_code <- paste(script_lines[check_start:check_end], collapse = "\n")
-    eval(parse(text = check_code), envir = .GlobalEnv)
-  }
+  # Variable should be cleaned up after with_env_vars completes
+  expect_equal(Sys.getenv("GAPIT_TEST_WITH_ENV_VAR", unset = ""), "")
+})
 
-  filter_code <- paste(script_lines[read_filter_start:read_filter_end], collapse = "\n")
-  eval(parse(text = filter_code), envir = .GlobalEnv)
-}
+test_that("with_env_vars restores original value after execution", {
+  Sys.setenv(GAPIT_TEST_RESTORE_VAR = "original_value")
 
-# Source the script-specific functions
-.source_script_functions()
+  with_env_vars(
+    list(GAPIT_TEST_RESTORE_VAR = "temporary_value"),
+    {
+      expect_equal(Sys.getenv("GAPIT_TEST_RESTORE_VAR"), "temporary_value")
+    }
+  )
+
+  # Should be restored to original
+  expect_equal(Sys.getenv("GAPIT_TEST_RESTORE_VAR"), "original_value")
+  Sys.unsetenv("GAPIT_TEST_RESTORE_VAR")
+})
 
 # ==============================================================================
 # Test: read_filter_file() with single model
@@ -768,4 +773,24 @@ test_that("multi-workflow traits can be combined with bind_rows", {
   expect_equal(nrow(combined), 4)  # 2 SNPs from each workflow
   expect_true("BLINK" %in% combined$model)
   expect_true("FarmCPU" %in% combined$model)
+})
+
+# ==============================================================================
+# Test: collect_workflow_stats handles corrupted metadata via <<- scoping
+# ==============================================================================
+test_that("collect_workflow_stats handles corrupted metadata.json", {
+  temp_dir <- create_temp_output_dir()
+  on.exit(cleanup_test_dir(temp_dir))
+
+  # Create a trait directory with corrupted (non-JSON) metadata
+  trait_dir <- file.path(temp_dir, "trait_corrupt")
+  dir.create(trait_dir, recursive = TRUE)
+  writeLines("THIS IS NOT VALID JSON {{{{", file.path(trait_dir, "metadata.json"))
+
+  workflow_stats <- collect_workflow_stats(trait_dir)
+
+  # Corrupted metadata should be bucketed under "unknown"
+  expect_type(workflow_stats, "list")
+  expect_true("unknown" %in% names(workflow_stats))
+  expect_equal(workflow_stats[["unknown"]]$trait_count, 1)
 })

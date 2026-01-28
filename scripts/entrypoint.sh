@@ -8,12 +8,20 @@
 
 set -euo pipefail
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+# Colors for output (only when stdout is a terminal)
+if [ -t 1 ]; then
+    RED='\033[0;31m'
+    GREEN='\033[0;32m'
+    YELLOW='\033[1;33m'
+    BLUE='\033[0;34m'
+    NC='\033[0m' # No Color
+else
+    RED=''
+    GREEN=''
+    YELLOW=''
+    BLUE=''
+    NC=''
+fi
 
 # ==============================================================================
 # Environment Variables with Defaults
@@ -169,8 +177,9 @@ validate_model() {
     IFS=',' read -ra models_array <<< "$MODEL"
 
     for model in "${models_array[@]}"; do
-        # Trim whitespace
-        model=$(echo "$model" | xargs)
+        # Trim whitespace using parameter expansion (no external deps)
+        model="${model#"${model%%[![:space:]]*}"}"
+        model="${model%"${model##*[![:space:]]}"}"
 
         if [[ ! " $valid_models " =~ " $model " ]]; then
             log_error "Invalid model: '$model'"
@@ -235,7 +244,7 @@ validate_snp_impute() {
 
 validate_threshold() {
     # Check if it's a valid number in scientific notation
-    if ! echo "$SNP_THRESHOLD" | grep -qE '^[0-9]+\.?[0-9]*[eE]?-?[0-9]*$'; then
+    if ! echo "$SNP_THRESHOLD" | grep -qE '^[0-9]+(\.[0-9]+)?([eE][+-]?[0-9]+)?$'; then
         log_error "Invalid threshold: SNP_THRESHOLD must be a numeric value (e.g., 5e-8), got: '$SNP_THRESHOLD'"
         return 1
     fi
@@ -446,7 +455,12 @@ validate_config() {
         errors=$((errors + 1))
     fi
 
-    if ! validate_paths; then
+    validate_paths
+    local path_rc=$?
+    if [ $path_rc -eq 2 ]; then
+        log_error "Infrastructure failure detected (exit code 2) - retryable"
+        return 2
+    elif [ $path_rc -ne 0 ]; then
         errors=$((errors + 1))
     fi
 
@@ -514,35 +528,36 @@ log_config() {
 run_single_trait() {
     log_info "Executing single-trait GWAS analysis..."
 
-    # Validate configuration
-    if ! validate_config; then
+    # Validate configuration (preserve exit code 2 for infrastructure failures)
+    validate_config
+    local config_rc=$?
+    if [ $config_rc -ne 0 ]; then
         log_error "Configuration validation failed. Exiting."
-        exit 1
+        exit $config_rc
     fi
 
     # Log configuration
     log_config
 
-    # Build R script command with parameters
-    # Note: R script still uses --models and --pca flags for backward compatibility
-    local cmd="Rscript /scripts/run_gwas_single_trait.R \
-        --trait-index $TRAIT_INDEX \
-        --genotype $GENOTYPE_FILE \
-        --phenotype $PHENOTYPE_FILE \
-        --ids $ACCESSION_IDS_FILE \
-        --output-dir $OUTPUT_PATH \
-        --models $MODEL \
-        --pca $PCA_TOTAL \
-        --maf $SNP_MAF \
-        --threads $OPENBLAS_NUM_THREADS"
+    # Build R script command as array to prevent word splitting
+    local cmd_array=(Rscript /scripts/run_gwas_single_trait.R
+        --trait-index "$TRAIT_INDEX"
+        --genotype "$GENOTYPE_FILE"
+        --phenotype "$PHENOTYPE_FILE"
+        --ids "$ACCESSION_IDS_FILE"
+        --output-dir "$OUTPUT_PATH"
+        --models "$MODEL"
+        --pca "$PCA_TOTAL"
+        --maf "$SNP_MAF"
+        --threads "$OPENBLAS_NUM_THREADS")
 
     # Add optional SNP_FDR parameter if set
     if [ -n "$SNP_FDR" ]; then
-        cmd="$cmd --snp-fdr $SNP_FDR"
+        cmd_array+=(--snp-fdr "$SNP_FDR")
     fi
 
-    # Execute R script
-    exec $cmd
+    # Execute R script with proper array expansion
+    exec "${cmd_array[@]}"
 }
 
 run_aggregation() {

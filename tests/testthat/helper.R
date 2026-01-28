@@ -167,7 +167,7 @@ with_env_vars <- function(vars, code) {
   # Save old values and set new ones
   for (name in names(vars)) {
     old_vals[[name]] <- Sys.getenv(name, unset = NA)
-    Sys.setenv(name = vars[[name]])
+    do.call(Sys.setenv, setNames(list(vars[[name]]), name))
   }
 
   # Ensure cleanup happens even if code fails
@@ -176,7 +176,7 @@ with_env_vars <- function(vars, code) {
       if (is.na(old_vals[[name]])) {
         Sys.unsetenv(name)
       } else {
-        Sys.setenv(name = old_vals[[name]])
+        do.call(Sys.setenv, setNames(list(old_vals[[name]]), name))
       }
     }
   })

@@ -439,6 +439,8 @@ test_that("sourcing aggregation_utils.R makes functions available", {
   expect_true(exists("detect_models_from_first_trait"))
   expect_true(exists("get_gapit_param"))
   expect_true(exists("select_best_trait_dirs"))
+  expect_true(exists("check_trait_completeness"))
+  expect_true(exists("read_filter_file"))
 
   # Functions should be callable
   expect_type(extract_models_from_metadata, "closure")
@@ -446,6 +448,8 @@ test_that("sourcing aggregation_utils.R makes functions available", {
   expect_type(detect_models_from_first_trait, "closure")
   expect_type(get_gapit_param, "closure")
   expect_type(select_best_trait_dirs, "closure")
+  expect_type(check_trait_completeness, "closure")
+  expect_type(read_filter_file, "closure")
 })
 
 test_that("aggregation_utils.R functions work without CLI arguments", {
@@ -463,4 +467,70 @@ test_that("aggregation_utils.R functions work without CLI arguments", {
   # get_gapit_param - works with just a list
   result3 <- get_gapit_param(list(), "test", "test", default = "ok")
   expect_equal(result3, "ok")
+})
+
+# ==============================================================================
+# Tests: format_duration() edge cases
+# ==============================================================================
+
+test_that("format_duration returns N/A for NaN input", {
+  expect_equal(format_duration(NaN), "N/A")
+})
+
+test_that("format_duration returns N/A for NA input", {
+  expect_equal(format_duration(NA), "N/A")
+})
+
+test_that("format_duration returns N/A for NULL input", {
+  expect_equal(format_duration(NULL), "N/A")
+})
+
+test_that("format_duration formats minutes correctly", {
+  expect_equal(format_duration(90), "90.0 minutes")
+  expect_equal(format_duration(90, "minutes"), "90.0 minutes")
+})
+
+test_that("format_duration formats hours correctly", {
+  expect_equal(format_duration(1.5, "hours"), "1.5 hours")
+})
+
+# ==============================================================================
+# Tests: format_pvalue() vector safety
+# ==============================================================================
+
+test_that("format_pvalue handles vector input with NA", {
+  result <- format_pvalue(c(NA, 1e-5, 3.2e-10))
+  expect_type(result, "character")
+  expect_equal(length(result), 3)
+  expect_equal(result[1], "NA")
+  expect_match(result[2], "1\\.00e-05")
+  expect_match(result[3], "3\\.20e-10")
+})
+
+test_that("format_pvalue handles scalar NA", {
+  expect_equal(format_pvalue(NA), "NA")
+})
+
+test_that("format_pvalue handles NULL", {
+  expect_equal(format_pvalue(NULL), "NA")
+})
+
+# ==============================================================================
+# Tests: format_number() vector safety
+# ==============================================================================
+
+test_that("format_number handles vector input with NA", {
+  result <- format_number(c(NA, 42, 1000000))
+  expect_type(result, "character")
+  expect_equal(length(result), 3)
+  expect_equal(result[1], "NA")
+  expect_match(result[3], "1,000,000")
+})
+
+test_that("format_number handles scalar NA", {
+  expect_equal(format_number(NA), "NA")
+})
+
+test_that("format_number handles NULL", {
+  expect_equal(format_number(NULL), "NA")
 })

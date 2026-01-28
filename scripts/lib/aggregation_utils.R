@@ -62,19 +62,25 @@ if (!exists("KNOWN_GAPIT_MODELS")) {
 # Formatting Helper Functions
 # ==============================================================================
 
-#' Format p-value for display
-#' @param pval Numeric p-value
-#' @return Character string in scientific notation
+#' Format p-value for display (vector-safe)
+#' @param pval Numeric p-value (scalar or vector)
+#' @return Character string(s) in scientific notation
 format_pvalue <- function(pval) {
-  if (is.na(pval)) return("NA")
+  if (length(pval) > 1) {
+    return(vapply(pval, format_pvalue, character(1)))
+  }
+  if (is.null(pval) || is.na(pval)) return("NA")
   sprintf("%.2e", pval)
 }
 
-#' Format number with thousand separators
-#' @param n Numeric value
-#' @return Character string with commas
+#' Format number with thousand separators (vector-safe)
+#' @param n Numeric value (scalar or vector)
+#' @return Character string(s) with commas
 format_number <- function(n) {
-  if (is.na(n)) return("NA")
+  if (length(n) > 1) {
+    return(vapply(n, format_number, character(1)))
+  }
+  if (is.null(n) || is.na(n)) return("NA")
   format(n, big.mark = ",", scientific = FALSE)
 }
 
@@ -83,6 +89,9 @@ format_number <- function(n) {
 #' @param unit Output unit ("minutes" or "hours")
 #' @return Character string with unit
 format_duration <- function(minutes, unit = "minutes") {
+  if (is.null(minutes) || length(minutes) == 0 || is.na(minutes) || is.nan(minutes)) {
+    return("N/A")
+  }
   if (unit == "hours") {
     sprintf("%.1f hours", minutes)
   } else {
@@ -510,11 +519,15 @@ select_best_trait_dirs <- function(trait_dirs, expected_models) {
 
   # For each trait index, select best directory
   # Priority: most models complete, then newest timestamp
-  selected <- trait_info %>%
-    dplyr::group_by(trait_index) %>%
-    dplyr::arrange(dplyr::desc(n_models), dplyr::desc(timestamp)) %>%
-    dplyr::slice(1) %>%
-    dplyr::ungroup()
+  selected <- dplyr::ungroup(
+    dplyr::slice(
+      dplyr::arrange(
+        dplyr::group_by(trait_info, trait_index),
+        dplyr::desc(n_models), dplyr::desc(timestamp)
+      ),
+      1
+    )
+  )
 
   return(selected$path)
 }
@@ -589,14 +602,15 @@ collect_workflow_stats <- function(trait_dirs) {
 
     }, error = function(e) {
       # On error reading metadata, count as unknown
+      # Use <<- to assign in the enclosing collect_workflow_stats scope
       if (is.null(workflow_stats[["unknown"]])) {
-        workflow_stats[["unknown"]] <- list(
+        workflow_stats[["unknown"]] <<- list(
           workflow_name = "unknown",
           trait_count = 0,
           total_duration_minutes = 0
         )
       }
-      workflow_stats[["unknown"]]$trait_count <- workflow_stats[["unknown"]]$trait_count + 1
+      workflow_stats[["unknown"]]$trait_count <<- workflow_stats[["unknown"]]$trait_count + 1
     })
   }
 
@@ -638,4 +652,148 @@ format_workflow_stats_table <- function(workflow_stats) {
   }
 
   return(paste(lines, collapse = "\n"))
+}
+
+# ==============================================================================
+# Trait Completeness and Filter File Functions
+# ==============================================================================
+
+#' Check which trait directories are missing Filter files
+#'
+#' Scans trait directories for the presence of
+#' GAPIT.Association.Filter_GWAS_results.csv, which is the definitive
+#' completion signal (GAPIT only creates it after all models finish).
+#'
+#' @param trait_dirs Character vector of trait directory paths
+#' @return Character vector of paths to incomplete trait directories
+check_trait_completeness <- function(trait_dirs) {
+  incomplete <- character(0)
+  for (dir in trait_dirs) {
+    filter_file <- file.path(dir, "GAPIT.Association.Filter_GWAS_results.csv")
+    if (!file.exists(filter_file)) {
+      incomplete <- c(incomplete, dir)
+    }
+  }
+  return(incomplete)
+}
+
+#' Read GAPIT Filter file and parse model information
+#'
+#' Reads GAPIT.Association.Filter_GWAS_results.csv which contains only
+#' significant SNPs with model information in the traits column.
+#' Format: "<MODEL>.<TraitName>" (e.g., "BLINK.root_length")
+#'
+#' Handles known GAPIT quirks:
+#' - BLINK model has swapped columns (MAF contains sample count instead of frequency)
+#' - Trait names may have (NYC) or (Kansas) suffix indicating analysis type
+#'
+#' Returns NULL if Filter file is missing (trait incomplete).
+#' Returns empty data.frame if Filter file exists but has no significant SNPs.
+#'
+#' @param trait_dir Path to trait result directory
+#' @param threshold Significance threshold (unused, kept for API compatibility)
+#' @return data.frame with columns including model, trait, analysis_type, and trait_dir, or NULL if incomplete
+read_filter_file <- function(trait_dir, threshold = 5e-8) {
+  filter_file <- file.path(trait_dir, "GAPIT.Association.Filter_GWAS_results.csv")
+
+  # Missing Filter file = incomplete trait (fail-fast)
+  if (!file.exists(filter_file)) {
+    return(NULL)
+  }
+
+  tryCatch({
+    # Read Filter file (contains only significant SNPs)
+    filter_data <- data.table::fread(filter_file, data.table = FALSE)
+
+    # Drop V1 column (row index) if present - not needed for analysis
+    # Critical fix: V1 has mixed types across files (numeric: 1216644 vs X-prefixed: X2625218)
+    # which causes bind_rows() type mismatch errors when combining results
+    if ("V1" %in% colnames(filter_data)) {
+      filter_data <- filter_data[, colnames(filter_data) != "V1", drop = FALSE]
+    }
+
+    # Check if traits column exists
+    # No traits column means no significant SNPs found (empty Filter file)
+    if (!"traits" %in% colnames(filter_data)) {
+      return(data.frame())
+    }
+
+    # Return empty data.frame if no rows (no significant SNPs)
+    if (nrow(filter_data) == 0) {
+      return(data.frame())
+    }
+
+    # Parse model and trait from traits column
+    # Format: "<MODEL>.<TraitName>" or "<MODEL>.<TraitName>(NYC|Kansas)"
+    # Handle compound models (FarmCPU.LM, Blink.LM) before simple split
+    filter_data$model <- ifelse(
+      grepl("^FarmCPU\\.LM\\.", filter_data$traits), "FarmCPU.LM",
+      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits), "Blink.LM",
+             sub("\\..*", "", filter_data$traits))
+    )
+
+    # Extract raw trait (before stripping analysis_type suffix)
+    raw_trait <- ifelse(
+      grepl("^FarmCPU\\.LM\\.", filter_data$traits),
+      sub("^FarmCPU\\.LM\\.", "", filter_data$traits),
+      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits),
+             sub("^Blink\\.LM\\.", "", filter_data$traits),
+             sub("^[^.]+\\.", "", filter_data$traits))
+    )
+
+    # Parse analysis_type from trait suffix (NYC, Kansas, or standard)
+    filter_data$analysis_type <- ifelse(
+      grepl("\\(NYC\\)$", raw_trait), "NYC",
+      ifelse(grepl("\\(Kansas\\)$", raw_trait), "Kansas", "standard")
+    )
+
+    # Strip analysis_type suffix from trait name
+    filter_data$trait <- gsub("\\(NYC\\)$|\\(Kansas\\)$", "", raw_trait)
+
+    # Add trait_dir for provenance tracking
+    filter_data$trait_dir <- basename(trait_dir)
+
+    # -------------------------------------------------------------------------
+    # GAPIT BLINK column swap fix
+    # -------------------------------------------------------------------------
+    # GAPIT's BLINK model outputs columns in wrong order:
+    # Header claims: P.value, MAF, nobs, Effect, H&B.P.Value
+    # Actual data:   P.value, nobs, Effect, MAF, H&B.P.Value
+    #
+    # In the Filter file, only MAF column is present (no nobs, Effect, H&B).
+    # When MAF > 1, it's actually the sample count (nobs), not a frequency.
+    # Since we can't recover the true MAF from Filter file, set to NA.
+    # -------------------------------------------------------------------------
+    if ("MAF" %in% colnames(filter_data)) {
+      # Detect invalid MAF values (frequency must be in [0, 0.5] for minor allele)
+      invalid_maf <- !is.na(filter_data$MAF) & filter_data$MAF > 1
+
+      if (any(invalid_maf)) {
+        n_invalid <- sum(invalid_maf)
+        affected_models <- unique(filter_data$model[invalid_maf])
+        warning(sprintf(
+          "Detected BLINK column order issue in %s: %d rows have MAF > 1 (models: %s). Setting to NA.",
+          basename(trait_dir), n_invalid, paste(affected_models, collapse = ", ")
+        ))
+        filter_data$MAF[invalid_maf] <- NA
+      }
+    }
+
+    # Validate model names using KNOWN_GAPIT_MODELS from constants (warn if unexpected, but continue)
+    unexpected <- unique(filter_data$model[!(filter_data$model %in% KNOWN_GAPIT_MODELS)])
+    if (length(unexpected) > 0) {
+      cat("  Warning: Unexpected model names in", basename(trait_dir), ":",
+          paste(unexpected, collapse=", "), "\n")
+    }
+
+    # Remove original traits column
+    filter_data$traits <- NULL
+
+    return(filter_data)
+
+  }, error = function(e) {
+    cat("  Warning: Error reading Filter file for", basename(trait_dir), ":",
+        e$message, "\n")
+    return(NULL)
+  })
 }

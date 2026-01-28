@@ -69,7 +69,7 @@ source(file.path(.script_dir, "lib", "aggregation_utils.R"))
 #' @param default Default value if not set or empty
 #' @return The value or NULL if empty/unset
 get_env_or_null <- function(name, default = NULL) {
-  value <- Sys.getenv(name, "")
+  value <- trimws(Sys.getenv(name, ""))
   if (value == "" || value == "null" || value == "NULL") {
     return(default)
   }
@@ -251,14 +251,14 @@ generate_executive_summary <- function(stats, top_snp, top_trait) {
     "| Metric | Value |",
     "|--------|-------|",
     workflow_info,
-    sprintf("| Analysis Date | %s |", format(as.Date(stats$collection_time), "%Y-%m-%d")),
+    sprintf("| Analysis Date | %s |", if (!is.null(stats$collection_time)) format(as.Date(stats$collection_time), "%Y-%m-%d") else "N/A"),
     sprintf("| Total Traits Analyzed | %s |", format_number(stats$total_traits_attempted)),
     sprintf("| Successful | %s (%s) |", format_number(stats$successful_traits), success_rate),
     sprintf("| Failed | %s |", format_number(stats$failed_traits)),
     sprintf("| **Total Significant SNPs** | **%s** |", format_number(stats$total_significant_snps)),
     sprintf("| Top Hit | %s |", top_hit_str),
     sprintf("| Top Trait | %s |", top_trait_str),
-    sprintf("| Total Runtime | %s |", format_duration(stats$total_duration_hours * 60, "hours")),
+    sprintf("| Total Runtime | %s |", format_duration(stats$total_duration_hours, "hours")),
     sprintf("| Avg Runtime per Trait | %s |", format_duration(stats$average_duration_minutes)),
     ""
   )
@@ -300,14 +300,15 @@ generate_top_snps_table <- function(snps_df, top_n = 20) {
     row <- top_snps[i, ]
     model_val <- if ("model" %in% names(row) && !is.na(row$model)) row$model else "N/A"
     trait_val <- if ("trait" %in% names(row) && !is.na(row$trait)) truncate_string(row$trait, 35) else "N/A"
+    maf_val <- if ("MAF" %in% names(row) && !is.na(row$MAF)) sprintf("%.3f", row$MAF) else "N/A"
     lines <- c(lines, sprintf(
-      "| %d | %s | %s | %s | %s | %.3f | %s | %s |",
+      "| %d | %s | %s | %s | %s | %s | %s | %s |",
       i,
       row$SNP,
       row$Chr,
       format_number(row$Pos),
       format_pvalue(row$P.value),
-      row$MAF,
+      maf_val,
       model_val,
       trait_val
     ))
@@ -486,7 +487,7 @@ generate_quality_metrics <- function(stats, summary_table) {
     lines <- c(lines,
                "### Runtime Distribution",
                sprintf("- **Average:** %s", format_duration(stats$average_duration_minutes)),
-               sprintf("- **Total Compute Time:** %s", format_duration(stats$total_duration_hours * 60, "hours")),
+               sprintf("- **Total Compute Time:** %s", format_duration(stats$total_duration_hours, "hours")),
                "")
   }
 
@@ -640,157 +641,22 @@ generate_markdown_summary <- function(output_dir, stats, summary_table, snps_df,
 
 # ------------------------------------------------------------------------------
 # Deduplication and trait completeness
-# Note: select_best_trait_dirs is provided by aggregation_utils.R
+# Note: select_best_trait_dirs, check_trait_completeness, and read_filter_file
+#       are provided by aggregation_utils.R (sourced above)
 # ------------------------------------------------------------------------------
-
-#' Check trait directories for completeness (Filter file present)
-#'
-#' @param trait_dirs Vector of trait directory paths
-#' @return Vector of incomplete trait directory paths (missing Filter file)
-check_trait_completeness <- function(trait_dirs) {
-  incomplete <- character(0)
-  for (dir in trait_dirs) {
-    filter_file <- file.path(dir, "GAPIT.Association.Filter_GWAS_results.csv")
-    if (!file.exists(filter_file)) {
-      incomplete <- c(incomplete, dir)
-    }
-  }
-  return(incomplete)
-}
-
-#' Read GAPIT Filter file and parse model information
-#'
-#' Reads GAPIT.Association.Filter_GWAS_results.csv which contains only
-#' significant SNPs with model information in the traits column.
-#' Format: "<MODEL>.<TraitName>" (e.g., "BLINK.root_length")
-#'
-#' Handles known GAPIT quirks:
-#' - BLINK model has swapped columns (MAF contains sample count instead of frequency)
-#' - Trait names may have (NYC) or (Kansas) suffix indicating analysis type
-#'
-#' Returns NULL if Filter file is missing (trait incomplete).
-#' Returns empty data.frame if Filter file exists but has no significant SNPs.
-#'
-#' @param trait_dir Path to trait result directory
-#' @param threshold Significance threshold (unused, kept for API compatibility)
-#' @return data.frame with columns including model, trait, analysis_type, and trait_dir, or NULL if incomplete
-read_filter_file <- function(trait_dir, threshold = 5e-8) {
-  filter_file <- file.path(trait_dir, "GAPIT.Association.Filter_GWAS_results.csv")
-
-  # Missing Filter file = incomplete trait (fail-fast)
-  if (!file.exists(filter_file)) {
-    return(NULL)
-  }
-
-  tryCatch({
-    # Read Filter file (contains only significant SNPs)
-    filter_data <- fread(filter_file, data.table = FALSE)
-
-    # Drop V1 column (row index) if present - not needed for analysis
-    # Critical fix: V1 has mixed types across files (numeric: 1216644 vs X-prefixed: X2625218)
-    # which causes bind_rows() type mismatch errors when combining results
-    if ("V1" %in% colnames(filter_data)) {
-      filter_data <- filter_data[, colnames(filter_data) != "V1", drop = FALSE]
-    }
-
-    # Check if traits column exists
-    # No traits column means no significant SNPs found (empty Filter file)
-    if (!"traits" %in% colnames(filter_data)) {
-      return(data.frame())
-    }
-
-    # Return empty data.frame if no rows (no significant SNPs)
-    if (nrow(filter_data) == 0) {
-      return(data.frame())
-    }
-
-    # Parse model and trait from traits column
-    # Format: "<MODEL>.<TraitName>" or "<MODEL>.<TraitName>(NYC|Kansas)"
-    # Handle compound models (FarmCPU.LM, Blink.LM) before simple split
-    filter_data$model <- ifelse(
-      grepl("^FarmCPU\\.LM\\.", filter_data$traits), "FarmCPU.LM",
-      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits), "Blink.LM",
-             sub("\\..*", "", filter_data$traits))
-    )
-
-    # Extract raw trait (before stripping analysis_type suffix)
-    raw_trait <- ifelse(
-      grepl("^FarmCPU\\.LM\\.", filter_data$traits),
-      sub("^FarmCPU\\.LM\\.", "", filter_data$traits),
-      ifelse(grepl("^Blink\\.LM\\.", filter_data$traits),
-             sub("^Blink\\.LM\\.", "", filter_data$traits),
-             sub("^[^.]+\\.", "", filter_data$traits))
-    )
-
-    # Parse analysis_type from trait suffix (NYC, Kansas, or standard)
-    filter_data$analysis_type <- ifelse(
-      grepl("\\(NYC\\)$", raw_trait), "NYC",
-      ifelse(grepl("\\(Kansas\\)$", raw_trait), "Kansas", "standard")
-    )
-
-    # Strip analysis_type suffix from trait name
-    filter_data$trait <- gsub("\\(NYC\\)$|\\(Kansas\\)$", "", raw_trait)
-
-    # Add trait_dir for provenance tracking
-    filter_data$trait_dir <- basename(trait_dir)
-
-    # -------------------------------------------------------------------------
-    # GAPIT BLINK column swap fix
-    # -------------------------------------------------------------------------
-    # GAPIT's BLINK model outputs columns in wrong order:
-    # Header claims: P.value, MAF, nobs, Effect, H&B.P.Value
-    # Actual data:   P.value, nobs, Effect, MAF, H&B.P.Value
-    #
-    # In the Filter file, only MAF column is present (no nobs, Effect, H&B).
-    # When MAF > 1, it's actually the sample count (nobs), not a frequency.
-    # Since we can't recover the true MAF from Filter file, set to NA.
-    # -------------------------------------------------------------------------
-    if ("MAF" %in% colnames(filter_data)) {
-      # Detect invalid MAF values (frequency must be in [0, 0.5] for minor allele)
-      invalid_maf <- !is.na(filter_data$MAF) & filter_data$MAF > 1
-
-      if (any(invalid_maf)) {
-        n_invalid <- sum(invalid_maf)
-        affected_models <- unique(filter_data$model[invalid_maf])
-        warning(sprintf(
-          "Detected BLINK column order issue in %s: %d rows have MAF > 1 (models: %s). Setting to NA.",
-          basename(trait_dir), n_invalid, paste(affected_models, collapse = ", ")
-        ))
-        filter_data$MAF[invalid_maf] <- NA
-      }
-    }
-
-    # Validate model names using KNOWN_GAPIT_MODELS from constants (warn if unexpected, but continue)
-    unexpected <- unique(filter_data$model[!(filter_data$model %in% KNOWN_GAPIT_MODELS)])
-    if (length(unexpected) > 0) {
-      cat("  Warning: Unexpected model names in", basename(trait_dir), ":",
-          paste(unexpected, collapse=", "), "\n")
-    }
-
-    # Remove original traits column
-    filter_data$traits <- NULL
-
-    return(filter_data)
-
-  }, error = function(e) {
-    cat("  Warning: Error reading Filter file for", basename(trait_dir), ":",
-        e$message, "\n")
-    return(NULL)
-  })
-}
 
 # ==============================================================================
 # Find all trait result directories (with deduplication)
 # ==============================================================================
 cat("Scanning for trait results...\n")
 all_trait_dirs <- list.dirs(output_dir, recursive = FALSE, full.names = TRUE)
-all_trait_dirs <- all_trait_dirs[grepl("trait_\\d+_", basename(all_trait_dirs))]
+all_trait_dirs <- all_trait_dirs[grepl("^trait_\\d+", basename(all_trait_dirs))]
 
 cat("Found", length(all_trait_dirs), "trait result directories\n")
 
 if (length(all_trait_dirs) == 0) {
   cat("No trait results found. Exiting.\n")
-  quit(status = 0)
+  quit(save = "no", status = 0)
 }
 
 # Deduplicate: select best directory per trait index
@@ -859,19 +725,8 @@ cat("\n")
 # ==============================================================================
 cat("Creating summary table...\n")
 
-summary_df <- data.frame(
-  trait_index = integer(),
-  trait_name = character(),
-  n_samples = integer(),
-  n_valid = integer(),
-  n_snps = integer(),
-  duration_minutes = numeric(),
-  status = character(),
-  stringsAsFactors = FALSE
-)
-
-for (meta in metadata_list) {
-  summary_df <- rbind(summary_df, data.frame(
+summary_rows <- lapply(metadata_list, function(meta) {
+  data.frame(
     trait_index = if (is.null(meta$trait$column_index)) NA else meta$trait$column_index,
     trait_name = if (is.null(meta$trait$name)) "unknown" else meta$trait$name,
     n_samples = if (is.null(meta$trait$n_total)) NA else meta$trait$n_total,
@@ -880,8 +735,9 @@ for (meta in metadata_list) {
     duration_minutes = if (is.null(meta$execution$duration_minutes)) NA else meta$execution$duration_minutes,
     status = if (is.null(meta$execution$status)) "unknown" else meta$execution$status,
     stringsAsFactors = FALSE
-  ))
-}
+  )
+})
+summary_df <- do.call(rbind, summary_rows)
 
 # Sort by trait index
 summary_df <- summary_df[order(summary_df$trait_index), ]
@@ -911,7 +767,7 @@ if (length(incomplete_traits) > 0) {
   cat("or use --allow-incomplete to skip incomplete traits.\n\n")
 
   if (!allow_incomplete) {
-    quit(status = 1)
+    quit(save = "no", status = 1)
   }
 
   cat("--allow-incomplete flag set: skipping incomplete traits\n\n")
@@ -982,12 +838,10 @@ if (nrow(all_snps) > 0 && "model" %in% colnames(all_snps)) {
   cat("  - Total significant SNPs:", nrow(all_snps), "\n")
 }
 
-# Save aggregated significant SNPs
-if (nrow(all_snps) > 0) {
-  sig_snps_file <- file.path(output_dir, "aggregated_results", "all_traits_significant_snps.csv")
-  write.csv(all_snps, sig_snps_file, row.names = FALSE)
-  cat("Significant SNPs saved:", sig_snps_file, "\n")
-}
+# Save aggregated significant SNPs (always create file, even if empty, for --markdown-only)
+sig_snps_file <- file.path(output_dir, "aggregated_results", "all_traits_significant_snps.csv")
+write.csv(all_snps, sig_snps_file, row.names = FALSE)
+cat("Significant SNPs saved:", sig_snps_file, "(", nrow(all_snps), "rows )\n")
 
 cat("\n")
 
