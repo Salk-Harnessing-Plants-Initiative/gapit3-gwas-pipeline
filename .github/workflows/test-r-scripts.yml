@@ -36,7 +36,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ env.R_LIBS_USER }}
-          key: ${{ runner.os }}-r-4.4.1-v1
+          key: ${{ runner.os }}-r-4.4.1-${{ hashFiles('.github/workflows/test-r-scripts.yml') }}
           restore-keys: |
             ${{ runner.os }}-r-4.4.1-
 

@@ -56,10 +56,14 @@ jobs:
 
       - name: Determine build environment
         id: determine-env
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_ENV: ${{ github.event.inputs.environment }}
+          GIT_REF: ${{ github.ref }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            ENV="${{ github.event.inputs.environment }}"
-          elif [[ "${{ github.event_name }}" == "push" ]] && [[ "${{ github.ref }}" =~ ^refs/tags/v ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            ENV="$INPUT_ENV"
+          elif [[ "$EVENT_NAME" == "push" ]] && [[ "$GIT_REF" =~ ^refs/tags/v ]]; then
             ENV="prod"
           else
             ENV="test"
@@ -72,8 +76,11 @@ jobs:
 
       - name: Validate production build
         if: steps.determine-env.outputs.is-prod == 'true'
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ github.event.inputs.version }}
         run: |
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] && [[ -z "${{ github.event.inputs.version }}" ]]; then
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]] && [[ -z "$INPUT_VERSION" ]]; then
             echo "::error::Production builds via workflow_dispatch require a version input"
             exit 1
           fi
@@ -221,20 +228,32 @@ jobs:
       - name: Test validation script with fixtures
         run: |
           echo "::group::Testing validation script with test fixtures"
+          set +e
           docker run --rm \
             -v $(pwd)/tests/fixtures:/data \
             -v $(pwd)/tests/fixtures:/config \
-            ${{ steps.image-ref.outputs.image-tag }} validate || true
+            ${{ steps.image-ref.outputs.image-tag }} validate
+          EXIT_CODE=$?
+          set -e
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::Validation exited with code $EXIT_CODE (expected with minimal test fixtures)"
+          fi
           echo "::endgroup::"
 
       - name: Test trait extraction with sample data
         run: |
           echo "::group::Testing trait extraction"
+          set +e
           docker run --rm \
             -v $(pwd)/tests/fixtures:/data \
             -v $(pwd)/tests:/tests \
             ${{ steps.image-ref.outputs.image-tag }} \
-            extract-traits /data/phenotype_mini.txt /tests/test_manifest.yaml || true
+            extract-traits /data/phenotype_mini.txt /tests/test_manifest.yaml
+          EXIT_CODE=$?
+          set -e
+          if [ $EXIT_CODE -ne 0 ]; then
+            echo "::warning::Trait extraction exited with code $EXIT_CODE (expected with minimal test fixtures)"
+          fi
           echo "::endgroup::"
 
       - name: Test environment variable configuration
