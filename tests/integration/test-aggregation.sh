@@ -182,7 +182,7 @@ test_output_csv_has_model_column() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_csv_has_column "$snps_file" "model" "model column in output CSV"
@@ -203,7 +203,7 @@ test_output_csv_has_multiple_models() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_file_contains "$snps_file" "BLINK" "BLINK model found in output"
@@ -222,7 +222,7 @@ test_output_csv_sorted_by_pvalue() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     # Use R for robust P.value sort verification
@@ -254,7 +254,7 @@ test_summary_stats_has_snps_by_model() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_file_contains "$stats_file" "snps_by_model" "snps_by_model in summary_stats.json"
@@ -273,7 +273,7 @@ test_aggregation_handles_trait_with_periods() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     # trait_003_period_in_name has trait "mean_GR_rootLength_day_1.2(NYC)"
@@ -294,7 +294,7 @@ test_aggregation_handles_fallback() {
             --batch-id "test-integration" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     # Check that fallback trait was processed (look for its SNP)
@@ -319,7 +319,7 @@ test_aggregation_performance() {
         --batch-id "test-performance" \
         --models "BLINK,FarmCPU,MLM" \
         --allow-incomplete \
-        2>&1 >/dev/null
+        >/dev/null 2>&1
 
     end_time=$(date +%s)
     elapsed=$((end_time - start_time))
@@ -350,7 +350,7 @@ test_summary_stats_has_configuration_section() {
             --batch-id "test-config" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_file_contains "$stats_file" '"configuration"' "configuration section in summary_stats.json"
@@ -371,7 +371,7 @@ test_models_source_tracks_cli() {
         --batch-id "test-cli-models" \
         --models "BLINK,FarmCPU" \
         --allow-incomplete \
-        2>&1 >/dev/null
+        >/dev/null 2>&1
 
     local stats_file="$TEMP_OUTPUT/aggregated_results/summary_stats.json"
 
@@ -405,7 +405,7 @@ EOF
         --output-dir "$no_meta_dir" \
         --batch-id "test-default-models" \
         --allow-incomplete \
-        2>&1 >/dev/null || true
+        >/dev/null 2>&1 || true
 
     local stats_file="$no_meta_dir/aggregated_results/summary_stats.json"
 
@@ -445,7 +445,7 @@ test_markdown_summary_generated() {
         --batch-id "test-markdown" \
         --models "BLINK,FarmCPU,MLM" \
         --allow-incomplete \
-        2>&1 >/dev/null
+        >/dev/null 2>&1
 
     local md_file="$TEMP_OUTPUT/aggregated_results/pipeline_summary.md"
 
@@ -472,7 +472,7 @@ test_markdown_has_configuration_section() {
             --batch-id "test-markdown" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_file_contains "$md_file" "## Configuration" "Configuration section in markdown"
@@ -491,7 +491,7 @@ test_markdown_has_executive_summary() {
             --batch-id "test-markdown" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     assert_file_contains "$md_file" "## Executive Summary" "Executive Summary in markdown"
@@ -510,7 +510,7 @@ test_markdown_formatting_correct() {
             --batch-id "test-markdown" \
             --models "BLINK,FarmCPU,MLM" \
             --allow-incomplete \
-            2>&1 >/dev/null
+            >/dev/null 2>&1
     fi
 
     # Check p-value formatting (scientific notation)
