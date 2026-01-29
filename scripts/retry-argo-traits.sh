@@ -42,6 +42,15 @@ NC='\033[0m'
 # Functions
 # ==============================================================================
 
+# Escape a value for safe use inside YAML double-quoted strings
+yaml_escape() {
+    local val="$1"
+    # Escape backslashes first, then double quotes
+    val="${val//\\/\\\\}"
+    val="${val//\"/\\\"}"
+    printf '%s' "$val"
+}
+
 show_help() {
     cat << EOF
 ${GREEN}GAPIT3 GWAS - Retry Failed Argo Workflow Traits${NC}
@@ -497,23 +506,40 @@ if [[ "$AGGREGATE" == "true" ]]; then
 "
 fi
 
+# Escape all shell-interpolated values for safe YAML embedding
+Y_IMAGE=$(yaml_escape "$IMAGE")
+Y_DATA_HOSTPATH=$(yaml_escape "$DATA_HOSTPATH")
+Y_OUTPUT_HOSTPATH=$(yaml_escape "$OUTPUT_HOSTPATH")
+Y_GENOTYPE_FILE=$(yaml_escape "$GENOTYPE_FILE")
+Y_PHENOTYPE_FILE=$(yaml_escape "$PHENOTYPE_FILE")
+Y_ACCESSION_IDS_FILE=$(yaml_escape "$ACCESSION_IDS_FILE")
+Y_MODEL=$(yaml_escape "$MODEL")
+Y_PCA_TOTAL=$(yaml_escape "$PCA_TOTAL")
+Y_SNP_MAF=$(yaml_escape "$SNP_MAF")
+Y_SNP_FDR=$(yaml_escape "$SNP_FDR")
+Y_KINSHIP_ALGORITHM=$(yaml_escape "$KINSHIP_ALGORITHM")
+Y_SNP_EFFECT=$(yaml_escape "$SNP_EFFECT")
+Y_SNP_IMPUTE=$(yaml_escape "$SNP_IMPUTE")
+Y_NAMESPACE=$(yaml_escape "$NAMESPACE")
+Y_WORKFLOW=$(yaml_escape "$WORKFLOW")
+
 # Generate full workflow YAML
 RETRY_YAML="apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: gapit3-gwas-retry-${WORKFLOW_SUFFIX}-
-  namespace: ${NAMESPACE}
+  namespace: ${Y_NAMESPACE}
   labels:
     pipeline: gapit3-gwas
     stage: retry
-    original-workflow: ${WORKFLOW}
+    original-workflow: ${Y_WORKFLOW}
 spec:
   # ===========================================================================
   # GAPIT3 GWAS - Retry Workflow (${#TRAIT_ARRAY[@]} traits)
   # ===========================================================================
-  # Retry workflow for incomplete traits from: ${WORKFLOW}
+  # Retry workflow for incomplete traits from: ${Y_WORKFLOW}
   # Template: ${TEMPLATE_NAME}
-  # Model: ${MODEL}
+  # Model: ${Y_MODEL}
   # ===========================================================================
 
   entrypoint: retry-traits
@@ -523,34 +549,34 @@ spec:
   arguments:
     parameters:
     - name: image
-      value: \"${IMAGE}\"
+      value: \"${Y_IMAGE}\"
     - name: data-hostpath
-      value: \"${DATA_HOSTPATH}\"
+      value: \"${Y_DATA_HOSTPATH}\"
     - name: output-hostpath
-      value: \"${OUTPUT_HOSTPATH}\"
+      value: \"${Y_OUTPUT_HOSTPATH}\"
     # File paths
     - name: genotype-file
-      value: \"${GENOTYPE_FILE}\"
+      value: \"${Y_GENOTYPE_FILE}\"
     - name: phenotype-file
-      value: \"${PHENOTYPE_FILE}\"
+      value: \"${Y_PHENOTYPE_FILE}\"
     - name: accession-ids-file
-      value: \"${ACCESSION_IDS_FILE}\"
+      value: \"${Y_ACCESSION_IDS_FILE}\"
     # Core GAPIT parameters (v3.0.0 naming)
     - name: model
-      value: \"${MODEL}\"
+      value: \"${Y_MODEL}\"
     - name: pca-total
-      value: \"${PCA_TOTAL}\"
+      value: \"${Y_PCA_TOTAL}\"
     - name: snp-maf
-      value: \"${SNP_MAF}\"
+      value: \"${Y_SNP_MAF}\"
     - name: snp-fdr
-      value: \"${SNP_FDR}\"
+      value: \"${Y_SNP_FDR}\"
     # Advanced GAPIT parameters
     - name: kinship-algorithm
-      value: \"${KINSHIP_ALGORITHM}\"
+      value: \"${Y_KINSHIP_ALGORITHM}\"
     - name: snp-effect
-      value: \"${SNP_EFFECT}\"
+      value: \"${Y_SNP_EFFECT}\"
     - name: snp-impute
-      value: \"${SNP_IMPUTE}\"
+      value: \"${Y_SNP_IMPUTE}\"
 
   # Global timeout (7 days - effectively no limit for retries)
   activeDeadlineSeconds: 604800
@@ -604,8 +630,9 @@ fi
 if [[ "$SUBMIT" == "true" ]]; then
     log_info "Submitting retry workflow..."
 
-    # Create temp file for submission
+    # Create temp file for submission (with cleanup trap)
     TEMP_YAML=$(mktemp /tmp/retry-workflow-XXXXXX.yaml)
+    trap 'rm -f "$TEMP_YAML"' EXIT INT TERM
     echo "$RETRY_YAML" > "$TEMP_YAML"
 
     # Submit workflow

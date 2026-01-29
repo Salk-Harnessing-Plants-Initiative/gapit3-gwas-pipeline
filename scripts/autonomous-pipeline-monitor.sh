@@ -154,6 +154,27 @@ if [[ -z "$WORKFLOW" || -z "$OUTPUT_DIR" || -z "$EXPECTED_TRAITS" || -z "$DATASE
     exit 1
 fi
 
+# Validate numeric inputs
+if ! [[ "$EXPECTED_TRAITS" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --expected-traits must be a positive integer, got: $EXPECTED_TRAITS"
+    exit 1
+fi
+if ! [[ "$POLL_INTERVAL" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --poll-interval must be a positive integer, got: $POLL_INTERVAL"
+    exit 1
+fi
+if ! [[ "$TIMEOUT_HOURS" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --timeout must be a positive integer, got: $TIMEOUT_HOURS"
+    exit 1
+fi
+if ! [[ "$SUCCESS_THRESHOLD" =~ ^[0-9]+$ ]]; then
+    echo "ERROR: --success-threshold must be a positive integer, got: $SUCCESS_THRESHOLD"
+    exit 1
+fi
+
+# Sanitize dataset name to prevent command injection
+DATASET_NAME=$(echo "$DATASET_NAME" | tr -cd '[:alnum:]._-/')
+
 # Set up logging
 LOG_FILE="$OUTPUT_DIR/pipeline_monitor.log"
 mkdir -p "$OUTPUT_DIR"
@@ -236,7 +257,11 @@ validate_outputs() {
 
     log_info "Found $filter_count Filter files (complete traits)"
 
-    # Calculate percentage
+    # Calculate percentage (guard division by zero)
+    if [[ "$EXPECTED_TRAITS" -eq 0 ]]; then
+        log_error "EXPECTED_TRAITS is 0, cannot calculate completion percentage"
+        return 1
+    fi
     local percent=$((filter_count * 100 / EXPECTED_TRAITS))
     log_info "Completion: ${percent}% ($filter_count / $EXPECTED_TRAITS)"
 
@@ -389,10 +414,14 @@ main() {
         fi
     fi
 
-    # Phase 4: Upload (even if aggregation failed, upload what we have)
-    if ! upload_to_box; then
-        log_error "Box upload failed"
-        exit_code=1
+    # Phase 4: Upload (only if previous phases succeeded)
+    if [[ $exit_code -eq 0 ]]; then
+        if ! upload_to_box; then
+            log_error "Box upload failed"
+            exit_code=1
+        fi
+    else
+        log_warn "Skipping Phase 4 (upload) due to earlier failures"
     fi
 
     # Final summary
