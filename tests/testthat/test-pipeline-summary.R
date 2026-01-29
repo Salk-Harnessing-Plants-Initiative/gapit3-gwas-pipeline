@@ -92,7 +92,7 @@ tryCatch(source_summary_functions(), error = function(e) NULL)
 # Test: format_pvalue() helper function
 # ==============================================================================
 test_that("format_pvalue formats p-values correctly", {
-  skip_if_not(exists("format_pvalue"), "format_pvalue not yet implemented")
+  # format_pvalue is sourced from aggregation_utils.R
 
   # Very small p-values
 
@@ -112,7 +112,7 @@ expect_equal(format_pvalue(3.971779e-88), "3.97e-88")
 # Test: format_number() helper function
 # ==============================================================================
 test_that("format_number adds thousand separators", {
-  skip_if_not(exists("format_number"), "format_number not yet implemented")
+  # format_number is sourced from aggregation_utils.R
 
   expect_equal(format_number(1886), "1,886")
   expect_equal(format_number(1378379), "1,378,379")
@@ -125,7 +125,7 @@ test_that("format_number adds thousand separators", {
 # Test: format_duration() helper function
 # ==============================================================================
 test_that("format_duration formats duration correctly", {
-  skip_if_not(exists("format_duration"), "format_duration not yet implemented")
+  # format_duration is sourced from aggregation_utils.R
 
   # Minutes only
   expect_equal(format_duration(65.0), "65.0 minutes")
@@ -139,7 +139,7 @@ test_that("format_duration formats duration correctly", {
 # Test: truncate_string() helper function
 # ==============================================================================
 test_that("truncate_string truncates long strings", {
-  skip_if_not(exists("truncate_string"), "truncate_string not yet implemented")
+  # truncate_string is sourced from aggregation_utils.R
 
   # Short string - no truncation
   expect_equal(truncate_string("short", 40), "short")
@@ -471,7 +471,7 @@ test_that("generate_markdown_summary matches expected format", {
 # Test: SNP_FDR in Configuration Section
 # ==============================================================================
 test_that("generate_configuration_section includes SNP FDR when set", {
-  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+  # generate_configuration_section is sourced from aggregation_utils.R
 
   metadata <- list(
     parameters = list(
@@ -501,7 +501,7 @@ test_that("generate_configuration_section includes SNP FDR when set", {
 })
 
 test_that("generate_configuration_section handles null SNP FDR", {
-  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+  # generate_configuration_section is sourced from aggregation_utils.R
 
   metadata <- list(
     parameters = list(
@@ -527,7 +527,7 @@ test_that("generate_configuration_section handles null SNP FDR", {
 })
 
 test_that("generate_configuration_section shows both MAF and SNP FDR", {
-  skip_if_not(exists("generate_configuration_section"), "generate_configuration_section not yet implemented")
+  # generate_configuration_section is sourced from aggregation_utils.R
 
   metadata <- list(
     parameters = list(
