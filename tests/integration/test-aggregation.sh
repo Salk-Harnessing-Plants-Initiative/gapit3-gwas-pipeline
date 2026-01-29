@@ -25,15 +25,15 @@ NC='\033[0m' # No Color
 # ==============================================================================
 
 log_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "${GREEN}[INFO]${NC} $*"
 }
 
 log_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "${RED}[ERROR]${NC} $*"
 }
 
 log_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "${YELLOW}[WARNING]${NC} $*"
 }
 
 assert_file_exists() {
@@ -75,7 +75,7 @@ assert_csv_has_column() {
     local column="$2"
     local test_name="$3"
 
-    if head -1 "$file" | grep -q "$column"; then
+    if head -1 "$file" | grep -qE "(^|,)\"?${column}\"?(,|$)"; then
         log_info "✓ PASS: $test_name"
         ((TESTS_PASSED++))
         return 0
@@ -225,12 +225,12 @@ test_output_csv_sorted_by_pvalue() {
             2>&1 >/dev/null
     fi
 
-    # Use R for robust P.value column extraction and comparison
-    # R handles quoted CSV headers and scientific notation natively
+    # Use R for robust P.value sort verification
+    # Checks entire column, not just first/last values
     local sorted
     sorted=$(Rscript -e "
       d <- read.csv('$snps_file')
-      cat(d\$P.value[1] <= d\$P.value[nrow(d)])
+      cat(!is.unsorted(d\$P.value))
     " 2>/dev/null)
 
     if [ "$sorted" = "TRUE" ]; then
@@ -302,10 +302,9 @@ test_aggregation_handles_fallback() {
         log_info "✓ PASS: Fallback trait processed (PERL3 SNPs found)"
         ((TESTS_PASSED++))
     else
-        log_warning "Fallback trait may not have significant SNPs - checking if fallback ran"
-        # This is OK - the fallback may filter out non-significant SNPs
-        log_info "✓ PASS: Aggregation completed without error (fallback works)"
-        ((TESTS_PASSED++))
+        log_error "✗ FAIL: Fallback trait PERL3 SNPs not found in output"
+        log_error "  Fallback processing may not have worked correctly"
+        ((TESTS_FAILED++))
     fi
 }
 
@@ -313,7 +312,7 @@ test_aggregation_performance() {
     log_info "Testing aggregation performance..."
 
     local start_time end_time elapsed
-    start_time=$(date +%s.%N)
+    start_time=$(date +%s)
 
     Rscript "${PROJECT_ROOT}/scripts/collect_results.R" \
         --output-dir "$TEMP_OUTPUT" \
@@ -322,11 +321,11 @@ test_aggregation_performance() {
         --allow-incomplete \
         2>&1 >/dev/null
 
-    end_time=$(date +%s.%N)
-    elapsed=$(echo "$end_time - $start_time" | bc)
+    end_time=$(date +%s)
+    elapsed=$((end_time - start_time))
 
     # Should complete in <5 seconds for test fixtures
-    if (( $(echo "$elapsed < 5" | bc -l) )); then
+    if [ "$elapsed" -lt 5 ]; then
         log_info "✓ PASS: Aggregation completed in ${elapsed}s (< 5s)"
         ((TESTS_PASSED++))
     else
@@ -519,9 +518,8 @@ test_markdown_formatting_correct() {
         log_info "✓ PASS: P-values formatted in scientific notation"
         ((TESTS_PASSED++))
     else
-        log_warning "P-value formatting not verified (may be OK if no significant SNPs)"
-        log_info "✓ PASS: Markdown formatting check completed"
-        ((TESTS_PASSED++))
+        log_error "✗ FAIL: P-values not found in scientific notation format in markdown"
+        ((TESTS_FAILED++))
     fi
 }
 
