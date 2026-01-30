@@ -97,7 +97,7 @@
 
 ## 10. Validation
 
-- [ ] 10.1 Run `Rscript -e "testthat::test_dir('tests/testthat')"` — all tests pass (466+)
-- [ ] 10.2 Run `bash tests/integration/test-aggregation.sh` — all integration tests pass
-- [ ] 10.3 Run `shellcheck scripts/*.sh` — no errors/warnings
-- [ ] 10.4 Push and confirm CI green on all checks
+- [x] 10.1 Run `Rscript -e "testthat::test_dir('tests/testthat')"` — all tests pass (490 pass, 2 skip)
+- [x] 10.2 Run `bash tests/integration/test-aggregation.sh` — all integration tests pass
+- [x] 10.3 Run `shellcheck scripts/*.sh` — no errors/warnings
+- [x] 10.4 Push and confirm CI green on all checks (all 4 workflows passed)
