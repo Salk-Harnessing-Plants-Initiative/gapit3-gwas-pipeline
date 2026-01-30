@@ -1,0 +1,24 @@
+{
+  "schema_version": "2.0.0",
+  "execution": {
+    "trait_index": 2,
+    "status": "success"
+  },
+  "parameters": {
+    "models": ["BLINK", "FarmCPU"],
+    "pca_components": 3,
+    "multiple_analysis": true,
+    "maf_filter": 0.05,
+    "snp_fdr": 0.05,
+    "openblas_threads": 12,
+    "omp_threads": 12
+  },
+  "genotype": {
+    "n_snps": 287000,
+    "n_accessions": 1135
+  },
+  "inputs": {
+    "genotype_file": "/data/genotype/all_chromosomes.hmp.txt",
+    "phenotype_file": "/data/phenotype/traits.txt"
+  }
+}

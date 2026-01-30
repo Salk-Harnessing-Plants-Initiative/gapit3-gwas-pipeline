@@ -8,12 +8,10 @@
 
 FROM rocker/r-ver:4.4.1 AS base
 
-# Set environment variables
+# Set environment variables (build-time only - runtime config via ENV at container start)
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ=America/Los_Angeles \
-    R_LIBS_USER=/usr/local/lib/R/site-library \
-    OPENBLAS_NUM_THREADS=16 \
-    OMP_NUM_THREADS=16
+    R_LIBS_USER=/usr/local/lib/R/site-library
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -62,9 +60,9 @@ RUN R -e "install.packages(c( \
     'gridExtra', \
     'matrixStats', \
     'optparse', \
-    'yaml', \
     'jsonlite', \
-    'logging' \
+    'logging', \
+    'testthat' \
     ), repos='https://cloud.r-project.org', Ncpus=4)"
 
 # Layer 3: GAPIT3 from GitHub (pinned version)
@@ -84,24 +82,22 @@ RUN mkdir -p /data/genotype \
     /data/metadata \
     /outputs \
     /logs \
-    /config \
     /scripts
 
 # Set working directory
 WORKDIR /workspace
 
-# Copy pipeline scripts (will be added in next steps)
+# Copy pipeline scripts
 COPY scripts/ /scripts/
-COPY config/ /config/
 
 # Make scripts executable
 RUN chmod +x /scripts/*.sh /scripts/*.R
 
-# Set entrypoint
+# Set entrypoint (handles runtime configuration via environment variables)
 ENTRYPOINT ["/scripts/entrypoint.sh"]
 
-# Default command (can be overridden)
-CMD ["--help"]
+# Default command - run single trait analysis
+CMD ["run-single-trait"]
 
 # ==============================================================================
 # Metadata

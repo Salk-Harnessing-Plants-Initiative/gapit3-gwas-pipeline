@@ -1,0 +1,200 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: gapit3-gwas-single-trait-ultrahighmem
+  namespace: runai-talmo-lab
+spec:
+  # ===========================================================================
+  # GAPIT3 GWAS - Single Trait WorkflowTemplate (ULTRA HIGH MEMORY)
+  # ===========================================================================
+  # Ultra-high-resource variant for very large datasets (>1.5M SNPs)
+  # Use this template when:
+  #   - Dataset has >1.5 million SNPs (e.g., MAC-filtered genotypes)
+  #   - Base genotype matrix exceeds 6 GB (samples × SNPs × 8 bytes)
+  #   - Highmem template (96Gi) fails with OOMKilled
+  #
+  # Resources: 160Gi memory, 16 CPU cores
+  # Memory estimation: Peak (GB) ≈ (samples × SNPs × 8 × 5) / 1024³ × 1.5
+  #
+  # Example: 546 samples × 2.64M SNPs = ~129 GB peak → needs 160Gi
+  #
+  # WARNING: This template uses significant cluster resources:
+  #   - 2 jobs per node (CPU-limited, not memory-limited)
+  #   - 10 parallel jobs = 5 nodes = 20 GPUs blocked (31% of cluster)
+  #
+  # Reference from workflows using: templateRef.name: gapit3-gwas-single-trait-ultrahighmem
+  # ===========================================================================
+
+  entrypoint: run-gwas
+  serviceAccountName: default  # Required for workflowtaskresults permission
+
+  # Template-level arguments with defaults
+  # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
+  arguments:
+    parameters:
+    - name: trait-index
+      value: "2"
+    - name: trait-name
+      value: "unknown"
+    - name: image
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test"
+    # Data file paths (relative to /data mount point)
+    - name: genotype-file
+      value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+    - name: phenotype-file
+      value: "/data/phenotype/iron_traits_edited.txt"
+    - name: accession-ids-file
+      value: "/data/metadata/ids_gwas.txt"
+    # Core GAPIT parameters (v3.0.0 naming) - defaults match GAPIT's native defaults
+    - name: model
+      value: "MLM"                    # GAPIT default
+    - name: pca-total
+      value: "0"                      # GAPIT default (no PCA)
+    - name: snp-maf
+      value: "0"                      # GAPIT default (no MAF filtering)
+    - name: snp-fdr
+      value: ""                       # GAPIT default is 1 (disabled); empty = disabled
+    # Advanced GAPIT parameters - defaults match GAPIT's native defaults
+    - name: kinship-algorithm
+      value: "Zhang"                  # GAPIT default
+    - name: snp-effect
+      value: "Add"                    # GAPIT default
+    - name: snp-impute
+      value: "Middle"                 # GAPIT default
+
+  templates:
+  # ===========================================================================
+  # Main GWAS execution template (ULTRA HIGH MEMORY)
+  # ===========================================================================
+  # IMPORTANT: This template requires the calling workflow to define volumes:
+  #   - nfs-data: Mounted at /data (read-only) for genotype/phenotype files
+  #   - nfs-outputs: Mounted at /outputs (read-write) for GWAS results
+  # See gapit3-test-pipeline.yaml for example volume configuration
+  # ===========================================================================
+  - name: run-gwas
+    inputs:
+      parameters:
+      - name: trait-index
+      - name: trait-name
+      - name: image
+      # Data file paths
+      - name: genotype-file
+      - name: phenotype-file
+      - name: accession-ids-file
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: model
+      - name: pca-total
+      - name: snp-maf
+      - name: snp-fdr
+      # Advanced GAPIT parameters
+      - name: kinship-algorithm
+      - name: snp-effect
+      - name: snp-impute
+
+    metadata:
+      labels:
+        app: gapit3-gwas
+        component: single-trait-ultrahighmem
+        trait-index: "{{inputs.parameters.trait-index}}"
+      annotations:
+        # Run.AI annotations for cluster scheduling
+        runai/preemptible: "true"  # Allow preemption for better cluster utilization
+
+    container:
+      image: "{{inputs.parameters.image}}"
+      imagePullPolicy: Always
+
+      # Entrypoint command - configuration is passed via environment variables (env section below)
+      # The entrypoint.sh script reads from env vars, NOT CLI args
+      command: ["/scripts/entrypoint.sh"]
+      args:
+        - "run-single-trait"
+
+      # Volume mounts
+      volumeMounts:
+      - name: nfs-data
+        mountPath: /data
+        readOnly: true  # Genotype/phenotype are read-only
+      - name: nfs-outputs
+        mountPath: /outputs
+        readOnly: false
+
+      # Environment variables
+      env:
+      # Data paths (parameterized from workflow)
+      - name: GENOTYPE_FILE
+        value: "{{inputs.parameters.genotype-file}}"
+      - name: PHENOTYPE_FILE
+        value: "{{inputs.parameters.phenotype-file}}"
+      - name: ACCESSION_IDS_FILE
+        value: "{{inputs.parameters.accession-ids-file}}"
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: MODEL
+        value: "{{inputs.parameters.model}}"
+      - name: PCA_TOTAL
+        value: "{{inputs.parameters.pca-total}}"
+      - name: SNP_MAF
+        value: "{{inputs.parameters.snp-maf}}"
+      - name: SNP_FDR
+        value: "{{inputs.parameters.snp-fdr}}"
+      # Advanced GAPIT parameters
+      - name: KINSHIP_ALGORITHM
+        value: "{{inputs.parameters.kinship-algorithm}}"
+      - name: SNP_EFFECT
+        value: "{{inputs.parameters.snp-effect}}"
+      - name: SNP_IMPUTE
+        value: "{{inputs.parameters.snp-impute}}"
+      # Compute resources - matched to memory allocation
+      - name: OPENBLAS_NUM_THREADS
+        value: "16"
+      - name: OMP_NUM_THREADS
+        value: "16"
+      # Trait configuration
+      - name: TRAIT_INDEX
+        value: "{{inputs.parameters.trait-index}}"
+      - name: TRAIT_NAME
+        value: "{{inputs.parameters.trait-name}}"
+      # Provenance metadata for traceability
+      - name: WORKFLOW_NAME
+        value: "{{workflow.name}}"
+      - name: WORKFLOW_UID
+        value: "{{workflow.uid}}"
+      - name: POD_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.name
+      - name: NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+      - name: WORKFLOW_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: CONTAINER_IMAGE
+        value: "{{inputs.parameters.image}}"
+      - name: RETRY_ATTEMPT
+        value: "{{retries}}"
+
+      # Resource allocation - ULTRA HIGH MEMORY for very large datasets (>1.5M SNPs)
+      # Memory: 160Gi provides headroom for ~129 GB peak usage
+      # CPU: 16 cores for OpenBLAS matrix operations
+      resources:
+        requests:
+          memory: "160Gi"
+          cpu: "16"
+        limits:
+          memory: "180Gi"  # 20Gi headroom for peak usage spikes
+          cpu: "24"        # Allow burst for I/O operations
+
+    # Retry strategy for transient failures
+    retryStrategy:
+      limit: 3  # Reduced from 5 since these are already retries
+      retryPolicy: "OnFailure"
+      backoff:
+        duration: "5m"      # Wait 5 minutes before first retry (longer for resource settling)
+        factor: 2           # Double wait time for each retry
+        maxDuration: "30m"  # Max wait time
+
+    # Note: Artifact storage not configured on cluster
+    # Results are saved directly to mounted volume at /outputs/trait_*/

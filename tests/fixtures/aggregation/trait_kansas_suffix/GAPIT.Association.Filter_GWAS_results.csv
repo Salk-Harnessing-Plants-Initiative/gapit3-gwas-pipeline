@@ -1,0 +1,3 @@
+,SNP,Chr,Pos,P.value,MAF,traits
+100001,PERL1.12345,1,12345,3.5e-09,0.12,FarmCPU.shoot_iron_content(Kansas)
+100002,PERL2.67890,2,67890,4.2e-09,0.15,BLINK.shoot_iron_content(Kansas)

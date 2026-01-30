@@ -1,0 +1,186 @@
+# Tasks: Expose All GAPIT Parameters
+
+**Approach: Test-Driven Development (TDD)**
+- Write tests FIRST for each feature
+- Run tests to confirm they fail
+- Implement the feature
+- Run tests to confirm they pass
+
+## Phase 1: Test Infrastructure & Fixtures
+
+### 1.1 Create Test Fixtures for Schema v3.0.0
+- [x] Create `tests/fixtures/gapit_params/v3_full/metadata.json` with all GAPIT params
+- [x] Create `tests/fixtures/gapit_params/v3_minimal/metadata.json` with minimal params
+- [x] Create `tests/fixtures/gapit_params/v2_legacy/metadata.json` for backward compat
+
+### 1.2 Create Unit Test File
+- [x] Create `tests/testthat/test-gapit-parameters.R`
+- [x] Add tests for `get_gapit_param()` helper function
+- [x] Add tests for schema v3.0.0 reading
+- [x] Add tests for backward compatibility with v2.0.0
+- [x] Tests now run successfully (blocker resolved by `refactor-collect-results-testable`)
+
+### 1.3 Create Integration Test File
+- [x] Create `tests/integration/test-gapit-params-e2e.sh`
+- [x] Add tests for new env var names (MODEL, PCA_TOTAL, SNP_MAF)
+- [x] Add tests for deprecated name warnings
+- [x] Add tests for new parameters (KINSHIP_ALGORITHM, etc.)
+- [x] All 12 integration tests PASSING
+
+## Phase 2: Fix MAF Parameter Bug (TDD)
+
+### 2.1 Write Tests for MAF Fix
+- [x] Add test: GAPIT receives `SNP.MAF` not `MAF.Threshold`
+- [x] Add test: Metadata records `SNP.MAF` in gapit section
+- [x] Run tests - should FAIL
+
+### 2.2 Implement MAF Fix
+- [x] Change `gapit_args$MAF.Threshold` to `gapit_args$SNP.MAF` in run_gwas_single_trait.R
+- [x] Run tests - should PASS
+
+## Phase 3: Update Metadata Schema (TDD)
+
+### 3.1 Write Tests for Schema v3.0.0
+- [x] Add test: metadata has `schema_version: "3.0.0"`
+- [x] Add test: parameters nested under `parameters.gapit`
+- [x] Add test: GAPIT params use native names (model, PCA.total, SNP.MAF, SNP.FDR)
+- [x] Run tests - should FAIL
+
+### 3.2 Implement Schema v3.0.0
+- [x] Update metadata structure in run_gwas_single_trait.R
+- [x] Keep legacy fields for backward compatibility
+- [x] Run tests - should PASS
+
+## Phase 4: Update Pipeline Summary (TDD)
+
+### 4.1 Write Tests for New Summary Format
+- [x] Add test: summary reads from `parameters.gapit.*`
+- [x] Add test: summary falls back to legacy `parameters.*`
+- [x] Add test: summary displays grouped sections (GAPIT Parameters, Filtering, Data)
+- [x] Add test: summary shows GAPIT native param names
+- [x] R unit tests now pass (blocker resolved)
+
+### 4.2 Implement Summary Updates
+- [x] Add `get_gapit_param()` helper to collect_results.R
+- [x] Update `generate_configuration_section()` with grouped format
+- [x] R unit tests now pass (blocker resolved)
+
+## Phase 5: Add Deprecation Warnings (TDD)
+
+### 5.1 Write Tests for Deprecation
+- [x] Add integration test: MODELS triggers warning, sets MODEL
+- [x] Add integration test: PCA_COMPONENTS triggers warning, sets PCA_TOTAL
+- [x] Add integration test: MAF_FILTER triggers warning, sets SNP_MAF
+- [x] Add integration test: new name takes precedence over deprecated
+- [x] All deprecation tests PASSING
+
+### 5.2 Implement Deprecation Handling
+- [x] Add `handle_deprecated_params()` function to entrypoint.sh
+- [x] Call function before validation
+- [x] Call function in help command so warnings show there too
+- [x] Run tests - should PASS
+
+## Phase 6: Add New GAPIT Parameters (TDD)
+
+### 6.1 Write Tests for New Parameters
+- [x] Add test: KINSHIP_ALGORITHM env var accepted (VanRaden, Zhang, Loiselle, EMMA)
+- [x] Add test: SNP_EFFECT env var accepted (Add, Dom)
+- [x] Add test: SNP_IMPUTE env var accepted (Middle, Major, Minor)
+- [x] Add test: Invalid values rejected with clear error message
+- [x] All new parameter tests PASSING
+
+### 6.2 Implement New Parameters in entrypoint.sh
+- [x] Add new env var declarations with defaults
+- [x] Add validation functions for each parameter
+- [x] Update `log_config()` to display new parameters
+- [x] Run tests - should PASS
+
+### 6.3 Implement New Parameters in R Script
+- [x] Add new CLI options to run_gwas_single_trait.R (KINSHIP_ALGORITHM, SNP_EFFECT, SNP_IMPUTE)
+- [x] Pass new parameters to GAPIT
+- [x] Record in metadata
+- [x] Run tests - should PASS (12/12 integration tests)
+
+### 6.4 Fix cutOff Parameter Bug (TDD)
+- [x] Add test: SNP_THRESHOLD is displayed in config
+- [x] Add CLI option --cutoff to run_gwas_single_trait.R
+- [x] Pass cutOff to GAPIT call
+- [x] Update documentation
+- [x] Run tests - should PASS (14/14 integration tests)
+
+### 6.5 Update Legacy Integration Tests for v3.0.0
+- [x] Update `tests/integration/test-env-vars-e2e.sh` for v3.0.0 parameter names
+- [x] Update `tests/integration/test-snp-fdr-e2e.sh` for v3.0.0 parameter names
+- [x] Change tests checking for MODELS → MODEL
+- [x] Change tests checking for PCA_COMPONENTS → PCA_TOTAL
+- [x] Change tests checking for MAF_FILTER → SNP_MAF
+- [x] Update default value expectations (MLM, 0, 0 instead of BLINK,FarmCPU, 3, 0.05)
+- [x] Run CI to verify all tests pass (4/4 workflows passing)
+
+## Phase 7: Update Argo/RunAI Templates
+
+### 7.1 Update WorkflowTemplates
+- [x] Add new parameters to gapit3-gwas-single-trait template (all v3.0.0 params)
+- [x] Add new parameters to gapit3-gwas-single-trait-highmem template
+- [x] Map to environment variables
+- [ ] Test workflow submission (requires cluster access)
+
+### 7.2 Update RunAI Scripts
+- [x] Update submit-all-traits-runai.sh with new parameter names
+- [x] Support both legacy and v3.0.0 parameter names
+- [x] Load new parameters from .env
+
+## Phase 8: Documentation
+
+### 8.1 Create GAPIT_PARAMETERS.md
+- [x] Document all exposed parameters with GAPIT native naming
+- [x] Show GAPIT defaults vs pipeline defaults
+- [x] Provide usage examples
+- [x] Created `docs/GAPIT_PARAMETERS.md`
+
+### 8.2 Update .env.example
+- [x] Update parameter names: MODELS→MODEL, PCA_COMPONENTS→PCA_TOTAL, MAF_FILTER→SNP_MAF
+- [x] Add new parameters (KINSHIP_ALGORITHM, SNP_EFFECT, SNP_IMPUTE)
+- [x] Include valid options for enums
+- [x] Show default values and document deprecation
+
+### 8.3 Update README.md
+- [x] Add section on GAPIT parameter configuration
+- [x] Document deprecation warnings and migration
+- [x] Update examples to use v3.0.0 parameter names (MODEL, PCA_TOTAL, SNP_MAF)
+- [x] Add link to docs/GAPIT_PARAMETERS.md
+
+## Phase 9: Final Validation
+
+### 9.1 Run Full Test Suite
+- [x] All integration tests pass (14/14 after SNP_THRESHOLD addition)
+- [x] All R unit tests pass (441 tests, blocker resolved by `refactor-collect-results-testable`)
+- [x] CI pipeline passes (4/4 workflows: R Script Tests, Bash Validation, Docker Build, Devcontainer)
+
+### 9.2 Manual Validation
+- [ ] Test with real GWAS data
+- [ ] Verify metadata completeness
+- [ ] Check pipeline summary output
+
+## Resolved Blockers
+
+### R Unit Test Infrastructure (Phase 1.2) - RESOLVED
+~~The R unit tests for `get_gapit_param()` and `generate_configuration_section()` could not run because `collect_results.R` executed on source.~~
+
+**Resolution**: The `refactor-collect-results-testable` change (archived 2026-01-06) extracted functions into `scripts/lib/aggregation_utils.R` which can be sourced independently. All 441 R unit tests now pass including the 26 GAPIT parameter tests.
+
+## File Change Summary
+
+| File | Phase | Changes |
+|------|-------|---------|
+| `tests/fixtures/gapit_params/` | 1.1 | New test fixtures for v3.0.0 schema |
+| `tests/testthat/test-gapit-parameters.R` | 1.2 | New unit tests |
+| `tests/integration/test-gapit-params-e2e.sh` | 1.3 | New integration tests |
+| `scripts/run_gwas_single_trait.R` | 2.2, 3.2, 6.3 | Fix MAF, update schema, add params |
+| `scripts/collect_results.R` | 4.2 | Update summary generation |
+| `scripts/entrypoint.sh` | 5.2, 6.2 | Deprecation handling, new params |
+| `cluster/argo/workflow-templates/*.yaml` | 7.1 | Add new parameters |
+| `scripts/submit-all-traits-runai.sh` | 7.2 | Load new parameters |
+| `docs/GAPIT_PARAMETERS.md` | 8.1 | New documentation |
+| `.env.example` | 8.2 | Document all parameters |
+| `README.md` | 8.3 | Link to docs |

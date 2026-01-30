@@ -16,36 +16,102 @@ suppressPackageStartupMessages({
   library(matrixStats)
   library(gridExtra)
   library(optparse)
-  library(yaml)
   library(jsonlite)
+  library(tools)  # For md5sum
 })
 
 # ==============================================================================
-# Parse command line arguments
+# Helper functions
+# ==============================================================================
+
+#' Get environment variable with NULL fallback for empty strings
+#' @param name Environment variable name
+#' @param default Default value if not set or empty
+#' @return The value or NULL if empty/unset
+get_env_or_null <- function(name, default = NULL) {
+  value <- Sys.getenv(name, "")
+  if (value == "" || value == "null" || value == "NULL") {
+    return(default)
+  }
+  return(value)
+}
+
+#' Compute MD5 checksum for a file
+#' @param file_path Path to file
+#' @return MD5 hash string or NULL if file doesn't exist or checksums disabled
+compute_file_md5 <- function(file_path) {
+  # Check if checksums are disabled
+  if (toupper(Sys.getenv("SKIP_INPUT_CHECKSUMS", "false")) == "TRUE") {
+    return(NULL)
+  }
+
+  if (is.null(file_path) || !file.exists(file_path)) {
+    return(NULL)
+  }
+
+  tryCatch({
+    md5sum(file_path)[[1]]
+  }, error = function(e) {
+    cat("  Warning: Could not compute MD5 for", file_path, ":", e$message, "\n")
+    return(NULL)
+  })
+}
+
+# ==============================================================================
+# Parse command line arguments and environment variables
 # ==============================================================================
 option_list <- list(
-  make_option(c("-t", "--trait-index"), type = "integer", default = NULL,
-              help = "Trait column index (required)", metavar = "INTEGER"),
-  make_option(c("-c", "--config"), type = "character", default = "/config/config.yaml",
-              help = "Path to config file [default: %default]", metavar = "FILE"),
-  make_option(c("-g", "--genotype"), type = "character", default = NULL,
-              help = "Path to genotype HapMap file (overrides config)", metavar = "FILE"),
-  make_option(c("-p", "--phenotype"), type = "character", default = NULL,
-              help = "Path to phenotype file (overrides config)", metavar = "FILE"),
-  make_option(c("-i", "--ids"), type = "character", default = NULL,
-              help = "Path to accession IDs file (overrides config)", metavar = "FILE"),
-  make_option(c("-o", "--output-dir"), type = "character", default = "/outputs",
-              help = "Output directory [default: %default]", metavar = "DIR"),
-  make_option(c("-m", "--models"), type = "character", default = NULL,
-              help = "Comma-separated models (e.g., 'BLINK,FarmCPU') [overrides config]", metavar = "STRING"),
-  make_option(c("--pca"), type = "integer", default = NULL,
-              help = "Number of PCA components [overrides config]", metavar = "INTEGER"),
-  make_option(c("--threads"), type = "integer", default = NULL,
-              help = "Number of CPU threads to use", metavar = "INTEGER")
+  make_option(c("-t", "--trait-index"), type = "integer",
+              default = as.integer(Sys.getenv("TRAIT_INDEX", "2")),
+              help = "Trait column index [env: TRAIT_INDEX]", metavar = "INTEGER"),
+  make_option(c("-g", "--genotype"), type = "character",
+              default = Sys.getenv("GENOTYPE_FILE", "/data/genotype/all_chromosomes_binary.hmp.txt"),
+              help = "Path to genotype HapMap file [env: GENOTYPE_FILE]", metavar = "FILE"),
+  make_option(c("-p", "--phenotype"), type = "character",
+              default = Sys.getenv("PHENOTYPE_FILE", "/data/phenotype/traits.txt"),
+              help = "Path to phenotype file [env: PHENOTYPE_FILE]", metavar = "FILE"),
+  make_option(c("-i", "--ids"), type = "character",
+              default = Sys.getenv("ACCESSION_IDS_FILE", ""),
+              help = "Path to accession IDs file [env: ACCESSION_IDS_FILE]", metavar = "FILE"),
+  make_option(c("-o", "--output-dir"), type = "character",
+              default = Sys.getenv("OUTPUT_PATH", "/outputs"),
+              help = "Output directory [env: OUTPUT_PATH]", metavar = "DIR"),
+  # Core GAPIT parameters - defaults match GAPIT's native defaults
+  make_option(c("-m", "--models"), type = "character",
+              default = Sys.getenv("MODEL", Sys.getenv("MODELS", "MLM")),
+              help = "Comma-separated models (GAPIT default: MLM) [env: MODEL]", metavar = "STRING"),
+  make_option(c("--pca"), type = "integer",
+              default = as.integer(Sys.getenv("PCA_TOTAL", Sys.getenv("PCA_COMPONENTS", "0"))),
+              help = "Number of PCA components (GAPIT default: 0) [env: PCA_TOTAL]", metavar = "INTEGER"),
+  make_option(c("--threads"), type = "integer",
+              default = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
+              help = "Number of CPU threads [env: OPENBLAS_NUM_THREADS]", metavar = "INTEGER"),
+  make_option(c("--maf"), type = "numeric",
+              default = as.numeric(Sys.getenv("SNP_MAF", Sys.getenv("MAF_FILTER", "0"))),
+              help = "Minor allele frequency filter (GAPIT default: 0) [env: SNP_MAF]", metavar = "FLOAT"),
+  make_option(c("--multiple-analysis"), type = "logical",
+              default = as.logical(Sys.getenv("MULTIPLE_ANALYSIS", "TRUE")),
+              help = "Run multiple analysis (GAPIT default: TRUE) [env: MULTIPLE_ANALYSIS]", metavar = "BOOL"),
+  make_option(c("--snp-fdr"), type = "numeric",
+              default = NULL,
+              help = "FDR threshold for SNP significance (GAPIT default: 1/disabled) [env: SNP_FDR]", metavar = "FLOAT"),
+  # Advanced GAPIT parameters - defaults match GAPIT's native defaults
+  make_option(c("--kinship-algorithm"), type = "character",
+              default = Sys.getenv("KINSHIP_ALGORITHM", Sys.getenv("KINSHIP_METHOD", "Zhang")),
+              help = "Kinship algorithm (GAPIT default: Zhang) [env: KINSHIP_ALGORITHM]", metavar = "STRING"),
+  make_option(c("--snp-effect"), type = "character",
+              default = Sys.getenv("SNP_EFFECT", "Add"),
+              help = "SNP effect model (GAPIT default: Add) [env: SNP_EFFECT]", metavar = "STRING"),
+  make_option(c("--snp-impute"), type = "character",
+              default = Sys.getenv("SNP_IMPUTE", "Middle"),
+              help = "Imputation method (GAPIT default: Middle) [env: SNP_IMPUTE]", metavar = "STRING"),
+  make_option(c("--cutoff"), type = "numeric",
+              default = as.numeric(Sys.getenv("SNP_THRESHOLD", "0.05")),
+              help = "Significance cutoff (GAPIT default: 0.05) [env: SNP_THRESHOLD]", metavar = "FLOAT")
 )
 
 opt_parser <- OptionParser(option_list = option_list,
-                          description = "\nRun GWAS analysis for a single trait using GAPIT3")
+                          description = "\nRun GWAS analysis for a single trait using GAPIT3\nConfiguration via command-line arguments or environment variables.")
 opt <- parse_args(opt_parser)
 
 # Validate required arguments
@@ -54,31 +120,37 @@ if (is.null(opt$`trait-index`)) {
 }
 
 # ==============================================================================
-# Load configuration
+# Runtime Configuration (from command-line args or environment variables)
 # ==============================================================================
-cat("Loading configuration from:", opt$config, "\n")
-config <- read_yaml(opt$config)
+cat("Runtime Configuration:\n")
+cat("  Trait Index:    ", opt$`trait-index`, "\n")
+cat("  Models:         ", opt$models, "\n")
+cat("  PCA Components: ", opt$pca, "\n")
+cat("  MAF Filter:     ", opt$maf, "\n")
+cat("  SNP FDR:        ", ifelse(is.null(opt$`snp-fdr`), "disabled", opt$`snp-fdr`), "\n")
+cat("  Cutoff:         ", opt$cutoff, "\n")
+cat("  Multiple Analysis:", opt$`multiple-analysis`, "\n")
+cat("  Kinship Algorithm:", opt$`kinship-algorithm`, "\n")
+cat("  SNP Effect:     ", opt$`snp-effect`, "\n")
+cat("  SNP Impute:     ", opt$`snp-impute`, "\n")
+cat("\n")
 
-# Override config with command-line arguments if provided
-genotype_file <- ifelse(is.null(opt$genotype), config$data$genotype, opt$genotype)
-phenotype_file <- ifelse(is.null(opt$phenotype), config$data$phenotype, opt$phenotype)
-ids_file <- ifelse(is.null(opt$ids), config$data$accession_ids, opt$ids)
+# Parse inputs
+genotype_file <- opt$genotype
+phenotype_file <- opt$phenotype
+ids_file <- opt$ids
 
-# GAPIT parameters
-if (!is.null(opt$models)) {
-  models <- strsplit(opt$models, ",")[[1]]
-} else {
-  models <- config$gapit$models
-}
+# Parse models (split comma-separated list and trim whitespace)
+models <- strsplit(opt$models, ",")[[1]]
+models <- trimws(models)
 
-pca_components <- ifelse(is.null(opt$pca), config$gapit$pca_components, opt$pca)
+pca_components <- opt$pca
+multiple_analysis <- opt$`multiple-analysis`
 
 # Set thread count
-if (!is.null(opt$threads)) {
-  Sys.setenv(OPENBLAS_NUM_THREADS = opt$threads)
-  Sys.setenv(OMP_NUM_THREADS = opt$threads)
-  cat("Set thread count to:", opt$threads, "\n")
-}
+Sys.setenv(OPENBLAS_NUM_THREADS = opt$threads)
+Sys.setenv(OMP_NUM_THREADS = opt$threads)
+cat("Thread count set to:", opt$threads, "\n\n")
 
 # ==============================================================================
 # Setup output directory
@@ -104,9 +176,28 @@ cat("PCA components:", pca_components, "\n")
 cat(strrep("=", 78), "\n\n")
 
 # ==============================================================================
-# Metadata tracking
+# Metadata tracking (schema v2.0.0 with provenance)
 # ==============================================================================
+
+# Compute input file checksums (if enabled)
+cat("Computing input file checksums...\n")
+genotype_md5 <- compute_file_md5(genotype_file)
+phenotype_md5 <- compute_file_md5(phenotype_file)
+ids_md5 <- if (!is.null(ids_file) && ids_file != "") compute_file_md5(ids_file) else NULL
+
+if (toupper(Sys.getenv("SKIP_INPUT_CHECKSUMS", "false")) == "TRUE") {
+  cat("  - Checksums disabled (SKIP_INPUT_CHECKSUMS=true)\n")
+} else {
+  cat("  - Genotype MD5:", ifelse(is.null(genotype_md5), "N/A", genotype_md5), "\n")
+  cat("  - Phenotype MD5:", ifelse(is.null(phenotype_md5), "N/A", phenotype_md5), "\n")
+}
+
+# Parse retry attempt (Argo provides as string, may be empty for first attempt)
+retry_attempt_str <- get_env_or_null("RETRY_ATTEMPT")
+retry_attempt <- if (!is.null(retry_attempt_str)) as.integer(retry_attempt_str) else NULL
+
 metadata <- list(
+  schema_version = "3.0.0",
   execution = list(
     trait_index = trait_index,
     start_time = Sys.time(),
@@ -114,15 +205,49 @@ metadata <- list(
     r_version = R.version.string,
     gapit_version = as.character(packageVersion("GAPIT"))
   ),
+  argo = list(
+    workflow_name = get_env_or_null("WORKFLOW_NAME"),
+    workflow_uid = get_env_or_null("WORKFLOW_UID"),
+    namespace = get_env_or_null("WORKFLOW_NAMESPACE"),
+    pod_name = get_env_or_null("POD_NAME"),
+    node_name = get_env_or_null("NODE_NAME"),
+    retry_attempt = retry_attempt,
+    max_retries = 5  # Default from workflow template
+  ),
+  container = list(
+    image = get_env_or_null("CONTAINER_IMAGE")
+  ),
   inputs = list(
     genotype_file = genotype_file,
+    genotype_md5 = genotype_md5,
     phenotype_file = phenotype_file,
-    ids_file = ids_file
+    phenotype_md5 = phenotype_md5,
+    ids_file = if (ids_file != "") ids_file else NULL,
+    ids_md5 = ids_md5
   ),
   parameters = list(
+    # GAPIT parameters using native GAPIT naming convention (v3.0.0)
+    gapit = list(
+      model = models,
+      PCA.total = pca_components,
+      Multiple_analysis = multiple_analysis,
+      SNP.MAF = opt$maf,
+      SNP.FDR = opt$`snp-fdr`,
+      kinship.algorithm = opt$`kinship-algorithm`,
+      SNP.effect = opt$`snp-effect`,
+      SNP.impute = opt$`snp-impute`
+    ),
+    # Compute resources
+    compute = list(
+      openblas_threads = as.integer(Sys.getenv("OPENBLAS_NUM_THREADS", "12")),
+      omp_threads = as.integer(Sys.getenv("OMP_NUM_THREADS", "12"))
+    ),
+    # Legacy parameter names for backward compatibility (v2.0.0)
     models = models,
     pca_components = pca_components,
-    multiple_analysis = config$gapit$multiple_analysis
+    multiple_analysis = multiple_analysis,
+    maf_filter = opt$maf,
+    snp_fdr = opt$`snp-fdr`
   ),
   resources = list(
     threads = Sys.getenv("OPENBLAS_NUM_THREADS")
@@ -199,13 +324,34 @@ cat(strrep("=", 78), "\n\n")
 gwas_start <- Sys.time()
 
 tryCatch({
-  myGAPIT <- GAPIT(
+  # Build GAPIT arguments
+  gapit_args <- list(
     Y = myY,
     G = myG,
     PCA.total = pca_components,
     model = models,
-    Multiple_analysis = if (is.null(config$gapit$multiple_analysis)) TRUE else config$gapit$multiple_analysis
+    Multiple_analysis = multiple_analysis,
+    kinship.algorithm = opt$`kinship-algorithm`,
+    SNP.effect = opt$`snp-effect`,
+    SNP.impute = opt$`snp-impute`,
+    cutOff = opt$cutoff
   )
+
+  # Add SNP.MAF if specified (GAPIT's native parameter name for MAF filtering)
+  # Note: Previous versions incorrectly used MAF.Threshold which is not a valid GAPIT parameter
+  if (!is.null(opt$maf) && opt$maf > 0) {
+    cat("Applying SNP.MAF threshold:", opt$maf, "\n")
+    gapit_args$SNP.MAF <- opt$maf
+  }
+
+  # Add SNP.FDR if specified
+  if (!is.null(opt$`snp-fdr`)) {
+    cat("Applying FDR threshold:", opt$`snp-fdr`, "\n")
+    gapit_args$SNP.FDR <- opt$`snp-fdr`
+  }
+
+  # Run GAPIT with constructed arguments
+  myGAPIT <- do.call(GAPIT, gapit_args)
 
   gwas_end <- Sys.time()
   gwas_duration <- as.numeric(difftime(gwas_end, gwas_start, units = "mins"))

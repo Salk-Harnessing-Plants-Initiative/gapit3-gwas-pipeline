@@ -31,6 +31,10 @@ GAPIT.*.csv
 GAPIT.*.txt
 *_GWAS_Results.csv
 
+# Exception: allow test fixtures
+!tests/fixtures/**/GAPIT.*.csv
+!tests/fixtures/**/*_GWAS_Results.csv
+
 # Trait manifest (generated)
 traits_manifest.yaml
 batch_*.txt
@@ -135,6 +139,7 @@ yarn-error.log*
 .env
 .env.local
 .env.*.local
+.env.backup
 *.secret
 
 # ==============================================================================
@@ -145,3 +150,4 @@ temp/
 *.tmp
 *.bak
 *.backup
+workflow-debug-*/

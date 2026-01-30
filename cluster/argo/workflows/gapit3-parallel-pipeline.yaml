@@ -2,45 +2,65 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: gapit3-gwas-parallel-  # Argo appends unique suffix
-  namespace: default  # TODO: Change to your namespace
+  namespace: runai-talmo-lab
   labels:
     pipeline: gapit3-gwas
     stage: production
 spec:
   # ===========================================================================
-  # GAPIT3 GWAS - Full Parallel Pipeline (184 Traits)
+  # GAPIT3 GWAS - Full Parallel Pipeline (186 Traits)
   # ===========================================================================
-  # Production workflow: runs all 184 traits in parallel
-  # DAG structure: Validate → Extract → 184 parallel GWAS → Collect Results
+  # Production workflow: runs all 186 traits in parallel
+  # DAG structure: Validate → Extract → 186 parallel GWAS → Collect Results
+  #
+  # NOTE: Resource allocation (CPU, memory) is configured in WorkflowTemplate:
+  #   cluster/argo/workflow-templates/gapit3-single-trait-template.yaml
   # ===========================================================================
 
   entrypoint: parallel-pipeline
   serviceAccountName: default
 
   # Workflow-level parameters
+  # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
   arguments:
     parameters:
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:feat-add-ci-testing-workflows-test"
     - name: data-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update
+      value: "/hpi/hpi_dev/users/eberrigan/20260104_Elohim_Bello_iron_deficiency_GAPIT_GWAS_normalized/data"
     - name: output-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update
+      value: "/hpi/hpi_dev/users/eberrigan/20260104_Elohim_Bello_iron_deficiency_GAPIT_GWAS_normalized/outputs"
+    # Data file paths (relative to /data mount point)
+    - name: genotype-file
+      value: "/data/genotype/acc_snps_filtered_mac.recode_edited_diploid.hmp.txt"
+    - name: phenotype-file
+      value: "/data/phenotype/iron_traits_edited_normal.txt"
+    - name: accession-ids-file
+      value: "/data/metadata/ids_gwas.txt"
+    # Trait range
     - name: start-trait-index
       value: "2"      # First trait column (after Taxa)
     - name: end-trait-index
       value: "187"    # Last trait column (186 traits total)
-    - name: cpu-cores
-      value: "12"
-    - name: memory-gb
-      value: "32"
-    - name: models
-      value: "BLINK,FarmCPU"
-    - name: max-parallelism
-      value: "50"     # Limit concurrent jobs to avoid cluster overload
+    # GAPIT parameters (v3.0.0 naming)
+    - name: model
+      value: "BLINK,FarmCPU,MLM"
+    - name: pca-total
+      value: "3"
+    - name: snp-maf
+      value: "0.0073"  # MAF threshold (MAC >= 8 with 546 samples: 8/(2*546) = 0.00733)
+    - name: snp-fdr
+      value: "0.05"  # 5% FDR threshold (Benjamini-Hochberg correction)
+    # Advanced GAPIT parameters
+    - name: kinship-algorithm
+      value: "Zhang"
+    - name: snp-effect
+      value: "Add"
+    - name: snp-impute
+      value: "Middle"
 
-  # Global timeout (allow ~10 hours for full pipeline)
-  activeDeadlineSeconds: 36000
+  # Global timeout (7 days - effectively no limit, can terminate manually if needed)
+  activeDeadlineSeconds: 604800
 
   # Workflow-level volumes
   volumes:
@@ -69,14 +89,40 @@ spec:
         dependencies: [validate-inputs]
         template: extract-traits-inline
 
-      # Step 3: Run all traits in parallel (withSequence)
+      # Step 3: Run all traits in parallel (withSequence) - using highmem template for large datasets
       - name: run-all-traits
         dependencies: [extract-traits]
-        template: run-single-trait-wrapper
+        templateRef:
+          name: gapit3-gwas-single-trait-highmem
+          template: run-gwas
         arguments:
           parameters:
           - name: trait-index
             value: "{{item}}"
+          - name: trait-name
+            value: "trait-{{item}}"
+          - name: image
+            value: "{{workflow.parameters.image}}"
+          - name: genotype-file
+            value: "{{workflow.parameters.genotype-file}}"
+          - name: phenotype-file
+            value: "{{workflow.parameters.phenotype-file}}"
+          - name: accession-ids-file
+            value: "{{workflow.parameters.accession-ids-file}}"
+          - name: model
+            value: "{{workflow.parameters.model}}"
+          - name: pca-total
+            value: "{{workflow.parameters.pca-total}}"
+          - name: snp-maf
+            value: "{{workflow.parameters.snp-maf}}"
+          - name: snp-fdr
+            value: "{{workflow.parameters.snp-fdr}}"
+          - name: kinship-algorithm
+            value: "{{workflow.parameters.kinship-algorithm}}"
+          - name: snp-effect
+            value: "{{workflow.parameters.snp-effect}}"
+          - name: snp-impute
+            value: "{{workflow.parameters.snp-impute}}"
         withSequence:
           start: "{{workflow.parameters.start-trait-index}}"
           end: "{{workflow.parameters.end-trait-index}}"
@@ -106,6 +152,14 @@ spec:
       command: ["/scripts/entrypoint.sh"]
       args: ["validate"]
 
+      env:
+      - name: GENOTYPE_FILE
+        value: "{{workflow.parameters.genotype-file}}"
+      - name: PHENOTYPE_FILE
+        value: "{{workflow.parameters.phenotype-file}}"
+      - name: ACCESSION_IDS_FILE
+        value: "{{workflow.parameters.accession-ids-file}}"
+
       volumeMounts:
       - name: nfs-data
         mountPath: /data
@@ -129,7 +183,7 @@ spec:
       command: ["/scripts/entrypoint.sh"]
       args:
         - "extract-traits"
-        - "/data/phenotype/iron_traits_edited.txt"
+        - "{{workflow.parameters.phenotype-file}}"
         - "/outputs/traits_manifest.yaml"
 
       volumeMounts:
@@ -148,40 +202,9 @@ spec:
           cpu: "2"
 
   # ===========================================================================
-  # Template: Wrapper for single trait execution
-  # ===========================================================================
-  - name: run-single-trait-wrapper
-    inputs:
-      parameters:
-      - name: trait-index
-
-    # Reference the WorkflowTemplate
-    templateRef:
-      name: gapit3-gwas-single-trait
-      template: run-gwas
-
-    # Pass parameters to the template
-    arguments:
-      parameters:
-      - name: trait-index
-        value: "{{inputs.parameters.trait-index}}"
-      - name: trait-name
-        value: "trait-{{inputs.parameters.trait-index}}"
-      - name: image
-        value: "{{workflow.parameters.image}}"
-      - name: data-hostpath
-        value: "{{workflow.parameters.data-hostpath}}"
-      - name: output-hostpath
-        value: "{{workflow.parameters.output-hostpath}}"
-      - name: cpu-cores
-        value: "{{workflow.parameters.cpu-cores}}"
-      - name: memory-gb
-        value: "{{workflow.parameters.memory-gb}}"
-      - name: models
-        value: "{{workflow.parameters.models}}"
-
-  # ===========================================================================
   # Parallelism control
   # ===========================================================================
   # Limit concurrent pod execution to avoid overwhelming cluster
-  parallelism: "{{workflow.parameters.max-parallelism}}"
+  # At peak: 10 jobs × 96GB = 960GB RAM, 10 jobs × 16 CPU = 160 CPUs
+  # Reduced for highmem template (96GB per job)
+  parallelism: 10

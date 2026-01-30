@@ -1,0 +1,146 @@
+name: Bash Script Validation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'scripts/**/*.sh'
+      - 'tests/unit/**/*.sh'
+      - 'tests/integration/**/*.sh'
+      - '.github/workflows/validate-bash-scripts.yml'
+  pull_request:
+    branches:
+      - '**'
+    paths:
+      - 'scripts/**/*.sh'
+      - 'tests/unit/**/*.sh'
+      - 'tests/integration/**/*.sh'
+      - '.github/workflows/validate-bash-scripts.yml'
+  workflow_dispatch:
+
+jobs:
+  validate-bash:
+    runs-on: ubuntu-latest
+    name: Validate Bash Scripts
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Install shellcheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y shellcheck
+
+      - name: Run bash syntax check on all scripts
+        run: |
+          echo "::group::Bash Syntax Check"
+          EXIT_CODE=0
+          for script in scripts/*.sh tests/integration/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Checking syntax: $script"
+              if ! bash -n "$script"; then
+                echo "::error file=$script::Syntax error in $script"
+                EXIT_CODE=1
+              else
+                echo "✓ $script"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Run shellcheck on all scripts
+        run: |
+          echo "::group::ShellCheck Analysis"
+          EXIT_CODE=0
+          for script in scripts/*.sh tests/integration/*.sh; do
+            if [ -f "$script" ]; then
+              echo "Running shellcheck: $script"
+              # Excluded checks:
+              # SC1090,SC1091: Can't follow non-constant source (process substitution, .env files)
+              # SC2034: Variable appears unused (may be used via export or externally)
+              # SC2046: Quote to prevent word splitting (intentional in some cases)
+              # SC2076: Regex quotes (sometimes needed for literal matching)
+              # SC2155: Declare and assign separately (common pattern, acceptable trade-off)
+              if ! shellcheck -e SC1090,SC1091,SC2034,SC2046,SC2076,SC2155 --severity=warning "$script"; then
+                echo "::error file=$script::ShellCheck found issues in $script"
+                EXIT_CODE=1
+              else
+                echo "✓ $script"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Verify shebang consistency
+        run: |
+          echo "::group::Shebang Consistency Check"
+          EXIT_CODE=0
+          for script in scripts/*.sh tests/integration/*.sh; do
+            if [ -f "$script" ]; then
+              FIRST_LINE=$(head -n1 "$script")
+              if [[ ! "$FIRST_LINE" =~ ^#!/(usr/bin/env\ bash|bin/bash) ]]; then
+                echo "::warning file=$script::Script $script has non-standard shebang: $FIRST_LINE"
+                echo "Expected: #!/usr/bin/env bash or #!/bin/bash"
+                # Don't fail, just warn
+              else
+                echo "✓ $script has valid shebang"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+          exit $EXIT_CODE
+
+      - name: Check for set -euo pipefail
+        run: |
+          echo "::group::Safe Bash Options Check"
+          for script in scripts/*.sh tests/integration/*.sh; do
+            if [ -f "$script" ]; then
+              if grep -q "set -euo pipefail" "$script" || grep -q "set -e" "$script"; then
+                echo "✓ $script uses safe bash options"
+              else
+                echo "::warning file=$script::Script $script should use 'set -euo pipefail' for safer execution"
+              fi
+            fi
+          done
+          echo "::endgroup::"
+
+      - name: Run unit tests for retry scripts
+        run: |
+          echo "::group::Retry Script Unit Tests"
+          if [ -f "tests/unit/test-retry-script.sh" ]; then
+            chmod +x tests/unit/test-retry-script.sh scripts/*.sh
+            if bash tests/unit/test-retry-script.sh; then
+              echo "✓ All retry script unit tests passed"
+            else
+              echo "::error::Retry script unit tests failed"
+              exit 1
+            fi
+          else
+            echo "No retry script unit tests found, skipping"
+          fi
+          echo "::endgroup::"
+
+      - name: Validation summary
+        if: always()
+        run: |
+          echo "### Bash Script Validation Summary :shell:" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status:** ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Validated:**" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Bash syntax (bash -n)" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ ShellCheck static analysis" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Shebang consistency" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Safe bash options" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Retry script unit tests" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Scripts Checked:**" >> $GITHUB_STEP_SUMMARY
+          for script in scripts/*.sh tests/integration/*.sh; do
+            if [ -f "$script" ]; then
+              echo "- \`$script\`" >> $GITHUB_STEP_SUMMARY
+            fi
+          done

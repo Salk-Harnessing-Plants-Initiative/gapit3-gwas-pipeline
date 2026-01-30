@@ -1,0 +1,6 @@
+Taxa	trait_1	trait_2	trait_3
+sample_1	95.3	102.1	88.7
+sample_2	103.7	98.4	105.2
+sample_3	89.2	110.5	92.8
+sample_4	112.4	95.8	101.3
+sample_5	98.1	107.2	97.6

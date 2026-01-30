@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: gapit3-trait-extractor
-  namespace: default  # TODO: Change to your Argo namespace
+  namespace: runai-talmo-lab
 spec:
   # ===========================================================================
   # GAPIT3 - Trait Name Extractor Template
@@ -64,9 +64,5 @@ spec:
           memory: "8Gi"
           cpu: "4"
 
-    outputs:
-      artifacts:
-      - name: traits-manifest
-        path: /outputs/traits_manifest.yaml
-        archive:
-          none: {}
+    # Note: Artifact storage not configured on cluster
+    # Manifest is saved directly to mounted volume at /outputs/traits_manifest.yaml

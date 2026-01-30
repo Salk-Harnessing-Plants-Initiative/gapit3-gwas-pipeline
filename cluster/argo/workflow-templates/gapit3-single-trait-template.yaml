@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: gapit3-gwas-single-trait
-  namespace: default  # TODO: Change to your Argo namespace
+  namespace: runai-talmo-lab
 spec:
   # ===========================================================================
   # GAPIT3 GWAS - Single Trait WorkflowTemplate
@@ -12,9 +12,10 @@ spec:
   # ===========================================================================
 
   entrypoint: run-gwas
-  serviceAccountName: default
+  serviceAccountName: default  # Required for workflowtaskresults permission
 
   # Template-level arguments with defaults
+  # Parameter naming follows GAPIT v3.0.0 conventions (see docs/GAPIT_PARAMETERS.md)
   arguments:
     parameters:
     - name: trait-index
@@ -22,32 +23,39 @@ spec:
     - name: trait-name
       value: "unknown"
     - name: image
-      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:latest"
-    - name: data-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/data"  # TODO: Update path
-    - name: output-hostpath
-      value: "/hpi/hpi_dev/users/YOUR_USERNAME/gapit3-gwas/outputs"  # TODO: Update path
-    - name: cpu-cores
-      value: "12"
-    - name: memory-gb
-      value: "32"
-    - name: models
-      value: "BLINK,FarmCPU"
-
-  # Volume definitions using hostPath (MUST pre-exist on cluster nodes)
-  volumes:
-  - name: nfs-data
-    hostPath:
-      path: "{{workflow.parameters.data-hostpath}}"
-      type: Directory  # Directory MUST exist on the host
-  - name: nfs-outputs
-    hostPath:
-      path: "{{workflow.parameters.output-hostpath}}"
-      type: DirectoryOrCreate  # Will create if doesn't exist
+      value: "ghcr.io/salk-harnessing-plants-initiative/gapit3-gwas-pipeline:sha-539fe5c-test"
+    # Data file paths (relative to /data mount point)
+    - name: genotype-file
+      value: "/data/genotype/acc_snps_filtered_maf_perl_edited_diploid.hmp.txt"
+    - name: phenotype-file
+      value: "/data/phenotype/iron_traits_edited.txt"
+    - name: accession-ids-file
+      value: "/data/metadata/ids_gwas.txt"
+    # Core GAPIT parameters (v3.0.0 naming) - defaults match GAPIT's native defaults
+    - name: model
+      value: "MLM"                    # GAPIT default
+    - name: pca-total
+      value: "0"                      # GAPIT default (no PCA)
+    - name: snp-maf
+      value: "0"                      # GAPIT default (no MAF filtering)
+    - name: snp-fdr
+      value: ""                       # GAPIT default is 1 (disabled); empty = disabled
+    # Advanced GAPIT parameters - defaults match GAPIT's native defaults
+    - name: kinship-algorithm
+      value: "Zhang"                  # GAPIT default
+    - name: snp-effect
+      value: "Add"                    # GAPIT default
+    - name: snp-impute
+      value: "Middle"                 # GAPIT default
 
   templates:
   # ===========================================================================
   # Main GWAS execution template
+  # ===========================================================================
+  # IMPORTANT: This template requires the calling workflow to define volumes:
+  #   - nfs-data: Mounted at /data (read-only) for genotype/phenotype files
+  #   - nfs-outputs: Mounted at /outputs (read-write) for GWAS results
+  # See gapit3-test-pipeline.yaml for example volume configuration
   # ===========================================================================
   - name: run-gwas
     inputs:
@@ -55,9 +63,19 @@ spec:
       - name: trait-index
       - name: trait-name
       - name: image
-      - name: cpu-cores
-      - name: memory-gb
-      - name: models
+      # Data file paths
+      - name: genotype-file
+      - name: phenotype-file
+      - name: accession-ids-file
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: model
+      - name: pca-total
+      - name: snp-maf
+      - name: snp-fdr
+      # Advanced GAPIT parameters
+      - name: kinship-algorithm
+      - name: snp-effect
+      - name: snp-impute
 
     metadata:
       labels:
@@ -72,20 +90,11 @@ spec:
       image: "{{inputs.parameters.image}}"
       imagePullPolicy: Always
 
-      # Entrypoint command
+      # Entrypoint command - configuration is passed via environment variables (env section below)
+      # The entrypoint.sh script reads from env vars, NOT CLI args
       command: ["/scripts/entrypoint.sh"]
       args:
         - "run-single-trait"
-        - "--trait-index"
-        - "{{inputs.parameters.trait-index}}"
-        - "--config"
-        - "/config/config.yaml"
-        - "--output-dir"
-        - "/outputs"
-        - "--models"
-        - "{{inputs.parameters.models}}"
-        - "--threads"
-        - "{{inputs.parameters.cpu-cores}}"
 
       # Volume mounts
       volumeMounts:
@@ -98,51 +107,79 @@ spec:
 
       # Environment variables
       env:
+      # Data paths (parameterized from workflow)
+      - name: GENOTYPE_FILE
+        value: "{{inputs.parameters.genotype-file}}"
+      - name: PHENOTYPE_FILE
+        value: "{{inputs.parameters.phenotype-file}}"
+      - name: ACCESSION_IDS_FILE
+        value: "{{inputs.parameters.accession-ids-file}}"
+      # Core GAPIT parameters (v3.0.0 naming)
+      - name: MODEL
+        value: "{{inputs.parameters.model}}"
+      - name: PCA_TOTAL
+        value: "{{inputs.parameters.pca-total}}"
+      - name: SNP_MAF
+        value: "{{inputs.parameters.snp-maf}}"
+      - name: SNP_FDR
+        value: "{{inputs.parameters.snp-fdr}}"
+      # Advanced GAPIT parameters
+      - name: KINSHIP_ALGORITHM
+        value: "{{inputs.parameters.kinship-algorithm}}"
+      - name: SNP_EFFECT
+        value: "{{inputs.parameters.snp-effect}}"
+      - name: SNP_IMPUTE
+        value: "{{inputs.parameters.snp-impute}}"
+      # Compute resources
       - name: OPENBLAS_NUM_THREADS
-        value: "{{inputs.parameters.cpu-cores}}"
+        value: "12"
       - name: OMP_NUM_THREADS
-        value: "{{inputs.parameters.cpu-cores}}"
+        value: "12"
+      # Trait configuration
       - name: TRAIT_INDEX
         value: "{{inputs.parameters.trait-index}}"
       - name: TRAIT_NAME
         value: "{{inputs.parameters.trait-name}}"
+      # Provenance metadata for traceability
       - name: WORKFLOW_NAME
         value: "{{workflow.name}}"
+      - name: WORKFLOW_UID
+        value: "{{workflow.uid}}"
       - name: POD_NAME
         valueFrom:
           fieldRef:
             fieldPath: metadata.name
+      - name: NODE_NAME
+        valueFrom:
+          fieldRef:
+            fieldPath: spec.nodeName
+      - name: WORKFLOW_NAMESPACE
+        valueFrom:
+          fieldRef:
+            fieldPath: metadata.namespace
+      - name: CONTAINER_IMAGE
+        value: "{{inputs.parameters.image}}"
+      - name: RETRY_ATTEMPT
+        value: "{{retries}}"
 
-      # Resource allocation (per guide: 32GB RAM + 12 cores)
+      # Resource allocation - increased for large datasets (1.4M+ SNPs, 2.2GB genotype file)
+      # Note: Resources must be fixed values in WorkflowTemplates when using templateRef
       resources:
         requests:
-          memory: "{{inputs.parameters.memory-gb}}Gi"
-          cpu: "{{inputs.parameters.cpu-cores}}"
+          memory: "64Gi"
+          cpu: "12"
         limits:
-          memory: "36Gi"  # Slight headroom
+          memory: "72Gi"  # Headroom for peak memory during numericalization
           cpu: "16"       # Allow burst to 16 cores
 
     # Retry strategy for transient failures
     retryStrategy:
-      limit: 2  # Retry up to 2 times
+      limit: 5  # Retry up to 5 times (6 total attempts)
       retryPolicy: "OnFailure"
       backoff:
         duration: "2m"      # Wait 2 minutes before first retry
         factor: 2           # Double wait time for each retry
-        maxDuration: "10m"  # Max wait time
+        maxDuration: "30m"  # Max wait time
 
-    # Output artifacts (optional - for Argo UI visualization)
-    outputs:
-      artifacts:
-      - name: metadata
-        path: /outputs/trait_{{inputs.parameters.trait-index}}_*/metadata.json
-        optional: true
-        archive:
-          none: {}  # Don't compress
-
-      - name: results
-        path: /outputs/trait_{{inputs.parameters.trait-index}}_*
-        optional: true
-        archive:
-          tar:
-            compressionLevel: 6
+    # Note: Artifact storage not configured on cluster
+    # Results are saved directly to mounted volume at /outputs/trait_*/

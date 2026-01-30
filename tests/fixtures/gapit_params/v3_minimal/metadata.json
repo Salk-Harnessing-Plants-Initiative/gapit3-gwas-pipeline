@@ -1,0 +1,24 @@
+{
+  "schema_version": "3.0.0",
+  "execution": {
+    "trait_index": 2,
+    "status": "success"
+  },
+  "parameters": {
+    "gapit": {
+      "model": ["MLM"],
+      "PCA.total": 0,
+      "Multiple_analysis": true,
+      "SNP.MAF": 0,
+      "SNP.FDR": null
+    },
+    "compute": {
+      "openblas_threads": 4,
+      "omp_threads": 4
+    }
+  },
+  "genotype": {
+    "n_snps": 100000,
+    "n_accessions": 500
+  }
+}

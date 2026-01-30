@@ -1,0 +1,35 @@
+# Test configuration for unit tests
+data:
+  genotype: tests/fixtures/genotype_mini.hmp.txt
+  phenotype: tests/fixtures/phenotype_mini.txt
+  accession_ids: tests/fixtures/ids_test.txt
+
+gapit:
+  models:
+    - BLINK
+    - FarmCPU
+  pca_components: 3
+  multiple_analysis: true
+
+output:
+  base_dir: /tmp/test_outputs
+  create_timestamp_dirs: false
+  save_intermediate: true
+
+resources:
+  threads: 2
+
+logging:
+  level: INFO
+  save_logs: true
+  log_dir: /tmp/test_logs
+
+metadata:
+  enable_provenance: true
+  save_execution_metadata: true
+  compute_checksums: true
+
+validation:
+  check_input_files: true
+  verify_trait_index: true
+  require_minimum_samples: 3

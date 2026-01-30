@@ -1,0 +1,3 @@
+,SNP,Chr,Pos,P.value,MAF,nobs,effect,H&B.P.Value,traits
+1,PERL2.67890,2,67890,3.40e-10,0.22,495,0.08,1.5e-09,BLINK.mean_GR_rootLength_day_1.2(NYC)
+2,PERL2.98765,2,98765,8.70e-09,0.18,495,0.04,4.2e-08,BLINK.mean_GR_rootLength_day_1.2(NYC)
