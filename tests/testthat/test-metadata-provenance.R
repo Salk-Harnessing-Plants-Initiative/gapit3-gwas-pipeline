@@ -11,6 +11,33 @@ library(tools)
 # Note: helper.R is automatically sourced by testthat
 
 # ==============================================================================
+# Source modules directly (preferred approach)
+# ==============================================================================
+
+# Get project root (handle different test execution contexts)
+.get_project_root <- function() {
+  candidates <- c(
+    "../..",           # Running from tests/testthat
+    "..",              # Running from tests
+    "."                # Running from project root
+  )
+
+  for (candidate in candidates) {
+    if (file.exists(file.path(candidate, "scripts", "lib", "constants.R"))) {
+      return(normalizePath(candidate))
+    }
+  }
+  stop("Could not find project root")
+}
+
+.project_root <- .get_project_root()
+
+# Source the utility modules
+# read_filter_file is now in aggregation_utils.R
+source(file.path(.project_root, "scripts", "lib", "constants.R"))
+source(file.path(.project_root, "scripts", "lib", "aggregation_utils.R"))
+
+# ==============================================================================
 # Helper functions for metadata tests
 # ==============================================================================
 
@@ -333,20 +360,7 @@ test_that("aggregation handles metadata with null provenance fields", {
 # Test: read_filter_file includes trait_dir column
 # ==============================================================================
 
-# Source aggregation functions for trait_dir test
-source_aggregation_functions <- function() {
-  script_path <- file.path("..", "..", "scripts", "collect_results.R")
-  script_lines <- readLines(script_path)
-
-  read_filter_start <- grep("^read_filter_file <- function", script_lines)[1]
-  read_filter_end <- grep("^}", script_lines)
-  read_filter_end <- read_filter_end[read_filter_end > read_filter_start][1]
-
-  filter_code <- paste(script_lines[read_filter_start:read_filter_end], collapse = "\n")
-  eval(parse(text = filter_code), envir = .GlobalEnv)
-}
-
-source_aggregation_functions()
+# read_filter_file is sourced from aggregation_utils.R at the top of this file
 
 test_that("read_filter_file includes trait_dir column", {
   fixture_dir <- get_fixture_path(file.path("aggregation", "trait_001_single_model"))
