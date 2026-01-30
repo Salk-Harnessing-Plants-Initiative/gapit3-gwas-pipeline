@@ -6,7 +6,7 @@
 # Author: Elizabeth (Salk HPI)
 # ==============================================================================
 
-FROM rocker/r-ver:4.4.1 AS base
+FROM rocker/r-ver:4.5.2 AS base
 
 # Set environment variables (build-time only - runtime config via ENV at container start)
 ENV DEBIAN_FRONTEND=noninteractive \
