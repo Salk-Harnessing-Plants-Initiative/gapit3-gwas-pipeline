@@ -8,7 +8,7 @@
 library(testthat)
 
 # Skip all tests in this file - config.yaml no longer used
-skip("Config.yaml tests skipped - configuration now via environment variables. See test-env_var_parsing.R")
+skip("config.yaml tests skipped - configuration now via environment variables. See test-env_var_parsing.R")
 
 # Commented out for backward compatibility documentation
 # Uncomment if you need to test legacy config.yaml support
